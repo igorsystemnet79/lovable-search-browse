@@ -14,7 +14,78 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ponude: {
+        Row: {
+          cena: number | null
+          created_at: string
+          emoji: string | null
+          id: string
+          istaknuto: boolean
+          kategorija: string
+          lokacija: string
+          naslov: string
+          opis: string | null
+          valuta: string
+        }
+        Insert: {
+          cena?: number | null
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          istaknuto?: boolean
+          kategorija: string
+          lokacija: string
+          naslov: string
+          opis?: string | null
+          valuta?: string
+        }
+        Update: {
+          cena?: number | null
+          created_at?: string
+          emoji?: string | null
+          id?: string
+          istaknuto?: boolean
+          kategorija?: string
+          lokacija?: string
+          naslov?: string
+          opis?: string | null
+          valuta?: string
+        }
+        Relationships: []
+      }
+      zahtevi: {
+        Row: {
+          budzet: number | null
+          created_at: string
+          id: string
+          kategorija: string
+          lokacija: string
+          naslov: string
+          opis: string | null
+          valuta: string
+        }
+        Insert: {
+          budzet?: number | null
+          created_at?: string
+          id?: string
+          kategorija: string
+          lokacija: string
+          naslov: string
+          opis?: string | null
+          valuta?: string
+        }
+        Update: {
+          budzet?: number | null
+          created_at?: string
+          id?: string
+          kategorija?: string
+          lokacija?: string
+          naslov?: string
+          opis?: string | null
+          valuta?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
