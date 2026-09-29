@@ -10,33 +10,63 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PonudeRouteImport } from './routes/ponude'
+import { Route as PretragaRouteImport } from './routes/pretraga'
+import { Route as ZahteviRouteImport } from './routes/zahtevi'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PonudeRoute = PonudeRouteImport.update({
+  id: '/ponude',
+  path: '/ponude',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PretragaRoute = PretragaRouteImport.update({
+  id: '/pretraga',
+  path: '/pretraga',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ZahteviRoute = ZahteviRouteImport.update({
+  id: '/zahtevi',
+  path: '/zahtevi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/ponude': typeof PonudeRoute
+  '/pretraga': typeof PretragaRoute
+  '/zahtevi': typeof ZahteviRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/ponude': typeof PonudeRoute
+  '/pretraga': typeof PretragaRoute
+  '/zahtevi': typeof ZahteviRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/ponude': typeof PonudeRoute
+  '/pretraga': typeof PretragaRoute
+  '/zahtevi': typeof ZahteviRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/ponude' | '/pretraga' | '/zahtevi'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/ponude' | '/pretraga' | '/zahtevi'
+  id: '__root__' | '/' | '/ponude' | '/pretraga' | '/zahtevi'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PonudeRoute: typeof PonudeRoute
+  PretragaRoute: typeof PretragaRoute
+  ZahteviRoute: typeof ZahteviRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +78,35 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/ponude': {
+      id: '/ponude'
+      path: '/ponude'
+      fullPath: '/ponude'
+      preLoaderRoute: typeof PonudeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pretraga': {
+      id: '/pretraga'
+      path: '/pretraga'
+      fullPath: '/pretraga'
+      preLoaderRoute: typeof PretragaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/zahtevi': {
+      id: '/zahtevi'
+      path: '/zahtevi'
+      fullPath: '/zahtevi'
+      preLoaderRoute: typeof ZahteviRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PonudeRoute: PonudeRoute,
+  PretragaRoute: PretragaRoute,
+  ZahteviRoute: ZahteviRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
