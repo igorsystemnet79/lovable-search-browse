@@ -1,14 +1,22 @@
-# Welcome to your Lovable project
+# Lovable Search & Browse
+
+Treba ispraviti sledece uz ocuvanje izgleda stranice:
+
+Klik na polje pretraga otvara novi tab u kome se nalaze svi rezultati pretrage.
+
+Treba proveriti bazu i sve pojmove koji se podudaraju sa pretragom, prikazati u tom, novom tabu.
+
+U polju istaknute ponude, klikom na opciju: Prikazi jos, kao i kod polja: Najnoviji zahtevi, otvoriti novu stranu sa prikazanim ponudama.
 
 This project was built with [Lovable](https://lovable.dev).
 
 ## Build with Lovable
 
-Open your project in the [Lovable editor](https://lovable.dev) and keep building.
+Continue developing this project in the [Lovable editor](https://lovable.dev/projects/3171d41b-d686-4f76-8f18-d8d120b20ddb).
 
 - **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: connect the project to GitHub and every change made in Lovable is committed straight to your repository.
-- **Full ownership**: this code is yours. Push to your repository and your changes sync back into Lovable, ready for your next prompt.
+- **Stay in sync**: every change made in Lovable is committed straight to this repository.
+- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
 
 ## Development
 
@@ -20,10 +28,3 @@ cd <repository-name>
 npm i
 npm run dev
 ```
-
-## Built with
-
-- TanStack Start
-- TypeScript
-- React
-- Tailwind CSS
