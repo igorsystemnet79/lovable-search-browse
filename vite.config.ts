@@ -7,7 +7,7 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 // Render.com (sets RENDER=true) needs a Node server build instead of the default Cloudflare one.
-const isRender = !!process.env.RENDER;
+const isRender = !!process.env["RENDER"];
 
 export default defineConfig({
   tanstackStart: {
