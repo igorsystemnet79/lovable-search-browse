@@ -7,6 +7,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { ponudeQuery, zahteviQuery } from "@/lib/listings";
+import { kategorije } from "@/lib/kategorije";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -26,17 +27,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-const kategorije = [
-  { naziv: "Automobili", slika: "https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=500&h=400&fit=crop" },
-  { naziv: "Nekretnine", slika: "https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=500&h=400&fit=crop" },
-  { naziv: "Mobilni telefoni", slika: "https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?w=500&h=400&fit=crop" },
-  { naziv: "Računari", slika: "https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=500&h=400&fit=crop" },
-  { naziv: "Moda", slika: "https://images.unsplash.com/photo-1483985988355-763728e1935b?w=500&h=400&fit=crop" },
-  { naziv: "Sport", slika: "https://images.unsplash.com/photo-1517836357463-d25dfeac3438?w=500&h=400&fit=crop" },
-  { naziv: "Posao", slika: "https://images.unsplash.com/photo-1521737711867-e3b97375f902?w=500&h=400&fit=crop" },
-  { naziv: "Sve za kuću", slika: "https://images.unsplash.com/photo-1556911220-bff31c812dba?w=500&h=400&fit=crop" },
-  { naziv: "Kolekcionarstvo", slika: "https://images.unsplash.com/photo-1519682337058-a94d519337bc?w=500&h=400&fit=crop" },
-];
 
 function Index() {
   const ponude = useQuery(ponudeQuery(5, true));
@@ -116,10 +106,10 @@ function Index() {
             <div className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
               {kategorije.map((kat) => (
                 <Link
-                  key={kat.naziv}
-                  to="/pretraga"
-                  search={{ q: kat.naziv, lokacija: "" }}
-                  className="overflow-hidden rounded-2xl bg-surface shadow-card transition-transform hover:-translate-y-1"
+                  key={kat.slug}
+                  to="/kategorija/$slug"
+                  params={{ slug: kat.slug }}
+                  className="flex flex-col overflow-hidden rounded-2xl bg-surface shadow-card transition-transform hover:-translate-y-1"
                 >
                   <img
                     src={kat.slika}

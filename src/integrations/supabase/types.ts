@@ -53,6 +53,54 @@ export type Database = {
         }
         Relationships: []
       }
+      poruke_podrske: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          ime: string
+          poruka: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          ime: string
+          poruka: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          ime?: string
+          poruka?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          grad: string | null
+          id: string
+          ime: string | null
+          telefon: string | null
+        }
+        Insert: {
+          created_at?: string
+          grad?: string | null
+          id: string
+          ime?: string | null
+          telefon?: string | null
+        }
+        Update: {
+          created_at?: string
+          grad?: string | null
+          id?: string
+          ime?: string | null
+          telefon?: string | null
+        }
+        Relationships: []
+      }
       zahtevi: {
         Row: {
           budzet: number | null
