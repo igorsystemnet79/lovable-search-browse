@@ -10,13 +10,23 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PodrskaRouteImport } from './routes/podrska'
 import { Route as PonudeRouteImport } from './routes/ponude'
 import { Route as PretragaRouteImport } from './routes/pretraga'
+import { Route as PrijavaRouteImport } from './routes/prijava'
+import { Route as RegistracijaRouteImport } from './routes/registracija'
+import { Route as ResetLozinkeRouteImport } from './routes/reset-lozinke'
 import { Route as ZahteviRouteImport } from './routes/zahtevi'
+import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PodrskaRoute = PodrskaRouteImport.update({
+  id: '/podrska',
+  path: '/podrska',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PonudeRoute = PonudeRouteImport.update({
@@ -29,44 +39,112 @@ const PretragaRoute = PretragaRouteImport.update({
   path: '/pretraga',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrijavaRoute = PrijavaRouteImport.update({
+  id: '/prijava',
+  path: '/prijava',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RegistracijaRoute = RegistracijaRouteImport.update({
+  id: '/registracija',
+  path: '/registracija',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetLozinkeRoute = ResetLozinkeRouteImport.update({
+  id: '/reset-lozinke',
+  path: '/reset-lozinke',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ZahteviRoute = ZahteviRouteImport.update({
   id: '/zahtevi',
   path: '/zahtevi',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KategorijaSlugRoute = KategorijaSlugRouteImport.update({
+  id: '/kategorija/$slug',
+  path: '/kategorija/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
   '/pretraga': typeof PretragaRoute
+  '/prijava': typeof PrijavaRoute
+  '/registracija': typeof RegistracijaRoute
+  '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
+  '/kategorija/$slug': typeof KategorijaSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
   '/pretraga': typeof PretragaRoute
+  '/prijava': typeof PrijavaRoute
+  '/registracija': typeof RegistracijaRoute
+  '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
+  '/kategorija/$slug': typeof KategorijaSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
   '/pretraga': typeof PretragaRoute
+  '/prijava': typeof PrijavaRoute
+  '/registracija': typeof RegistracijaRoute
+  '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
+  '/kategorija/$slug': typeof KategorijaSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/ponude' | '/pretraga' | '/zahtevi'
+  fullPaths:
+    | '/'
+    | '/podrska'
+    | '/ponude'
+    | '/pretraga'
+    | '/prijava'
+    | '/registracija'
+    | '/reset-lozinke'
+    | '/zahtevi'
+    | '/kategorija/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/ponude' | '/pretraga' | '/zahtevi'
-  id: '__root__' | '/' | '/ponude' | '/pretraga' | '/zahtevi'
+  to:
+    | '/'
+    | '/podrska'
+    | '/ponude'
+    | '/pretraga'
+    | '/prijava'
+    | '/registracija'
+    | '/reset-lozinke'
+    | '/zahtevi'
+    | '/kategorija/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/podrska'
+    | '/ponude'
+    | '/pretraga'
+    | '/prijava'
+    | '/registracija'
+    | '/reset-lozinke'
+    | '/zahtevi'
+    | '/kategorija/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  PodrskaRoute: typeof PodrskaRoute
   PonudeRoute: typeof PonudeRoute
   PretragaRoute: typeof PretragaRoute
+  PrijavaRoute: typeof PrijavaRoute
+  RegistracijaRoute: typeof RegistracijaRoute
+  ResetLozinkeRoute: typeof ResetLozinkeRoute
   ZahteviRoute: typeof ZahteviRoute
+  KategorijaSlugRoute: typeof KategorijaSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -76,6 +154,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/podrska': {
+      id: '/podrska'
+      path: '/podrska'
+      fullPath: '/podrska'
+      preLoaderRoute: typeof PodrskaRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/ponude': {
@@ -92,6 +177,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PretragaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/prijava': {
+      id: '/prijava'
+      path: '/prijava'
+      fullPath: '/prijava'
+      preLoaderRoute: typeof PrijavaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/registracija': {
+      id: '/registracija'
+      path: '/registracija'
+      fullPath: '/registracija'
+      preLoaderRoute: typeof RegistracijaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-lozinke': {
+      id: '/reset-lozinke'
+      path: '/reset-lozinke'
+      fullPath: '/reset-lozinke'
+      preLoaderRoute: typeof ResetLozinkeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/zahtevi': {
       id: '/zahtevi'
       path: '/zahtevi'
@@ -99,14 +205,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ZahteviRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kategorija/$slug': {
+      id: '/kategorija/$slug'
+      path: '/kategorija/$slug'
+      fullPath: '/kategorija/$slug'
+      preLoaderRoute: typeof KategorijaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  PodrskaRoute: PodrskaRoute,
   PonudeRoute: PonudeRoute,
   PretragaRoute: PretragaRoute,
+  PrijavaRoute: PrijavaRoute,
+  RegistracijaRoute: RegistracijaRoute,
+  ResetLozinkeRoute: ResetLozinkeRoute,
   ZahteviRoute: ZahteviRoute,
+  KategorijaSlugRoute: KategorijaSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
