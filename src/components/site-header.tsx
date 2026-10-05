@@ -25,7 +25,7 @@ export function SiteHeader() {
           {user ? (
             <>
               <span className="hidden px-2 text-brand-foreground/80 sm:inline">
-                {(user.user_metadata?.ime as string) || user.email}
+                {(user.user_metadata?.["ime"] as string) || user.email}
               </span>
               <button
                 type="button"
