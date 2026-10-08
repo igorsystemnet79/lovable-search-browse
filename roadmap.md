@@ -1,0 +1,3 @@
+- [ ] Replace header text with the existing logo.
+- [ ] Open matching request/offer forms and save submitted listings.
+- [ ] Link footer registration button and verify flows.

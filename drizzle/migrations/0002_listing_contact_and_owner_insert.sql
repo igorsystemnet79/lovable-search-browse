@@ -1,0 +1,5 @@
+ALTER TABLE public.ponude ADD COLUMN user_id uuid, ADD COLUMN kontakt_ime text, ADD COLUMN telefon text;
+ALTER TABLE public.zahtevi ADD COLUMN user_id uuid, ADD COLUMN kontakt_ime text, ADD COLUMN telefon text;
+GRANT INSERT ON public.ponude, public.zahtevi TO authenticated;
+CREATE POLICY "Users can create their own offers" ON public.ponude FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()) AND istaknuto = false AND char_length(trim(naslov)) BETWEEN 3 AND 150 AND char_length(trim(lokacija)) BETWEEN 2 AND 100 AND char_length(trim(kontakt_ime)) BETWEEN 2 AND 100 AND telefon ~ '^[+0-9 ()-]{6,30}$' AND char_length(coalesce(opis, '')) <= 3000 AND (cena IS NULL OR cena >= 0));
+CREATE POLICY "Users can create their own requests" ON public.zahtevi FOR INSERT TO authenticated WITH CHECK (user_id = (SELECT auth.uid()) AND char_length(trim(naslov)) BETWEEN 3 AND 150 AND char_length(trim(lokacija)) BETWEEN 2 AND 100 AND char_length(trim(kontakt_ime)) BETWEEN 2 AND 100 AND telefon ~ '^[+0-9 ()-]{6,30}$' AND char_length(coalesce(opis, '')) <= 3000 AND (budzet IS NULL OR budzet >= 0));
