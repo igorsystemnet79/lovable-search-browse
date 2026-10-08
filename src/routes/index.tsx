@@ -1,5 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { ListingFormDialog, type ListingKind } from "@/components/listing-form-dialog";
 
 import heroImage from "@/assets/hero-home.jpg";
 import { SiteHeader } from "@/components/site-header";
@@ -29,6 +32,15 @@ export const Route = createFileRoute("/")({
 
 
 function Index() {
+  const [listingKind, setListingKind] = useState<ListingKind | null>(null);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem("ponudimi-listing-draft");
+      if (!raw) return;
+      const draft = JSON.parse(raw);
+      if (draft.kind === "ponuda" || draft.kind === "zahtev") setListingKind(draft.kind);
+    } catch { /* Draft restoration is optional. */ }
+  }, []);
   const ponude = useQuery(ponudeQuery(5, true));
   const zahtevi = useQuery(zahteviQuery(5));
 
@@ -65,9 +77,9 @@ function Index() {
 
         <div className="container-page">
           <section className="mt-12 grid gap-4 sm:grid-cols-2">
-            <Link
-              to="/zahtevi"
-              className="flex items-center justify-between gap-4 rounded-2xl bg-brand p-6 text-brand-foreground shadow-card"
+            <Button
+              onClick={() => setListingKind("zahtev")}
+              className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-brand p-6 text-left text-brand-foreground shadow-card hover:bg-brand/90"
             >
               <div>
                 <h2 className="text-xl font-semibold">Postavi zahtev</h2>
@@ -76,11 +88,11 @@ function Index() {
               <span aria-hidden="true" className="text-2xl">
                 →
               </span>
-            </Link>
+            </Button>
 
-            <Link
-              to="/ponude"
-              className="flex items-center justify-between gap-4 rounded-2xl bg-highlight p-6 text-highlight-foreground shadow-card"
+            <Button
+              onClick={() => setListingKind("ponuda")}
+              className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-highlight p-6 text-left text-highlight-foreground shadow-card hover:bg-highlight/90"
             >
               <div>
                 <h2 className="text-xl font-semibold">Objavi oglas</h2>
@@ -89,7 +101,7 @@ function Index() {
               <span aria-hidden="true" className="text-2xl">
                 →
               </span>
-            </Link>
+            </Button>
           </section>
 
           <section className="mt-14">
@@ -152,6 +164,7 @@ function Index() {
       </main>
 
       <SiteFooter />
+      <ListingFormDialog kind={listingKind} onClose={() => setListingKind(null)} />
     </div>
   );
 }
