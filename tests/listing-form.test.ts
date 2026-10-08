@@ -1,6 +1,5 @@
-/// <reference types="bun" />
 import { describe, expect, test } from "bun:test";
-import { listingFormSchema } from "./listing-form";
+import { listingFormSchema } from "../src/lib/listing-form";
 
 const listing = { naslov: "Polovan bicikl", opis: "Očuvan", kategorija: "Sport", lokacija: "Beograd", kontakt_ime: "Prodavac", telefon: "+381 60 123 4567", iznos: "", valuta: "EUR" };
 describe("listing data", () => {

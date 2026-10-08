@@ -24,7 +24,7 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
     if (!kind) return;
     setSaved(false);
     setError("");
-    setForm({ ...empty, kontakt_ime: typeof user?.user_metadata["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata["grad"] === "string" ? user.user_metadata["grad"] : "" });
+    setForm({ ...empty, kontakt_ime: typeof user?.user_metadata?.["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata?.["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata?.["grad"] === "string" ? user.user_metadata["grad"] : "" });
     try {
       const raw = sessionStorage.getItem("ponudimi-listing-draft");
       if (raw) {
