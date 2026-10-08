@@ -1,3 +1,6 @@
+import { Link } from "@tanstack/react-router";
+import { Button } from "@/components/ui/button";
+
 export function SiteFooter() {
   return (
     <footer className="mt-16 bg-brand text-brand-foreground">
@@ -19,12 +22,12 @@ export function SiteFooter() {
           </div>
         </div>
 
-        <button
-          type="button"
-          className="rounded-full bg-highlight px-6 py-3 font-semibold text-highlight-foreground transition-opacity hover:opacity-90"
+        <Button
+          asChild
+          className="h-auto rounded-full bg-highlight px-6 py-3 font-semibold text-highlight-foreground transition-opacity hover:bg-highlight hover:opacity-90"
         >
-          Pridruži se besplatno
-        </button>
+          <Link to="/registracija">Pridruži se besplatno</Link>
+        </Button>
       </div>
     </footer>
   );

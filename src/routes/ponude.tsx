@@ -9,6 +9,8 @@ import { ponudeQuery } from "@/lib/listings";
 export const Route = createFileRoute("/ponude")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Sve ponude — PonudiMi" },
       { name: "description", content: "Pregledaj sve aktuelne ponude na PonudiMi." },
       { property: "og:title", content: "Sve ponude — PonudiMi" },

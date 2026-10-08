@@ -10,6 +10,8 @@ export type Ponuda = {
   valuta: string;
   emoji: string | null;
   istaknuto: boolean;
+  kontakt_ime?: string | null;
+  telefon?: string | null;
   created_at: string;
 };
 
@@ -20,6 +22,8 @@ export type Zahtev = {
   kategorija: string;
   lokacija: string;
   budzet: number | null;
+  kontakt_ime?: string | null;
+  telefon?: string | null;
   valuta: string;
   created_at: string;
 };

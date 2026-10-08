@@ -8,6 +8,8 @@ import { inputCls, btnCls } from "@/components/auth-shell";
 export const Route = createFileRoute("/podrska")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Podrška — PonudiMi" },
       { name: "description", content: "Česta pitanja i kontakt forma PonudiMi podrške." },
       { property: "og:title", content: "Podrška — PonudiMi" },

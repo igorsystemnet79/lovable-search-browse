@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
+import logo from "@/assets/ponudimi-logo.png";
 
 const outline =
   "rounded-full border border-brand-foreground/25 px-4 py-2 font-medium transition-colors hover:bg-brand-foreground/10";
@@ -14,8 +15,8 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 bg-brand text-brand-foreground">
       <div className="container-page flex flex-wrap items-center justify-between gap-3 py-4">
-        <Link to="/" className="text-lg font-bold tracking-tight">
-          Ponudi<span className="text-highlight">Mi</span>
+        <Link to="/" aria-label="PonudiMi — početna" className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md bg-surface">
+          <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
         </Link>
 
         <nav aria-label="Korisničke opcije" className="flex items-center gap-2 text-sm">

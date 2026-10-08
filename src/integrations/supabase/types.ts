@@ -22,9 +22,12 @@ export type Database = {
           id: string
           istaknuto: boolean
           kategorija: string
+          kontakt_ime: string | null
           lokacija: string
           naslov: string
           opis: string | null
+          telefon: string | null
+          user_id: string | null
           valuta: string
         }
         Insert: {
@@ -34,9 +37,12 @@ export type Database = {
           id?: string
           istaknuto?: boolean
           kategorija: string
+          kontakt_ime?: string | null
           lokacija: string
           naslov: string
           opis?: string | null
+          telefon?: string | null
+          user_id?: string | null
           valuta?: string
         }
         Update: {
@@ -46,9 +52,12 @@ export type Database = {
           id?: string
           istaknuto?: boolean
           kategorija?: string
+          kontakt_ime?: string | null
           lokacija?: string
           naslov?: string
           opis?: string | null
+          telefon?: string | null
+          user_id?: string | null
           valuta?: string
         }
         Relationships: []
@@ -107,9 +116,12 @@ export type Database = {
           created_at: string
           id: string
           kategorija: string
+          kontakt_ime: string | null
           lokacija: string
           naslov: string
           opis: string | null
+          telefon: string | null
+          user_id: string | null
           valuta: string
         }
         Insert: {
@@ -117,9 +129,12 @@ export type Database = {
           created_at?: string
           id?: string
           kategorija: string
+          kontakt_ime?: string | null
           lokacija: string
           naslov: string
           opis?: string | null
+          telefon?: string | null
+          user_id?: string | null
           valuta?: string
         }
         Update: {
@@ -127,9 +142,12 @@ export type Database = {
           created_at?: string
           id?: string
           kategorija?: string
+          kontakt_ime?: string | null
           lokacija?: string
           naslov?: string
           opis?: string | null
+          telefon?: string | null
+          user_id?: string | null
           valuta?: string
         }
         Relationships: []

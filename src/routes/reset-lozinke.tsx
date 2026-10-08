@@ -6,6 +6,8 @@ import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 export const Route = createFileRoute("/reset-lozinke")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Nova lozinka — PonudiMi" },
       { name: "description", content: "Postavi novu lozinku za PonudiMi nalog." },
       { property: "og:title", content: "Nova lozinka — PonudiMi" },

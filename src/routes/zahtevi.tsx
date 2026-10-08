@@ -9,6 +9,8 @@ import { zahteviQuery } from "@/lib/listings";
 export const Route = createFileRoute("/zahtevi")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Svi zahtevi — PonudiMi" },
       { name: "description", content: "Pregledaj sve aktuelne zahteve korisnika na PonudiMi." },
       { property: "og:title", content: "Svi zahtevi — PonudiMi" },

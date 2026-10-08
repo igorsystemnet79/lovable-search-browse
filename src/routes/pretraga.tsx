@@ -16,6 +16,8 @@ export const Route = createFileRoute("/pretraga")({
   }),
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Rezultati pretrage — PonudiMi" },
       { name: "description", content: "Svi oglasi i zahtevi koji odgovaraju tvojoj pretrazi." },
       { property: "og:title", content: "Rezultati pretrage — PonudiMi" },
