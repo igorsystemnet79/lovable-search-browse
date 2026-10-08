@@ -7,6 +7,8 @@ import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 export const Route = createFileRoute("/prijava")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Prijava — PonudiMi" },
       { name: "description", content: "Prijavi se na svoj PonudiMi nalog." },
       { property: "og:title", content: "Prijava — PonudiMi" },

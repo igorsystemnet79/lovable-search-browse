@@ -19,6 +19,8 @@ export const Route = createFileRoute("/kategorija/$slug")({
     const d = `Ponude i zahtevi u kategoriji ${loaderData.kat.naziv}.`;
     return {
       meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
         { title: t },
         { name: "description", content: d },
         { property: "og:title", content: t },

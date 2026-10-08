@@ -6,6 +6,8 @@ import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 export const Route = createFileRoute("/registracija")({
   head: () => ({
     meta: [
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
       { title: "Registracija — PonudiMi" },
       { name: "description", content: "Napravi besplatan PonudiMi nalog i počni da oglašavaš." },
       { property: "og:title", content: "Registracija — PonudiMi" },
