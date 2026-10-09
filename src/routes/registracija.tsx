@@ -26,6 +26,8 @@ function Registracija() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) return setGreska("Unesi ispravnu email adresu.");
+    if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     setBusy(true);
     setGreska("");
     const { error } = await supabase.auth.signUp({
@@ -52,7 +54,7 @@ function Registracija() {
     <AuthShell title="Registracija" subtitle="Napravi besplatan nalog za par sekundi.">
       <form onSubmit={onSubmit} className="space-y-3">
         <input className={inputCls} required maxLength={100} placeholder="Ime i prezime" value={f.ime} onChange={set("ime")} />
-        <input className={inputCls} type="tel" maxLength={30} placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
+        <input className={inputCls} type="tel" required maxLength={30} placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} maxLength={60} placeholder="Grad" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} type="email" required placeholder="Email" value={f.email} onChange={set("email")} />
         <input className={inputCls} type="password" required minLength={6} placeholder="Lozinka (min. 6 karaktera)" value={f.lozinka} onChange={set("lozinka")} />

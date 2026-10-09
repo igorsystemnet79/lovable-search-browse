@@ -86,6 +86,38 @@ export type Database = {
         }
         Relationships: []
       }
+      pracenja: {
+        Row: {
+          created_at: string
+          id: string
+          pocetna_cena: number | null
+          ponuda_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pocetna_cena?: number | null
+          ponuda_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pocetna_cena?: number | null
+          ponuda_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pracenja_ponuda_id_fkey"
+            columns: ["ponuda_id"]
+            isOneToOne: false
+            referencedRelation: "ponude"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

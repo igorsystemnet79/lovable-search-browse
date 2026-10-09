@@ -10,8 +10,10 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MojiOglasiRouteImport } from './routes/moji-oglasi'
 import { Route as PodrskaRouteImport } from './routes/podrska'
 import { Route as PonudeRouteImport } from './routes/ponude'
+import { Route as PraceniOglasiRouteImport } from './routes/praceni-oglasi'
 import { Route as PretragaRouteImport } from './routes/pretraga'
 import { Route as PrijavaRouteImport } from './routes/prijava'
 import { Route as RegistracijaRouteImport } from './routes/registracija'
@@ -24,6 +26,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MojiOglasiRoute = MojiOglasiRouteImport.update({
+  id: '/moji-oglasi',
+  path: '/moji-oglasi',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PodrskaRoute = PodrskaRouteImport.update({
   id: '/podrska',
   path: '/podrska',
@@ -32,6 +39,11 @@ const PodrskaRoute = PodrskaRouteImport.update({
 const PonudeRoute = PonudeRouteImport.update({
   id: '/ponude',
   path: '/ponude',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PraceniOglasiRoute = PraceniOglasiRouteImport.update({
+  id: '/praceni-oglasi',
+  path: '/praceni-oglasi',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PretragaRoute = PretragaRouteImport.update({
@@ -67,8 +79,10 @@ const KategorijaSlugRoute = KategorijaSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
+  '/praceni-oglasi': typeof PraceniOglasiRoute
   '/pretraga': typeof PretragaRoute
   '/prijava': typeof PrijavaRoute
   '/registracija': typeof RegistracijaRoute
@@ -78,8 +92,10 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
+  '/praceni-oglasi': typeof PraceniOglasiRoute
   '/pretraga': typeof PretragaRoute
   '/prijava': typeof PrijavaRoute
   '/registracija': typeof RegistracijaRoute
@@ -90,8 +106,10 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
+  '/praceni-oglasi': typeof PraceniOglasiRoute
   '/pretraga': typeof PretragaRoute
   '/prijava': typeof PrijavaRoute
   '/registracija': typeof RegistracijaRoute
@@ -103,8 +121,10 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
+    | '/praceni-oglasi'
     | '/pretraga'
     | '/prijava'
     | '/registracija'
@@ -114,8 +134,10 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
+    | '/praceni-oglasi'
     | '/pretraga'
     | '/prijava'
     | '/registracija'
@@ -125,8 +147,10 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
+    | '/praceni-oglasi'
     | '/pretraga'
     | '/prijava'
     | '/registracija'
@@ -137,8 +161,10 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  MojiOglasiRoute: typeof MojiOglasiRoute
   PodrskaRoute: typeof PodrskaRoute
   PonudeRoute: typeof PonudeRoute
+  PraceniOglasiRoute: typeof PraceniOglasiRoute
   PretragaRoute: typeof PretragaRoute
   PrijavaRoute: typeof PrijavaRoute
   RegistracijaRoute: typeof RegistracijaRoute
@@ -156,6 +182,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/moji-oglasi': {
+      id: '/moji-oglasi'
+      path: '/moji-oglasi'
+      fullPath: '/moji-oglasi'
+      preLoaderRoute: typeof MojiOglasiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/podrska': {
       id: '/podrska'
       path: '/podrska'
@@ -168,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/ponude'
       fullPath: '/ponude'
       preLoaderRoute: typeof PonudeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/praceni-oglasi': {
+      id: '/praceni-oglasi'
+      path: '/praceni-oglasi'
+      fullPath: '/praceni-oglasi'
+      preLoaderRoute: typeof PraceniOglasiRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pretraga': {
@@ -217,8 +257,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  MojiOglasiRoute: MojiOglasiRoute,
   PodrskaRoute: PodrskaRoute,
   PonudeRoute: PonudeRoute,
+  PraceniOglasiRoute: PraceniOglasiRoute,
   PretragaRoute: PretragaRoute,
   PrijavaRoute: PrijavaRoute,
   RegistracijaRoute: RegistracijaRoute,
