@@ -120,6 +120,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          adresa: string | null
           created_at: string
           grad: string | null
           id: string
@@ -127,6 +128,7 @@ export type Database = {
           telefon: string | null
         }
         Insert: {
+          adresa?: string | null
           created_at?: string
           grad?: string | null
           id: string
@@ -134,6 +136,7 @@ export type Database = {
           telefon?: string | null
         }
         Update: {
+          adresa?: string | null
           created_at?: string
           grad?: string | null
           id?: string
