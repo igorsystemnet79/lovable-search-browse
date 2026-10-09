@@ -1,3 +1,6 @@
 - [x] Replace header text with the existing logo.
 - [x] Open matching request/offer forms and save submitted listings.
-- [x] Link footer registration button and verify flows.
+- [x] Link footer registration button and verify flows.- [x] My listings page with edit/delete (owner only).
+- [x] Follow listings with price change.
+- [x] Email/phone format checks.
+- [ ] SMS phone code verification — needs SMS provider account.

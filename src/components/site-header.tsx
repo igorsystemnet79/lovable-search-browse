@@ -19,12 +19,14 @@ export function SiteHeader() {
           <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
         </Link>
 
-        <nav aria-label="Korisničke opcije" className="flex items-center gap-2 text-sm">
+        <nav aria-label="Korisničke opcije" className="flex flex-wrap items-center gap-2 text-sm">
           <Link to="/podrska" className={outline}>
             Podrška
           </Link>
           {user ? (
             <>
+              <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
+              <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
               <span className="hidden px-2 text-brand-foreground/80 sm:inline">
                 {(user.user_metadata?.["ime"] as string) || user.email}
               </span>
