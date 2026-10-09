@@ -12,7 +12,8 @@ import { listingFormSchema, type ListingFormValues } from "@/lib/listing-form";
 export type ListingKind = "ponuda" | "zahtev";
 const empty: ListingFormValues = { naslov: "", opis: "", kategorija: "", lokacija: "", kontakt_ime: "", telefon: "", iznos: "", valuta: "EUR" };
 
-export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null; onClose: () => void }) {
+export type ListingEdit = { id: string; values: ListingFormValues };
+export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind | null; onClose: () => void; edit?: ListingEdit | null }) {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState(empty);
@@ -25,6 +26,7 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
     setSaved(false);
     setError("");
     setForm({ ...empty, kontakt_ime: typeof user?.user_metadata?.["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata?.["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata?.["grad"] === "string" ? user.user_metadata["grad"] : "" });
+    if (edit) { setForm(edit.values); return; }
     try {
       const raw = sessionStorage.getItem("ponudimi-listing-draft");
       if (raw) {
@@ -32,7 +34,7 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
         if (draft.kind === kind) setForm({ ...empty, ...draft.form });
       }
     } catch { /* Storage may be unavailable. */ }
-  }, [kind, user?.id]);
+  }, [kind, user?.id, edit?.id]);
 
   function keepDraft() {
     try { sessionStorage.setItem("ponudimi-listing-draft", JSON.stringify({ kind, form })); } catch { /* Optional draft. */ }
@@ -53,7 +55,11 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
       const { iznos, ...values } = result.data;
       const amount = iznos === "" ? null : Number(iznos);
       const common = { ...values, user_id: user.id };
-      const response = kind === "ponuda"
+      const response = edit
+        ? kind === "ponuda"
+          ? await supabase.from("ponude").update({ ...values, cena: amount }).eq("id", edit.id)
+          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", edit.id)
+        : kind === "ponuda"
         ? await supabase.from("ponude").insert({ ...common, cena: amount, istaknuto: false })
         : await supabase.from("zahtevi").insert({ ...common, budzet: amount });
       if (response.error) throw response.error;
@@ -69,7 +75,7 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
     <Dialog open={kind !== null} onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
       <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-lg bg-surface">
         <DialogHeader>
-          <DialogTitle>{saved ? "Uspešno objavljeno" : offer ? "Objavi oglas" : "Postavi zahtev"}</DialogTitle>
+          <DialogTitle>{saved ? (edit ? "Izmene sačuvane" : "Uspešno objavljeno") : edit ? "Izmeni objavu" : offer ? "Objavi oglas" : "Postavi zahtev"}</DialogTitle>
           <DialogDescription>{saved ? (offer ? "Tvoj oglas je objavljen." : "Tvoj zahtev je objavljen.") : offer ? "Podaci o proizvodu ili usluzi i kontaktu." : "Podaci o onome što tražiš i kontaktu."}</DialogDescription>
         </DialogHeader>
         {saved ? (
@@ -90,7 +96,7 @@ export function ListingFormDialog({ kind, onClose }: { kind: ListingKind | null;
             <p className="text-xs text-muted-foreground sm:col-span-2">Ime i telefon biće javno prikazani uz objavu.</p>
             {!loading && !user && <p className="text-sm sm:col-span-2">Za objavu se <Link to="/prijava" onClick={keepDraft} className="font-semibold text-brand underline">prijavi</Link> ili <Link to="/registracija" onClick={keepDraft} className="font-semibold text-brand underline">registruj besplatno</Link>.</p>}
             {error && <p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
-            <Button type="submit" disabled={busy || loading || !user} className="h-auto rounded-full bg-highlight py-3 text-highlight-foreground hover:bg-highlight/90 sm:col-span-2">{busy ? "Objavljivanje…" : offer ? "Objavi oglas" : "Postavi zahtev"}</Button>
+            <Button type="submit" disabled={busy || loading || !user} className="h-auto rounded-full bg-highlight py-3 text-highlight-foreground hover:bg-highlight/90 sm:col-span-2">{busy ? "Čuvanje…" : edit ? "Sačuvaj izmene" : offer ? "Objavi oglas" : "Postavi zahtev"}</Button>
           </form>
         )}
       </DialogContent>
