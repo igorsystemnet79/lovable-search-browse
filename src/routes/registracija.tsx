@@ -18,7 +18,7 @@ export const Route = createFileRoute("/registracija")({
 });
 
 function Registracija() {
-  const [f, setF] = useState({ ime: "", telefon: "", grad: "", email: "", lozinka: "" });
+  const [f, setF] = useState({ ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "" });
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,7 @@ function Registracija() {
       password: f.lozinka,
       options: {
         emailRedirectTo: window.location.origin,
-        data: { ime: f.ime, telefon: f.telefon, grad: f.grad },
+        data: { ime: f.ime, telefon: f.telefon, grad: f.grad, adresa: f.adresa },
       },
     });
     setBusy(false);
@@ -56,6 +56,7 @@ function Registracija() {
         <input className={inputCls} required maxLength={100} placeholder="Ime i prezime" value={f.ime} onChange={set("ime")} />
         <input className={inputCls} type="tel" required maxLength={30} placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} maxLength={60} placeholder="Grad" value={f.grad} onChange={set("grad")} />
+        <input className={inputCls} maxLength={150} placeholder="Adresa stanovanja (ulica i broj)" value={f.adresa} onChange={set("adresa")} />
         <input className={inputCls} type="email" required placeholder="Email" value={f.email} onChange={set("email")} />
         <input className={inputCls} type="password" required minLength={6} placeholder="Lozinka (min. 6 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
         {greska && <p className="text-sm text-destructive">{greska}</p>}
