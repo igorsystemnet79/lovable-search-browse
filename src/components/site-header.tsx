@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useAuth } from "@/hooks/use-auth";
+import { useIsAdmin } from "@/hooks/use-is-admin";
 import { supabase } from "@/integrations/supabase/client";
 import logo from "@/assets/ponudimi-logo.png";
 
@@ -9,7 +9,7 @@ const solid =
   "rounded-full bg-highlight px-4 py-2 font-semibold text-highlight-foreground transition-opacity hover:opacity-90";
 
 export function SiteHeader() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useIsAdmin();
   const navigate = useNavigate();
 
   return (
@@ -25,6 +25,7 @@ export function SiteHeader() {
           </Link>
           {user ? (
             <>
+              {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
               <span className="hidden px-2 text-brand-foreground/80 sm:inline">

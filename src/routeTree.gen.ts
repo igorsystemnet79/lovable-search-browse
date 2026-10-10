@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as MojiOglasiRouteImport } from './routes/moji-oglasi'
 import { Route as PodrskaRouteImport } from './routes/podrska'
 import { Route as PonudeRouteImport } from './routes/ponude'
@@ -24,6 +25,11 @@ import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MojiOglasiRoute = MojiOglasiRouteImport.update({
@@ -79,6 +85,7 @@ const KategorijaSlugRoute = KategorijaSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -92,6 +99,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -106,6 +114,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -121,6 +130,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/admin'
     | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/moji-oglasi'
     | '/podrska'
     | '/ponude'
@@ -161,6 +173,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRoute
   MojiOglasiRoute: typeof MojiOglasiRoute
   PodrskaRoute: typeof PodrskaRoute
   PonudeRoute: typeof PonudeRoute
@@ -180,6 +193,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/moji-oglasi': {
@@ -257,6 +277,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRoute,
   MojiOglasiRoute: MojiOglasiRoute,
   PodrskaRoute: PodrskaRoute,
   PonudeRoute: PonudeRoute,
