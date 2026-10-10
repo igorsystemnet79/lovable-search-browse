@@ -55,7 +55,11 @@ export const sinhronizujApr = createServerFn({ method: "POST" })
       const lista = Array.isArray(body) ? body : ((body as { data?: unknown[] }).data ?? []);
       const firme = lista.map((f) => firmaSchema.safeParse(f)).filter((r) => r.success).map((r) => ({ ...r.data, synced_at: new Date().toISOString() }));
       for (let i = 0; i < firme.length; i += 500) {
-        const { error } = await supabaseAdmin.from("apr_firme").upsert(firme.slice(i, i + 500));
+        const batch = firme.slice(i, i + 500).map((f) => ({
+          pib: f.pib, naziv: f.naziv, synced_at: f.synced_at,
+          maticni_broj: f.maticni_broj ?? null, sediste: f.sediste ?? null, adresa: f.adresa ?? null, status: f.status ?? null,
+        }));
+        const { error } = await supabaseAdmin.from("apr_firme").upsert(batch);
         if (error) throw new Error(error.message);
       }
       // Re-verify company accounts against the fresh register.
