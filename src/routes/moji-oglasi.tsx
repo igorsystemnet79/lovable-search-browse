@@ -40,10 +40,15 @@ function MojiOglasi() {
     await supabase.from(table).delete().eq("id", id);
     await qc.invalidateQueries();
   }
+  async function zavrsi(table: "ponude" | "zahtevi", id: string, v: boolean) {
+    await supabase.from(table).update({ zavrseno: v }).eq("id", id);
+    await qc.invalidateQueries();
+  }
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
     <div className="mt-2 flex gap-4 px-4 text-sm">
       <button type="button" className="font-semibold text-brand hover:underline" onClick={() => { setEdit({ id: x.id, values: toValues(x, iznos) }); setKind(k); }}>Izmeni</button>
       <button type="button" className="font-semibold text-destructive hover:underline" onClick={() => obrisi(k === "ponuda" ? "ponude" : "zahtevi", x.id)}>Obriši</button>
+      <button type="button" className="font-semibold text-muted-foreground hover:underline" onClick={() => zavrsi(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.zavrseno)}>{x.zavrseno ? "Ponovo aktiviraj" : "Završi oglas"}</button>
     </div>
   );
 
