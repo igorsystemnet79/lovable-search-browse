@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FollowButton } from "@/components/follow-button";
 import { formatCena, formatVreme, izmeneQuery, type Ponuda, type Zahtev } from "@/lib/listings";
 
-function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: boolean; updatedAt?: string | null }) {
+function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: boolean | undefined; updatedAt?: string | null | undefined }) {
   const [open, setOpen] = useState(false);
   const q = useQuery({ ...izmeneQuery(id), enabled: open });
   if (!zavrseno && !updatedAt) return null;
