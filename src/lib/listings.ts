@@ -10,6 +10,8 @@ export type Ponuda = {
   valuta: string;
   emoji: string | null;
   istaknuto: boolean;
+  zavrseno?: boolean;
+  updated_at?: string | null;
   kontakt_ime?: string | null;
   telefon?: string | null;
   created_at: string;
@@ -22,6 +24,8 @@ export type Zahtev = {
   kategorija: string;
   lokacija: string;
   budzet: number | null;
+  zavrseno?: boolean;
+  updated_at?: string | null;
   kontakt_ime?: string | null;
   telefon?: string | null;
   valuta: string;
@@ -68,36 +72,27 @@ export const zahteviQuery = (limit?: number) => ({
 
 export type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[] };
 
-function escapeLike(value: string) {
-  return value.replace(/[%,()]/g, " ").trim();
-}
-
 export const pretragaQuery = (q: string, lokacija: string) => ({
   queryKey: ["pretraga", q, lokacija],
   queryFn: async (): Promise<SearchResults> => {
-    const term = escapeLike(q);
-    const mesto = escapeLike(lokacija);
-
-    let ponudeReq = supabase.from("ponude").select("*").order("created_at", { ascending: false });
-    let zahteviReq = supabase.from("zahtevi").select("*").order("created_at", { ascending: false });
-
-    if (term) {
-      const filter = `naslov.ilike.%${term}%,opis.ilike.%${term}%,kategorija.ilike.%${term}%,lokacija.ilike.%${term}%`;
-      ponudeReq = ponudeReq.or(filter);
-      zahteviReq = zahteviReq.or(filter);
-    }
-    if (mesto) {
-      ponudeReq = ponudeReq.ilike("lokacija", `%${mesto}%`);
-      zahteviReq = zahteviReq.ilike("lokacija", `%${mesto}%`);
-    }
-
-    const [ponude, zahtevi] = await Promise.all([ponudeReq, zahteviReq]);
+    const args = { q: q.slice(0, 200), mesto: lokacija.slice(0, 100) };
+    const [ponude, zahtevi] = await Promise.all([
+      supabase.rpc("pretrazi_ponude", args),
+      supabase.rpc("pretrazi_zahteve", args),
+    ]);
     if (ponude.error) throw ponude.error;
     if (zahtevi.error) throw zahtevi.error;
+    return { ponude: (ponude.data ?? []) as Ponuda[], zahtevi: (zahtevi.data ?? []) as Zahtev[] };
+  },
+});
 
-    return {
-      ponude: (ponude.data ?? []) as Ponuda[],
-      zahtevi: (zahtevi.data ?? []) as Zahtev[],
-    };
+export type Izmena = { id: string; oglas_id: string; opis: string; created_at: string };
+
+export const izmeneQuery = (oglasId: string) => ({
+  queryKey: ["izmene", oglasId],
+  queryFn: async (): Promise<Izmena[]> => {
+    const { data, error } = await supabase.from("izmene_oglasa").select("id, oglas_id, opis, created_at").eq("oglas_id", oglasId).order("created_at", { ascending: false }).limit(10);
+    if (error) throw error;
+    return data ?? [];
   },
 });

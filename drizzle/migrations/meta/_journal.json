@@ -43,6 +43,13 @@
       "when": 1791632121689,
       "tag": "0005_roles_companies_apr_admin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1791711381331,
+      "tag": "0006_listing_changes_and_smart_search",
+      "breakpoints": true
     }
   ]
 }

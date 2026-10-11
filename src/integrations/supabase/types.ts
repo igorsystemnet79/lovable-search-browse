@@ -71,6 +71,30 @@ export type Database = {
         }
         Relationships: []
       }
+      izmene_oglasa: {
+        Row: {
+          created_at: string
+          id: string
+          oglas_id: string
+          opis: string
+          tabela: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          oglas_id: string
+          opis: string
+          tabela: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          oglas_id?: string
+          opis?: string
+          tabela?: string
+        }
+        Relationships: []
+      }
       ponude: {
         Row: {
           cena: number | null
@@ -84,8 +108,10 @@ export type Database = {
           naslov: string
           opis: string | null
           telefon: string | null
+          updated_at: string | null
           user_id: string | null
           valuta: string
+          zavrseno: boolean
         }
         Insert: {
           cena?: number | null
@@ -99,8 +125,10 @@ export type Database = {
           naslov: string
           opis?: string | null
           telefon?: string | null
+          updated_at?: string | null
           user_id?: string | null
           valuta?: string
+          zavrseno?: boolean
         }
         Update: {
           cena?: number | null
@@ -114,8 +142,10 @@ export type Database = {
           naslov?: string
           opis?: string | null
           telefon?: string | null
+          updated_at?: string | null
           user_id?: string | null
           valuta?: string
+          zavrseno?: boolean
         }
         Relationships: []
       }
@@ -249,8 +279,10 @@ export type Database = {
           naslov: string
           opis: string | null
           telefon: string | null
+          updated_at: string | null
           user_id: string | null
           valuta: string
+          zavrseno: boolean
         }
         Insert: {
           budzet?: number | null
@@ -262,8 +294,10 @@ export type Database = {
           naslov: string
           opis?: string | null
           telefon?: string | null
+          updated_at?: string | null
           user_id?: string | null
           valuta?: string
+          zavrseno?: boolean
         }
         Update: {
           budzet?: number | null
@@ -275,8 +309,10 @@ export type Database = {
           naslov?: string
           opis?: string | null
           telefon?: string | null
+          updated_at?: string | null
           user_id?: string | null
           valuta?: string
+          zavrseno?: boolean
         }
         Relationships: []
       }
@@ -293,6 +329,59 @@ export type Database = {
         Returns: boolean
       }
       is_blocked: { Args: { _user_id: string }; Returns: boolean }
+      koren_reci: { Args: { w: string }; Returns: string }
+      normalizuj: { Args: { t: string }; Returns: string }
+      pretraga_uslov: { Args: { q: string; tekst: string }; Returns: boolean }
+      pretrazi_ponude: {
+        Args: { mesto: string; q: string }
+        Returns: {
+          cena: number | null
+          created_at: string
+          emoji: string | null
+          id: string
+          istaknuto: boolean
+          kategorija: string
+          kontakt_ime: string | null
+          lokacija: string
+          naslov: string
+          opis: string | null
+          telefon: string | null
+          updated_at: string | null
+          user_id: string | null
+          valuta: string
+          zavrseno: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "ponude"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      pretrazi_zahteve: {
+        Args: { mesto: string; q: string }
+        Returns: {
+          budzet: number | null
+          created_at: string
+          id: string
+          kategorija: string
+          kontakt_ime: string | null
+          lokacija: string
+          naslov: string
+          opis: string | null
+          telefon: string | null
+          updated_at: string | null
+          user_id: string | null
+          valuta: string
+          zavrseno: boolean
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "zahtevi"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
     }
     Enums: {
       app_role: "admin" | "moderator" | "user"
