@@ -176,7 +176,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
     if (!edit) return;
     const iznos = edit[polje];
     const patch = { naslov: edit.naslov, opis: edit.opis, lokacija: edit.lokacija, kontakt_ime: edit.kontakt_ime, telefon: edit.telefon, [polje]: iznos === undefined || iznos === null || Number.isNaN(iznos) ? null : iznos };
-    const { error } = await supabase.from(tabela).update(patch).eq("id", edit.id);
+    const { error } = await supabase.from(tabela).update(patch as never).eq("id", edit.id);
     setMsg(error ? "Čuvanje nije uspelo." : "Sačuvano.");
     setEdit(null);
     load();
