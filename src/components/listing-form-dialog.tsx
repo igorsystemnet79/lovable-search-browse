@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { inputCls } from "@/components/auth-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
-import { kategorije } from "@/lib/kategorije";
+import { kategorije, vrednostKategorije } from "@/lib/kategorije";
 import { listingFormSchema, type ListingFormValues } from "@/lib/listing-form";
 
 export type ListingKind = "ponuda" | "zahtev";
@@ -48,7 +48,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     if (!user || !kind || busy) return;
     const result = listingFormSchema.safeParse(form);
     if (!result.success) { setError(result.error.issues[0]?.message ?? "Proveri podatke."); return; }
-    if (!kategorije.some((k) => k.naziv === result.data.kategorija)) { setError("Izaberi kategoriju."); return; }
+    if (!vrednostKategorije(result.data.kategorija)) { setError("Izaberi kategoriju i potkategoriju."); return; }
     setBusy(true);
     setError("");
     try {
@@ -87,7 +87,18 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
-            <label className="space-y-1 text-sm font-medium">Kategorija<select className={inputCls} required {...field("kategorija")}><option value="">Izaberi kategoriju</option>{kategorije.map((k) => <option key={k.slug} value={k.naziv}>{k.naziv}</option>)}</select></label>
+            <label className="space-y-1 text-sm font-medium sm:col-span-2">
+              Kategorija i potkategorija
+              <select className={inputCls} required {...field("kategorija")}>
+                <option value="">Izaberi kategoriju</option>
+                {kategorije.map((k) => (
+                  <optgroup key={k.slug} label={k.naziv}>
+                    <option value={k.naziv}>Ostalo u kategoriji {k.naziv}</option>
+                    {k.podkategorije.map((pod) => <option key={pod} value={`${k.naziv} / ${pod}`}>{pod}</option>)}
+                  </optgroup>
+                ))}
+              </select>
+            </label>
             <label className="space-y-1 text-sm font-medium">Grad / mesto<input className={inputCls} required minLength={2} maxLength={100} {...field("lokacija")} /></label>
             <label className="space-y-1 text-sm font-medium">{offer ? "Prodavac / ponuđač" : "Ime osobe za kontakt"}<input className={inputCls} required minLength={2} maxLength={100} autoComplete="name" {...field("kontakt_ime")} /></label>
             <label className="space-y-1 text-sm font-medium">Telefon<input className={inputCls} type="tel" required minLength={6} maxLength={30} autoComplete="tel" {...field("telefon")} /></label>
