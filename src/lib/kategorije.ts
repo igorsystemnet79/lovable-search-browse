@@ -62,9 +62,9 @@ export const kategorije: Kategorija[] = [
   {
     slug: "posao",
     naziv: "Posao",
-    slika: "https://images.pexels.com/photos/450035/pexels-photo-450035.jpeg?auto=compress&cs=tinysrgb&w=900",
-    fotoAutor: "Mateusz Dach",
-    fotoIzvor: "https://www.pexels.com/photo/computer-set-up-on-a-workspace-450035/",
+    slika: "https://images.pexels.com/photos/6483627/pexels-photo-6483627.jpeg?auto=compress&cs=tinysrgb&w=900",
+    fotoAutor: "Mikael Blomkvist",
+    fotoIzvor: "https://www.pexels.com/photo/laptop-on-desk-6483627/",
     podkategorije: ["Puno radno vreme", "Pola radnog vremena", "Privremeni i sezonski poslovi", "Rad od kuće", "Praksa i obuka", "Honorarni poslovi", "Ostali poslovi"],
   },
   {
@@ -86,9 +86,9 @@ export const kategorije: Kategorija[] = [
   {
     slug: "poljoprivreda",
     naziv: "Poljoprivreda",
-    slika: "https://images.pexels.com/photos/19569316/pexels-photo-19569316.jpeg?auto=compress&cs=tinysrgb&w=900",
-    fotoAutor: "Fred dendoktoor",
-    fotoIzvor: "https://www.pexels.com/photo/tractor-on-rural-field-19569316/",
+    slika: "https://images.pexels.com/photos/37201225/pexels-photo-37201225.jpeg?auto=compress&cs=tinysrgb&w=900",
+    fotoAutor: "Mark Stebnicki",
+    fotoIzvor: "https://www.pexels.com/photo/aerial-view-of-plowed-field-with-tractor-and-workers-37201225/",
     podkategorije: ["Traktori", "Poljoprivredne mašine", "Priključne mašine", "Oprema i alati", "Stočarstvo", "Žitarice i semena", "Voće i povrće", "Ostalo za poljoprivredu"],
   },
   {
