@@ -14,17 +14,17 @@ export const kategorije: Kategorija[] = [
   {
     slug: "automobili",
     naziv: "Automobili",
-    slika: "https://images.pexels.com/photos/14038260/pexels-photo-14038260.jpeg?auto=compress&cs=tinysrgb&w=900",
-    fotoAutor: "Mike Bird",
-    fotoIzvor: "https://www.pexels.com/photo/car-on-parking-lot-14038260/",
+    slika: "https://images.pexels.com/photos/27745644/pexels-photo-27745644.jpeg?auto=compress&cs=tinysrgb&w=900",
+    fotoAutor: "Ralf Feltes",
+    fotoIzvor: "https://www.pexels.com/photo/a-vintage-car-parked-on-the-side-of-the-road-27745644/",
     podkategorije: ["Polovni automobili", "Novi automobili", "Delovi i oprema", "Gume i felne", "Auto kozmetika", "Auto-servisi", "Motocikli", "Kamioni i kombi vozila", "Plovila"],
   },
   {
     slug: "nekretnine",
     naziv: "Nekretnine",
-    slika: "https://images.pexels.com/photos/7414949/pexels-photo-7414949.jpeg?auto=compress&cs=tinysrgb&w=900",
-    fotoAutor: "MART PRODUCTION",
-    fotoIzvor: "https://www.pexels.com/photo/woman-taking-photos-7414949/",
+    slika: "https://images.pexels.com/photos/5824901/pexels-photo-5824901.jpeg?auto=compress&cs=tinysrgb&w=900",
+    fotoAutor: "Charlotte May",
+    fotoIzvor: "https://www.pexels.com/photo/living-room-interior-with-furniture-and-plants-at-home-5824901/",
     podkategorije: ["Stanovi – prodaja", "Stanovi – izdavanje", "Kuće – prodaja", "Kuće – izdavanje", "Zemljišta", "Poslovni prostori", "Vikendice", "Garaže i parking mesta", "Apartmani i sobe"],
   },
   {
@@ -128,4 +128,4 @@ export const kategorije: Kategorija[] = [
 export const nadjiKategoriju = (slug: string) => kategorije.find((k) => k.slug === slug);
 
 export const vrednostKategorije = (kategorija: string) =>
-  kategorije.some((k) => kategorija === k.naziv || kategorija.startsWith(`${k.naziv} / `));
+  kategorije.some((k) => kategorija === k.naziv || k.podkategorije.some((pod) => kategorija === `${k.naziv} / ${pod}`));
