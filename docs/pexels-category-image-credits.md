@@ -6,8 +6,8 @@ Licenca dozvoljava besplatnu komercijalnu upotrebu na sajtovima i aplikacijama, 
 
 | Kategorija | Autor | Izvor fotografije |
 |---|---|---|
-| Automobili | Mike Bird | https://www.pexels.com/photo/car-on-parking-lot-14038260/ |
-| Nekretnine | MART PRODUCTION | https://www.pexels.com/photo/woman-taking-photos-7414949/ |
+| Automobili | Ralf Feltes | https://www.pexels.com/photo/a-vintage-car-parked-on-the-side-of-the-road-27745644/ |
+| Nekretnine | Charlotte May | https://www.pexels.com/photo/living-room-interior-with-furniture-and-plants-at-home-5824901/ |
 | Mobilni telefoni | Andrey Matveev | https://www.pexels.com/photo/close-up-of-a-person-holding-a-smartphone-displaying-notifications-22604121/ |
 | Računari | Mikael Blomkvist | https://www.pexels.com/photo/laptop-on-desk-6483627/ |
 | Moda | Alena Darmel | https://www.pexels.com/photo/close-up-of-a-clothing-rack-8989864/ |
@@ -24,7 +24,7 @@ Licenca dozvoljava besplatnu komercijalnu upotrebu na sajtovima i aplikacijama, 
 ## Važne napomene
 
 - Pexels licenca ne prenosi automatski prava na logotipe, žigove, prepoznatljive osobe ili druge zaštićene elemente koji se eventualno vide na fotografiji.
-- Fotografije se koriste kao ilustracije kategorija, a ne kao dokaz da određeni brend ili osoba podržava PonudiMi.
+- Fotografije se koriste kao ilustracije kategorija, a ne kao dokaz da određeni brend ili osoba podržava PonudiMi. Za kategorije automobila i nekretnina izabrani su kadrovi bez prepoznatljivih osoba i istaknutih logotipa.
 - Ne prodavati niti distribuirati originalne fotografije kao samostalne fajlove.
 - Preporuka: čuvati ovu evidenciju uz kod i proveriti licencu ponovo ako se fotografije zamene ili promeni način upotrebe.
 
