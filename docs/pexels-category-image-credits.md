@@ -12,10 +12,10 @@ Licenca dozvoljava besplatnu komercijalnu upotrebu na sajtovima i aplikacijama, 
 | Računari | Mikael Blomkvist | https://www.pexels.com/photo/laptop-on-desk-6483627/ |
 | Moda | Alena Darmel | https://www.pexels.com/photo/close-up-of-a-clothing-rack-8989864/ |
 | Sport | Antoni Shkraba | https://www.pexels.com/photo/a-man-using-a-stationary-bicycle-5878660/ |
-| Posao | Mateusz Dach | https://www.pexels.com/photo/computer-set-up-on-a-workspace-450035/ |
+| Posao | Mikael Blomkvist | https://www.pexels.com/photo/laptop-on-desk-6483627/ |
 | Sve za kuću | Charlotte May | https://www.pexels.com/photo/living-room-interior-with-cozy-sofa-in-house-5825398/ |
 | Kolekcionarstvo | Damla Karaağaçlı | https://www.pexels.com/photo/a-collection-of-antiques-beside-coins-on-tray-14936593/ |
-| Poljoprivreda | Fred dendoktoor | https://www.pexels.com/photo/tractor-on-rural-field-19569316/ |
+| Poljoprivreda | Mark Stebnicki | https://www.pexels.com/photo/aerial-view-of-plowed-field-with-tractor-and-workers-37201225/ |
 | Građevina i alati | Anastasia Shuraeva | https://www.pexels.com/photo/a-close-up-shot-of-a-toolbox-8470252/ |
 | Kućni ljubimci | Alex Jaison | https://www.pexels.com/photo/dog-and-cat-standing-together-in-nature-28852102/ |
 | Muzika i instrumenti | Weavehall Collective | https://www.pexels.com/photo/electric-piano-and-guitars-in-a-room-18762059/ |
