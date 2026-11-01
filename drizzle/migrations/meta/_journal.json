@@ -50,6 +50,13 @@
       "when": 1791711381331,
       "tag": "0006_listing_changes_and_smart_search",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793545269483,
+      "tag": "0007_admin_email",
+      "breakpoints": true
     }
   ]
 }
