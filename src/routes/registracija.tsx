@@ -18,6 +18,22 @@ export const Route = createFileRoute("/registracija")({
   component: Registracija,
 });
 
+function porukaGreske(error: unknown) {
+  if (error instanceof Error) {
+    if (error.message.includes("Missing Supabase environment")) {
+      return "Povezivanje sa servisom za naloge nije podešeno. Potrebno je povezati Supabase u Lovable Cloud-u.";
+    }
+    if (/failed to fetch|network|fetch failed/i.test(error.message)) {
+      return "Nije moguće povezati se sa servisom. Proveri internet vezu i pokušaj ponovo.";
+    }
+    if (/already registered|user already exists/i.test(error.message)) {
+      return "Ova email adresa je već registrovana. Pokušaj da se prijaviš.";
+    }
+    return error.message || "Registracija trenutno nije moguća. Pokušaj ponovo.";
+  }
+  return "Registracija trenutno nije moguća. Pokušaj ponovo.";
+}
+
 function Registracija() {
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
   const [f, setF] = useState({ ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
@@ -28,7 +44,10 @@ function Registracija() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(f.email.trim())) return setGreska("Unesi ispravnu email adresu.");
+    if (busy) return;
+    const email = f.email.trim().toLowerCase();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
+    if (f.lozinka.length < 6) return setGreska("Lozinka mora imati najmanje 6 karaktera.");
     if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     if (tip === "pravno") {
       if (f.naziv_firme.trim().length < 2) return setGreska("Unesi naziv firme.");
@@ -36,20 +55,33 @@ function Registracija() {
     }
     setBusy(true);
     setGreska("");
-    const { error } = await supabase.auth.signUp({
-      email: f.email,
-      password: f.lozinka,
-      options: {
-        emailRedirectTo: window.location.origin,
-        data: {
-          ime: f.ime, telefon: f.telefon, grad: f.grad, adresa: f.adresa, tip_lica: tip,
-          ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password: f.lozinka,
+        options: {
+          emailRedirectTo: window.location.origin,
+          data: {
+            ime: f.ime.trim(),
+            telefon: f.telefon.trim(),
+            grad: f.grad.trim(),
+            adresa: f.adresa.trim(),
+            tip_lica: tip,
+            ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
+          },
         },
-      },
-    });
-    setBusy(false);
-    if (error) return setGreska(error.message.includes("registered") ? "Taj email je već registrovan." : "Registracija nije uspela. Proveri podatke.");
-    setUspeh(true);
+      });
+      if (error) throw error;
+      if (!data.user) {
+        setGreska("Registracija nije potvrđena. Proveri podešavanja servisa i pokušaj ponovo.");
+        return;
+      }
+      setUspeh(true);
+    } catch (error) {
+      setGreska(porukaGreske(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   if (uspeh)
@@ -74,13 +106,13 @@ function Registracija() {
             <input className={inputCls} required inputMode="numeric" maxLength={9} placeholder="PIB (9 cifara)" value={f.pib} onChange={set("pib")} />
           </>
         )}
-        <input className={inputCls} required maxLength={100} placeholder={tip === "pravno" ? "Ime i prezime odgovornog lica" : "Ime i prezime"} value={f.ime} onChange={set("ime")} />
-        <input className={inputCls} type="tel" required maxLength={30} placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
+        <input className={inputCls} required maxLength={100} autoComplete="name" placeholder={tip === "pravno" ? "Ime i prezime odgovornog lica" : "Ime i prezime"} value={f.ime} onChange={set("ime")} />
+        <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} maxLength={60} placeholder="Grad" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} maxLength={150} placeholder={tip === "pravno" ? "Adresa sedišta (ulica i broj)" : "Adresa stanovanja (ulica i broj)"} value={f.adresa} onChange={set("adresa")} />
-        <input className={inputCls} type="email" required placeholder="Email" value={f.email} onChange={set("email")} />
-        <input className={inputCls} type="password" required minLength={6} placeholder="Lozinka (min. 6 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
-        {greska && <p className="text-sm text-destructive">{greska}</p>}
+        <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={f.email} onChange={set("email")} />
+        <input className={inputCls} type="password" required minLength={6} autoComplete="new-password" placeholder="Lozinka (min. 6 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
+        {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
       </form>
       <p className="mt-4 text-center text-sm text-muted-foreground">
