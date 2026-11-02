@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { BackLink } from "@/components/back-link";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { nadjiKategoriju, kategorije } from "@/lib/kategorije";
 import type { Ponuda, Zahtev } from "@/lib/listings";
