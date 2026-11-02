@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { BackLink } from "@/components/back-link";
 import { ZahtevItem } from "@/components/listing-items";
 import { zahteviQuery } from "@/lib/listings";
 
