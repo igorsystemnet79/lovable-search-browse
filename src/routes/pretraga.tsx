@@ -41,9 +41,9 @@ function PretragaPage() {
       <SiteHeader />
 
       <main className="container-page py-8">
-        <Link to="/" className="text-sm text-muted-foreground hover:underline">
+        <BackLink className="text-sm text-muted-foreground hover:underline">
           ← Nazad na početnu
-        </Link>
+        </BackLink>
 
         <h1 className="mt-4 text-3xl font-bold">
           {q || lokacija ? (
