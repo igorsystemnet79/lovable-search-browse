@@ -63,7 +63,7 @@ function KategorijaPage() {
         <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent" />
         <div className="container-page absolute inset-0 flex items-center">
           <div className="text-brand-foreground">
-            <Link to="/" className="text-sm text-brand-foreground/80 hover:underline">← Nazad na početnu</Link>
+            <BackLink className="text-sm text-brand-foreground/80 hover:underline">← Nazad na početnu</BackLink>
             <h1 className="mt-2 text-4xl font-bold">{kat.naziv}</h1>
             <p className="mt-2 text-sm text-brand-foreground/80">{kat.podkategorije.length} potkategorija za precizniji izbor</p>
           </div>
