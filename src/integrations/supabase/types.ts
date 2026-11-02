@@ -205,6 +205,12 @@ export type Database = {
           },
         ]
       }
+      slike_oglasa: {
+        Row: { id: string; ponuda_id: string | null; zahtev_id: string | null; storage_path: string | null; external_url: string | null; pozicija: number; created_at: string }
+        Insert: { id?: string; ponuda_id?: string | null; zahtev_id?: string | null; storage_path?: string | null; external_url?: string | null; pozicija?: number; created_at?: string }
+        Update: { id?: string; ponuda_id?: string | null; zahtev_id?: string | null; storage_path?: string | null; external_url?: string | null; pozicija?: number; created_at?: string }
+        Relationships: []
+      }
       profiles: {
         Row: {
           adresa: string | null
