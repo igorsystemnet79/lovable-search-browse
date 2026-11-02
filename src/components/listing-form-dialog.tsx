@@ -86,11 +86,35 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
         listingId = response.data.id;
         setCreatedId(listingId);
       }
-      await sacuvajSlikeOglasa(kind, listingId, user.id, photos);
+      // Oglas bez fotografija ne treba da zavisi od dostupnosti tabele ili Storage-a za slike.
+      // Kod izmene ipak pozivamo čuvanje i sa praznom listom kako bi uklonjene slike bile obrisane.
+      if (photos.length > 0 || edit) {
+        try {
+          await sacuvajSlikeOglasa(kind, listingId, user.id, photos);
+        } catch (photoError) {
+          const detail = photoError instanceof Error ? photoError.message : "";
+          throw new Error(`Oglas je sačuvan, ali fotografije nisu. ${detail}`.trim());
+        }
+      }
       setSaved(true);
       try { sessionStorage.removeItem("ponudimi-listing-draft"); } catch { /* Optional draft. */ }
       await queryClient.invalidateQueries();
-    } catch { setError("Objava nije uspela. Proveri vezu i prijavu, pa pokušaj ponovo."); }
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      if (message.startsWith("Oglas je sačuvan, ali fotografije nisu.")) {
+        setError(message + " Možeš ponovo pokušati sa fotografijama ili ukloniti slike i sačuvati oglas.");
+      } else if (/row-level security|permission denied|not allowed/i.test(message)) {
+        setError("Nemamo dozvolu da sačuvamo ove podatke ili fotografije. Proveri prijavu i dozvole naloga.");
+      } else if (/bucket.*not found|storage.*not found/i.test(message)) {
+        setError("Prostor za fotografije nije podešen na serveru. Oglas može biti sačuvan bez fotografija.");
+      } else if (/does not exist|could not find the table/i.test(message)) {
+        setError("Nedostaje tabela potrebna za čuvanje fotografija. Oglas može biti sačuvan bez fotografija.");
+      } else if (/network|fetch|failed to fetch|timeout/i.test(message)) {
+        setError("Veza sa serverom nije uspela. Proveri internet i pokušaj ponovo.");
+      } else {
+        setError(message ? `Objava nije uspela: ${message}` : "Objava nije uspela. Pokušaj ponovo.");
+      }
+    }
     finally { setBusy(false); }
   }
 
