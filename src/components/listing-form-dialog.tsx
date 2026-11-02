@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { supabase } from "@/integrations/supabase/client";
 import { kategorije, vrednostKategorije } from "@/lib/kategorije";
 import { listingFormSchema, type ListingFormValues } from "@/lib/listing-form";
+import { ListingImages, ucitajSlikeOglasa, sacuvajSlikeOglasa, type ListingPhoto } from "@/components/listing-images";
 
 export type ListingKind = "ponuda" | "zahtev";
 const empty: ListingFormValues = { naslov: "", opis: "", kategorija: "", lokacija: "", kontakt_ime: "", telefon: "", iznos: "", valuta: "EUR" };
@@ -20,11 +21,13 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [photos, setPhotos] = useState<ListingPhoto[]>([]);
 
   useEffect(() => {
     if (!kind) return;
     setSaved(false);
     setError("");
+    setPhotos([]);
     setForm({ ...empty, kontakt_ime: typeof user?.user_metadata?.["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata?.["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata?.["grad"] === "string" ? user.user_metadata["grad"] : "" });
     if (edit) { setForm(edit.values); return; }
     try {
@@ -35,6 +38,15 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
       }
     } catch { /* Storage may be unavailable. */ }
   }, [kind, user?.id, edit?.id]);
+
+  useEffect(() => {
+    let active = true;
+    if (!kind || !edit?.id) return;
+    ucitajSlikeOglasa(kind, edit.id)
+      .then((items) => { if (active) setPhotos(items); })
+      .catch(() => { if (active) setError("Fotografije postojećeg oglasa nisu mogle da se učitaju."); });
+    return () => { active = false; };
+  }, [kind, edit?.id]);
 
   function keepDraft() {
     try { sessionStorage.setItem("ponudimi-listing-draft", JSON.stringify({ kind, form })); } catch { /* Optional draft. */ }
@@ -55,14 +67,22 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
       const { iznos, ...values } = result.data;
       const amount = iznos === "" ? null : Number(iznos);
       const common = { ...values, user_id: user.id };
-      const response = edit
-        ? kind === "ponuda"
+      let listingId = edit?.id ?? "";
+      if (edit) {
+        const response = kind === "ponuda"
           ? await supabase.from("ponude").update({ ...values, cena: amount }).eq("id", edit.id)
-          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", edit.id)
-        : kind === "ponuda"
-        ? await supabase.from("ponude").insert({ ...common, cena: amount, istaknuto: false })
-        : await supabase.from("zahtevi").insert({ ...common, budzet: amount });
-      if (response.error) throw response.error;
+          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", edit.id);
+        if (response.error) throw response.error;
+      } else if (kind === "ponuda") {
+        const response = await supabase.from("ponude").insert({ ...common, cena: amount, istaknuto: false }).select("id").single();
+        if (response.error) throw response.error;
+        listingId = response.data.id;
+      } else {
+        const response = await supabase.from("zahtevi").insert({ ...common, budzet: amount }).select("id").single();
+        if (response.error) throw response.error;
+        listingId = response.data.id;
+      }
+      await sacuvajSlikeOglasa(kind, listingId, user.id, photos);
       setSaved(true);
       try { sessionStorage.removeItem("ponudimi-listing-draft"); } catch { /* Optional draft. */ }
       await queryClient.invalidateQueries();
@@ -87,6 +107,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
+            <ListingImages value={photos} onChange={setPhotos} disabled={busy} />
             <label className="space-y-1 text-sm font-medium sm:col-span-2">
               Kategorija i potkategorija
               <select className={inputCls} required {...field("kategorija")}>
