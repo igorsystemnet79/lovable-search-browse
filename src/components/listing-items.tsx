@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FollowButton } from "@/components/follow-button";
+import { ListingImageGallery } from "@/components/listing-images";
 import { formatCena, formatVreme, izmeneQuery, type Ponuda, type Zahtev } from "@/lib/listings";
 
 function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: boolean | undefined; updatedAt?: string | null | undefined }) {
@@ -34,6 +35,7 @@ export function PonudaItem({ ponuda, hideFollow }: { ponuda: Ponuda; hideFollow?
       <p className="mt-1 text-xs text-muted-foreground">
         {formatCena(ponuda.cena, ponuda.valuta)} · {ponuda.lokacija} · {formatVreme(ponuda.created_at)}
       </p>
+      <ListingImageGallery kind="ponuda" id={ponuda.id} />
       {ponuda.opis ? <p className="mt-2 text-sm text-muted-foreground">{ponuda.opis}</p> : null}
       {ponuda.kontakt_ime && <p className="mt-2 text-sm">{ponuda.kontakt_ime}{ponuda.telefon && <> · <a className="text-brand hover:underline" href={`tel:${ponuda.telefon.replace(/[^+0-9]/g, "")}`}>{ponuda.telefon}</a></>}</p>}
       <StatusIzmene id={ponuda.id} zavrseno={ponuda.zavrseno} updatedAt={ponuda.updated_at} />
@@ -50,6 +52,7 @@ export function ZahtevItem({ zahtev }: { zahtev: Zahtev }) {
         {zahtev.lokacija} · {formatVreme(zahtev.created_at)}
         {zahtev.budzet !== null ? ` · budžet ${formatCena(zahtev.budzet, zahtev.valuta)}` : ""}
       </p>
+      <ListingImageGallery kind="zahtev" id={zahtev.id} />
       {zahtev.opis ? <p className="mt-2 text-sm text-muted-foreground">{zahtev.opis}</p> : null}
       {zahtev.kontakt_ime && <p className="mt-2 text-sm">{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
