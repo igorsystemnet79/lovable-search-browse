@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Link2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -202,4 +203,22 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
       }
     }
   }
+}
+
+export function ListingImageGallery({ kind, id }: { kind: "ponuda" | "zahtev"; id: string }) {
+  const q = useQuery({
+    queryKey: ["slike-oglasa", kind, id],
+    queryFn: () => ucitajSlikeOglasa(kind, id),
+    staleTime: 60_000,
+  });
+  if (!q.data?.length) return null;
+  return (
+    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      {q.data.map((photo, index) => (
+        <a key={photo.id ?? photo.preview} href={photo.preview} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-secondary">
+          <img src={photo.preview} alt={`Fotografija oglasa ${index + 1}`} loading="lazy" className="aspect-[4/3] w-full object-contain" />
+        </a>
+      ))}
+    </div>
+  );
 }
