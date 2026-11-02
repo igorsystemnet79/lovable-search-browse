@@ -13,13 +13,32 @@ export type ListingPhoto = {
 
 const MAX_PHOTOS = 7;
 const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MIN_IMAGE_SIDE = 240;
+const MAX_IMAGE_SIDE = 12_000;
+const MAX_IMAGE_PIXELS = 40_000_000;
+
+function validateImageDimensions(width: number, height: number) {
+  if (!width || !height) throw new Error("Fotografija nema ispravne dimenzije ili je oštećena.");
+  if (Math.min(width, height) < MIN_IMAGE_SIDE) {
+    throw new Error(`Fotografija je premalih dimenzija (${width} × ${height} px). Najkraća stranica mora imati najmanje ${MIN_IMAGE_SIDE} px. Izaberi jasniju fotografiju.`);
+  }
+  if (Math.max(width, height) > MAX_IMAGE_SIDE || width * height > MAX_IMAGE_PIXELS) {
+    throw new Error(`Fotografija ima prevelike dimenzije (${width} × ${height} px). Maksimalno je ${MAX_IMAGE_SIDE} px po stranici i 40 megapiksela.`);
+  }
+}
 
 async function resizeImage(file: File): Promise<Blob> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     throw new Error("Dozvoljeni su JPG, PNG i WEBP formati.");
   }
   if (file.size > MAX_FILE_BYTES) throw new Error("Fotografija ne sme biti veća od 10 MB.");
-  const bitmap = await createImageBitmap(file);
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file);
+  } catch {
+    throw new Error("Fotografija ne može da se otvori. Moguće je da je fajl oštećen ili nije prava slika.");
+  }
+  validateImageDimensions(bitmap.width, bitmap.height);
   const canvas = document.createElement("canvas");
   canvas.width = 800;
   canvas.height = 600;
@@ -99,7 +118,14 @@ export function ListingImages({
       } catch {
         await new Promise<void>((resolve, reject) => {
           const img = new Image();
-          img.onload = () => resolve();
+          img.onload = () => {
+            try {
+              validateImageDimensions(img.naturalWidth, img.naturalHeight);
+              resolve();
+            } catch (validationError) {
+              reject(validationError);
+            }
+          };
           img.onerror = () => reject(new Error("Adresa ne vodi direktno do dostupne fotografije."));
           img.src = candidate;
         });
@@ -133,7 +159,8 @@ export function ListingImages({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">Fotografije</p>
-          <p className="text-xs text-muted-foreground">Do 7 slika · automatski format 800 × 600 px</p>
+          <p className="text-xs text-muted-foreground">Do 7 fotografija · JPG, PNG ili WEBP · najviše 10 MB po fajlu</p>
+          <p className="text-xs text-muted-foreground">Najkraća stranica najmanje 240 px; najviše 12.000 px po stranici i 40 MP. Fotografije se automatski prilagođavaju formatu 800 × 600 px.</p>
         </div>
         <span className="text-xs font-medium text-muted-foreground">{value.length}/7</span>
       </div>
@@ -143,6 +170,7 @@ export function ListingImages({
           <ImagePlus className="h-4 w-4" /> Izaberi sa uređaja
         </button>
       </div>
+      <p className="text-xs text-muted-foreground">Kod fotografija dodatih internet adresom veličina fajla ne može uvek da se proveri unapred. Dimenzije fotografije se proveravaju pre dodavanja.</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Nalepi direktnu adresu fotografije (https://...)" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" disabled={disabled || busy || value.length >= MAX_PHOTOS} />
         <button type="button" onClick={() => void addUrl()} disabled={disabled || busy || !url.trim() || value.length >= MAX_PHOTOS} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50">
