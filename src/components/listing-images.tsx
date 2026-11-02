@@ -86,13 +86,25 @@ export function ListingImages({
     setBusy(true);
     setError("");
     try {
-      await new Promise<void>((resolve, reject) => {
-        const img = new Image();
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Adresa ne vodi direktno do dostupne fotografije."));
-        img.src = candidate;
-      });
-      onChange([...value, { preview: candidate, externalUrl: candidate }]);
+      // Ako izvor dozvoljava CORS, fotografiju preuzimamo, normalizujemo i čuvamo u našem Storage-u.
+      // Ako izvor blokira preuzimanje, čuvamo direktan URL kao rezervnu opciju.
+      try {
+        const response = await fetch(candidate, { mode: "cors" });
+        if (!response.ok) throw new Error("Preuzimanje nije dozvoljeno.");
+        const blob = await response.blob();
+        const sourceFile = new File([blob], "fotografija-sa-interneta", { type: blob.type || "image/jpeg" });
+        const normalized = await resizeImage(sourceFile);
+        const file = new File([normalized], "fotografija-sa-interneta.jpg", { type: "image/jpeg" });
+        onChange([...value, { preview: URL.createObjectURL(normalized), file }]);
+      } catch {
+        await new Promise<void>((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error("Adresa ne vodi direktno do dostupne fotografije."));
+          img.src = candidate;
+        });
+        onChange([...value, { preview: candidate, externalUrl: candidate }]);
+      }
       setUrl("");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Fotografija sa interneta nije dostupna.");
