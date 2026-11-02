@@ -109,3 +109,23 @@ $$;
 create trigger ogranicenje_broj_slika_oglasa
 before insert or update of ponuda_id, zahtev_id on public.slike_oglasa
 for each row execute function public.proveri_broj_slika_oglasa();
+
+-- Brisanje oglasa uklanja i njegove fajlove iz Storage-a (ne ostavljamo napustene slike).
+create or replace function public.obrisi_fajl_slike_oglasa()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, storage
+as $$
+begin
+  if old.storage_path is not null then
+    delete from storage.objects
+    where bucket_id = 'slike-oglasa' and name = old.storage_path;
+  end if;
+  return old;
+end;
+$$;
+
+create trigger obrisi_fajl_posle_brisanja_slike
+after delete on public.slike_oglasa
+for each row execute function public.obrisi_fajl_slike_oglasa();
