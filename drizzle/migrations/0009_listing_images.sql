@@ -81,3 +81,31 @@ on storage.objects for delete to authenticated
 using (
   bucket_id = 'slike-oglasa' and (storage.foldername(name))[1] = (select auth.uid())::text
 );
+
+-- Ogranicenje od 7 fotografija sprovodi se i na nivou baze, ne samo u interfejsu.
+create or replace function public.proveri_broj_slika_oglasa()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  broj integer;
+begin
+  if new.ponuda_id is not null then
+    select count(*) into broj from public.slike_oglasa
+    where ponuda_id = new.ponuda_id and id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid);
+  else
+    select count(*) into broj from public.slike_oglasa
+    where zahtev_id = new.zahtev_id and id <> coalesce(new.id, '00000000-0000-0000-0000-000000000000'::uuid);
+  end if;
+  if broj >= 7 then
+    raise exception 'Oglas može imati najviše 7 fotografija.';
+  end if;
+  return new;
+end;
+$$;
+
+create trigger ogranicenje_broj_slika_oglasa
+before insert or update of ponuda_id, zahtev_id on public.slike_oglasa
+for each row execute function public.proveri_broj_slika_oglasa();
