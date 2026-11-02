@@ -22,12 +22,14 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
+  const [createdId, setCreatedId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!kind) return;
     setSaved(false);
     setError("");
     setPhotos([]);
+    setCreatedId(null);
     setForm({ ...empty, kontakt_ime: typeof user?.user_metadata?.["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata?.["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata?.["grad"] === "string" ? user.user_metadata["grad"] : "" });
     if (edit) { setForm(edit.values); return; }
     try {
@@ -67,20 +69,22 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
       const { iznos, ...values } = result.data;
       const amount = iznos === "" ? null : Number(iznos);
       const common = { ...values, user_id: user.id };
-      let listingId = edit?.id ?? "";
-      if (edit) {
+      let listingId = edit?.id ?? createdId ?? "";
+      if (edit || createdId) {
         const response = kind === "ponuda"
-          ? await supabase.from("ponude").update({ ...values, cena: amount }).eq("id", edit.id)
-          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", edit.id);
+          ? await supabase.from("ponude").update({ ...values, cena: amount }).eq("id", listingId)
+          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", listingId);
         if (response.error) throw response.error;
       } else if (kind === "ponuda") {
         const response = await supabase.from("ponude").insert({ ...common, cena: amount, istaknuto: false }).select("id").single();
         if (response.error) throw response.error;
         listingId = response.data.id;
+        setCreatedId(listingId);
       } else {
         const response = await supabase.from("zahtevi").insert({ ...common, budzet: amount }).select("id").single();
         if (response.error) throw response.error;
         listingId = response.data.id;
+        setCreatedId(listingId);
       }
       await sacuvajSlikeOglasa(kind, listingId, user.id, photos);
       setSaved(true);
