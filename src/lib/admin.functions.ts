@@ -31,3 +31,8 @@ export async function dodajAdminFotografije({ kind, listingId, files }: { kind: 
 export async function obrisiAdminFotografiju(imageId: string) {
   return adminRequest(`/api/admin/images/${encodeURIComponent(imageId)}`, "DELETE");
 }
+
+export async function posaljiPredlogIzmene(data: { tabela: "ponude" | "zahtevi"; oglas_id: string; predlozeni_podaci: Record<string, unknown> }) { return adminRequest("/api/moderator/proposals", "POST", data); }
+export async function ucitajPredlogeModeratora() { return adminRequest("/api/moderator/proposals", "GET"); }
+export async function ucitajAdminPredloge() { return adminRequest("/api/admin/proposals", "GET"); }
+export async function odluciOPredlogu(id: string, decision: "odobreno" | "odbijeno", napomena?: string) { return adminRequest("/api/admin/proposals/" + encodeURIComponent(id) + "/decision", "POST", { decision, napomena }); }
