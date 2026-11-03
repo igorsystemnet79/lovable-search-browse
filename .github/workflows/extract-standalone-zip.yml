@@ -1,9 +1,7 @@
 name: Extract PonudiMi standalone ZIP
 
 on:
-  push:
-    branches:
-      - deploy/ponudimi-standalone
+  workflow_dispatch:
 
 permissions:
   contents: write
