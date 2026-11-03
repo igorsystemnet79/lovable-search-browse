@@ -30,9 +30,21 @@ CREATE TABLE IF NOT EXISTS zahtevi (
 );
 CREATE TABLE IF NOT EXISTS pracenja (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
- ponuda_id uuid NOT NULL REFERENCES ponude(id) ON DELETE CASCADE, pocetna_cena numeric,
- created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id,ponuda_id)
+ ponuda_id uuid REFERENCES ponude(id) ON DELETE CASCADE, zahtev_id uuid REFERENCES zahtevi(id) ON DELETE CASCADE,
+ pocetna_cena numeric, pocetni_budzet numeric,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1)
 );
+ALTER TABLE pracenja ALTER COLUMN ponuda_id DROP NOT NULL;
+ALTER TABLE pracenja ADD COLUMN IF NOT EXISTS zahtev_id uuid REFERENCES zahtevi(id) ON DELETE CASCADE;
+ALTER TABLE pracenja ADD COLUMN IF NOT EXISTS pocetni_budzet numeric;
+DO $ BEGIN
+ IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pracenja_jedan_oglas') THEN
+  ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
+ END IF;
+END $;
+CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_ponuda_unique ON pracenja(user_id,ponuda_id) WHERE ponuda_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_zahtev_unique ON pracenja(user_id,zahtev_id) WHERE zahtev_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS izmene_oglasa (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), oglas_id uuid NOT NULL, tabela text NOT NULL,
  opis text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
