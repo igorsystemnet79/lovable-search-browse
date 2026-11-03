@@ -219,8 +219,7 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
 app.post('/api/storage/upload',auth,memoryUpload.single('file'),asyncRoute(async(req,res)=>{
  const requested=safeObjectKey(req.body.path);if(!req.file)return res.status(400).json({error:'Fotografija nije poslata.'});
  if(!requested.startsWith(`${req.user.sub}/`))return res.status(403).json({error:'Nedozvoljena putanja fotografije.'});
- const ext={ 'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp' }[req.file.mimetype];
- const key=requested.replace(/\\.[^.]+$/,'')+ext;
+ const key=requested;
  await saveImage(key,req.file.buffer,req.file.mimetype);res.status(201).json({path:key,storage:s3?'r2':'local'});
 }));
 app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
