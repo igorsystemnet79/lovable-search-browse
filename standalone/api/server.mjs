@@ -89,6 +89,41 @@ for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.delete(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const {rowCount}=await pool.query(`DELETE FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json({ok:true});}));
 }
 app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';const table=kind==='ponuda'?'ponude':'zahtevi';const col=kind==='ponuda'?'ponuda_id':'zahtev_id';const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen.'});const old=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);if(old.rows[0].n+(req.files?.length||0)>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});const out=[];for(const [i,f] of (req.files||[]).entries()){const filename=`${randomUUID()}.jpg`;const key=`${req.user.sub}/${filename}`;const normalized=await normalizeImage(f.buffer);await saveImage(key,normalized,'image/jpeg');const p=`/uploads/${key}`;const {rows}=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,p,old.rows[0].n+i]);out.push(rows[0]);}res.status(201).json(out);}));
+
+app.post('/api/admin/listings/:kind/:id/images',auth,admin,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
+ const table=req.params.kind==='ponude'?'ponude':req.params.kind==='zahtevi'?'zahtevi':null;
+ if(!table)return res.status(400).json({error:'Nepoznat tip oglasa.'});
+ if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju.'});
+ const listing=await pool.query(`SELECT id,user_id FROM ${table} WHERE id=$1`,[req.params.id]);
+ if(!listing.rows[0])return res.status(404).json({error:'Oglas nije pronađen.'});
+ const col=table==='ponude'?'ponuda_id':'zahtev_id';
+ const count=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);
+ if(count.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});
+ const out=[];
+ for(const [i,file] of req.files.entries()){
+  const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
+  const normalized=await normalizeImage(file.buffer);
+  await saveImage(key,normalized,'image/jpeg');
+  try{
+   const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
+   out.push(inserted.rows[0]);
+  }catch(error){await removeImage(key);throw error;}
+ }
+ res.status(201).json(out);
+}));
+app.delete('/api/admin/images/:imageId',auth,admin,asyncRoute(async(req,res)=>{
+ const found=await pool.query('SELECT * FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
+ if(!found.rows[0])return res.status(404).json({error:'Fotografija nije pronađena.'});
+ const image=found.rows[0];
+ if(image.storage_path){
+  const parts=String(image.storage_path).split('/').filter(Boolean);
+  if(parts[0]==='uploads')parts.shift();
+  await removeImage(parts.join('/'));
+ }
+ await pool.query('DELETE FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
+ res.json({ok:true});
+}));
+
 app.post('/api/podrska',asyncRoute(async(req,res)=>{const {ime,email,poruka}=req.body||{};if(!ime||!/^\S+@\S+\.\S+$/.test(email||'')||!poruka||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
