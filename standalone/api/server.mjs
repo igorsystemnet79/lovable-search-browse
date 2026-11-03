@@ -98,7 +98,7 @@ const TABLE_COLUMNS = {
  zahtevi: ['id','naslov','opis','kategorija','lokacija','budzet','valuta','zavrseno','user_id','kontakt_ime','telefon','created_at','updated_at'],
  profiles: ['id','ime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email','created_at'],
  user_roles: ['id','user_id','role'],
- pracenja: ['id','user_id','ponuda_id','pocetna_cena','created_at'],
+ pracenja: ['id','user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet','created_at'],
  slike_oglasa: ['id','ponuda_id','zahtev_id','storage_path','external_url','pozicija','created_at'],
  izmene_oglasa: ['id','oglas_id','tabela','opis','created_at'],
  poruke_podrske: ['id','ime','email','poruka','created_at'],
@@ -109,7 +109,7 @@ const WRITE_COLUMNS = {
  ponude: ['naslov','opis','kategorija','lokacija','cena','valuta','emoji','kontakt_ime','telefon','zavrseno','user_id','istaknuto'],
  zahtevi: ['naslov','opis','kategorija','lokacija','budzet','valuta','kontakt_ime','telefon','zavrseno','user_id'],
  profiles: ['ime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email'],
- user_roles: ['user_id','role'], pracenja: ['user_id','ponuda_id','pocetna_cena'],
+ user_roles: ['user_id','role'], pracenja: ['user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet'],
  slike_oglasa: ['ponuda_id','zahtev_id','storage_path','external_url','pozicija'],
  poruke_podrske: ['ime','email','poruka'],
  apr_firme: ['pib','maticni_broj','naziv','sediste','adresa','status','synced_at'],
@@ -139,6 +139,12 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(table==='pracenja' && action==='update') return res.status(400).json({error:'Praćenje se ne menja direktno.'});
  if(table==='poruke_podrske' && action!=='insert' && !adminUser) return res.status(403).json({error:'Samo administrator može pregledati poruke.'});
  if(table==='pracenja' && !userId) return res.status(401).json({error:'Prijava je obavezna.'});
+ if(table==='pracenja' && action==='insert') for(const row of supplied){
+   const hasOffer=!!row.ponuda_id, hasRequest=!!row.zahtev_id;
+   if(hasOffer===hasRequest) return res.status(400).json({error:'Praćenje mora pripadati tačno jednoj ponudi ili zahtevu.'});
+   const listing=hasOffer?await pool.query('SELECT id FROM ponude WHERE id=$1',[row.ponuda_id]):await pool.query('SELECT id FROM zahtevi WHERE id=$1',[row.zahtev_id]);
+   if(!listing.rowCount) return res.status(404).json({error:'Oglas koji želiš da pratiš ne postoji.'});
+ }
  const supplied=Array.isArray(values)?values:[values||{}];
  for(const item of supplied) for(const key of Object.keys(item||{})) {
    if(!columns.includes(key) || ['id','created_at','updated_at'].includes(key)) return res.status(400).json({error:`Polje ${key} nije dozvoljeno za izmenu.`});
