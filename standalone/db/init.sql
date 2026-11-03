@@ -1,5 +1,9 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE TABLE IF NOT EXISTS storage_objects (
+ object_key text PRIMARY KEY, content_type text NOT NULL, body bytea NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS users (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL,
  password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
