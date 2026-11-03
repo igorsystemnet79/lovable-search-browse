@@ -32,6 +32,8 @@ const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text
 function AdminPage() {
   const { user, isAdmin, isModerator, checked } = useIsAdmin();
   const [tab, setTab] = useState<(typeof tabs)[number]>("Korisnici");
+  const [pendingCount, setPendingCount] = useState(0);
+  useEffect(() => { if (!isAdmin) return; let active = true; ucitajAdminPredloge().then((items) => { if (active) setPendingCount((items as Predlog[]).filter((p) => p.status === "na_cekanju").length); }).catch(() => {}); return () => { active = false; }; }, [isAdmin, tab]);
 
   let body;
   if (!checked) body = <p className="text-muted-foreground">Učitavanje...</p>;
@@ -44,7 +46,7 @@ function AdminPage() {
           <>
             <div className="mb-6 flex flex-wrap gap-2">
               {tabs.map((t) => (
-                <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t}</button>
+                <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t === "Odobrenja" && pendingCount > 0 ? `Odobrenja (${pendingCount})` : t}</button>
               ))}
             </div>
             {tab === "Korisnici" && <Korisnici selfId={user.id} />}
