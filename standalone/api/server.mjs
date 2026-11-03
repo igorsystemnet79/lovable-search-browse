@@ -123,7 +123,7 @@ const ownsImage = async (row,userId) => {
  if (row.zahtev_id) return (await pool.query('SELECT 1 FROM zahtevi WHERE id=$1 AND user_id=$2',[row.zahtev_id,userId])).rowCount>0;
  return false;
 };
-const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await pool.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);for(const row of rows){const rel=String(row.storage_path).replace(/^\\/+/, '').replace(/^uploads\\//, '');await removeImage(rel);} };
+const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await pool.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);for(const row of rows){const rel=String(row.storage_path).replace(/^\/+/, '').replace(/^uploads\//, '');await removeImage(rel);} };
 app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  const {table,action='select',values,filters=[],orders=[],limit,single,count,or}=req.body||{};
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
