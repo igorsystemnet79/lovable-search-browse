@@ -1,5 +1,9 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE EXTENSION IF NOT EXISTS unaccent;
+CREATE TABLE IF NOT EXISTS storage_objects (
+ object_key text PRIMARY KEY, content_type text NOT NULL, body bytea NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS users (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL,
  password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
@@ -42,6 +46,21 @@ ALTER TABLE pracenja DROP CONSTRAINT IF EXISTS pracenja_jedan_oglas;
 ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_ponuda_unique ON pracenja(user_id,ponuda_id) WHERE ponuda_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_zahtev_unique ON pracenja(user_id,zahtev_id) WHERE zahtev_id IS NOT NULL;
+CREATE TABLE IF NOT EXISTS moderator_proposals (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ tabela text NOT NULL CHECK (tabela IN ('ponude','zahtevi')),
+ oglas_id uuid NOT NULL,
+ moderator_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ trenutni_podaci jsonb NOT NULL,
+ predlozeni_podaci jsonb NOT NULL,
+ status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','odobreno','odbijeno')),
+ admin_napomena text,
+ odlucio_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ odluceno_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderator_proposals_status_idx ON moderator_proposals(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS moderator_proposals_moderator_idx ON moderator_proposals(moderator_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS izmene_oglasa (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), oglas_id uuid NOT NULL, tabela text NOT NULL,
  opis text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
