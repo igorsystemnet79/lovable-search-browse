@@ -42,11 +42,8 @@ CREATE TABLE IF NOT EXISTS pracenja (
 ALTER TABLE pracenja ALTER COLUMN ponuda_id DROP NOT NULL;
 ALTER TABLE pracenja ADD COLUMN IF NOT EXISTS zahtev_id uuid REFERENCES zahtevi(id) ON DELETE CASCADE;
 ALTER TABLE pracenja ADD COLUMN IF NOT EXISTS pocetni_budzet numeric;
-DO $ BEGIN
- IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='pracenja_jedan_oglas') THEN
-  ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
- END IF;
-END $;
+ALTER TABLE pracenja DROP CONSTRAINT IF EXISTS pracenja_jedan_oglas;
+ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_ponuda_unique ON pracenja(user_id,ponuda_id) WHERE ponuda_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_zahtev_unique ON pracenja(user_id,zahtev_id) WHERE zahtev_id IS NOT NULL;
 CREATE TABLE IF NOT EXISTS moderator_proposals (
