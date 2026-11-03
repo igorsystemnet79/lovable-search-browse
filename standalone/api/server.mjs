@@ -5,6 +5,7 @@ import pg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import path from 'node:path';
 import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -26,6 +27,20 @@ fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
 const storage = multer.diskStorage({ destination: uploadDir, filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`) });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024, files: 7 }, fileFilter: (_req, f, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(f.mimetype)) });
+const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, files: 1 }, fileFilter: (_req, f, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(f.mimetype)) });
+const s3Enabled = Boolean(process.env.S3_ENDPOINT && process.env.S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
+const s3 = s3Enabled ? new S3Client({ region: process.env.S3_REGION || 'auto', endpoint: process.env.S3_ENDPOINT, forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } }) : null;
+const imageMime = new Set(['image/jpeg','image/png','image/webp']);
+const safeObjectKey = value => String(value || '').replace(/^\\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
+async function saveImage(key, buffer, contentType) {
+ if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
+ if (s3) await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
+ else { const target=path.resolve(uploadDir,key); if(!target.startsWith(path.resolve(uploadDir)+path.sep)) throw new Error('Nedozvoljena putanja fotografije.'); fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,buffer); }
+}
+async function removeImage(key) {
+ if (s3) await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
+ else { const target=path.resolve(uploadDir,key); if(target.startsWith(path.resolve(uploadDir)+path.sep) && fs.existsSync(target)) fs.unlinkSync(target); }
+}
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
 const auth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (!token) return res.status(401).json({ error:'Prijava je obavezna.' }); try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); next(); } catch { res.status(401).json({ error:'Sesija je istekla.' }); } });
@@ -201,13 +216,20 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
  }
  return res.status(400).json({error:'Nepoznata funkcija.'});
 }));
-app.post('/api/storage/upload',auth,upload.single('file'),asyncRoute(async(req,res)=>{
- const requested=String(req.body.path||'').replace(/^\/+/, '');if(!req.file)return res.status(400).json({error:'Fotografija nije poslata.'});
- const resolved=path.resolve(uploadDir,requested);if(!requested.startsWith(`${req.user.sub}/`)||!resolved.startsWith(path.resolve(uploadDir)+path.sep)){fs.unlinkSync(req.file.path);return res.status(403).json({error:'Nedozvoljena putanja fotografije.'});}
- fs.mkdirSync(path.dirname(resolved),{recursive:true});fs.renameSync(req.file.path,resolved);res.status(201).json({path:requested});
+app.post('/api/storage/upload',auth,memoryUpload.single('file'),asyncRoute(async(req,res)=>{
+ const requested=safeObjectKey(req.body.path);if(!req.file)return res.status(400).json({error:'Fotografija nije poslata.'});
+ if(!requested.startsWith(`${req.user.sub}/`))return res.status(403).json({error:'Nedozvoljena putanja fotografije.'});
+ const ext={ 'image/jpeg':'.jpg','image/png':'.png','image/webp':'.webp' }[req.file.mimetype];
+ const key=requested.replace(/\\.[^.]+$/,'')+ext;
+ await saveImage(key,req.file.buffer,req.file.mimetype);res.status(201).json({path:key,storage:s3?'r2':'local'});
 }));
 app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
- const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const rel=String(item).replace(/^\/+/, '');const full=path.resolve(uploadDir,rel);if(!rel.startsWith(`${req.user.sub}/`)||!full.startsWith(path.resolve(uploadDir)+path.sep))continue;if(fs.existsSync(full))fs.unlinkSync(full);}res.json({ok:true});
+ const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const key=safeObjectKey(item);if(!key.startsWith(`${req.user.sub}/`))continue;await removeImage(key);}res.json({ok:true});
+}));
+app.get('/api/storage/public',asyncRoute(async(req,res)=>{
+ const key=safeObjectKey(req.query.path);if(!key)return res.status(400).end();
+ if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=86400');object.Body.pipe(res);}
+ else {const target=path.resolve(uploadDir,key);if(!target.startsWith(path.resolve(uploadDir)+path.sep))return res.status(404).end();res.sendFile(target);}
 }));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
