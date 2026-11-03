@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BackLink } from "@/components/back-link";
@@ -47,8 +47,8 @@ function KategorijaPage() {
     queryKey: ["kategorija", kat.slug],
     queryFn: async () => {
       const [p, z] = await Promise.all([
-        supabase.from("ponude").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
-        supabase.from("zahtevi").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
+        ponudimi.from("ponude").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
+        ponudimi.from("zahtevi").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
       ]);
       if (p.error) throw p.error;
       if (z.error) throw z.error;

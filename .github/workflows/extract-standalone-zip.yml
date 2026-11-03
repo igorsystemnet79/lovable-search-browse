@@ -1,0 +1,44 @@
+name: Extract PonudiMi standalone ZIP
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out isolated deployment branch
+        uses: actions/checkout@v4
+        with:
+          ref: deploy/ponudimi-standalone
+
+      - name: Extract standalone package
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP_FILE="PonudiMi-samostalna-instalacija.zip"
+          test -f "$ZIP_FILE"
+          mkdir -p /tmp/ponudimi-unpack
+          unzip -q "$ZIP_FILE" -d /tmp/ponudimi-unpack
+          SOURCE_DIR="$(find /tmp/ponudimi-unpack -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$SOURCE_DIR"
+          test -f "$SOURCE_DIR/package.json"
+          rsync -a --exclude='.git/' "$SOURCE_DIR/" ./
+          git status --short
+
+      - name: Commit extracted project files
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No extracted changes to commit."
+          else
+            git commit -m "Extract PonudiMi standalone installation package"
+            git push origin HEAD:deploy/ponudimi-standalone
+          fi

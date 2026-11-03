@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { inputCls } from "@/components/auth-shell";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { kategorije, vrednostKategorije } from "@/lib/kategorije";
 import { listingFormSchema, type ListingFormValues } from "@/lib/listing-form";
 import { ListingImages, ucitajSlikeOglasa, sacuvajSlikeOglasa, type ListingPhoto } from "@/components/listing-images";
@@ -72,16 +72,16 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
       let listingId = edit?.id ?? createdId ?? "";
       if (edit || createdId) {
         const response = kind === "ponuda"
-          ? await supabase.from("ponude").update({ ...values, cena: amount }).eq("id", listingId)
-          : await supabase.from("zahtevi").update({ ...values, budzet: amount }).eq("id", listingId);
+          ? await ponudimi.from("ponude").update({ ...values, cena: amount }).eq("id", listingId)
+          : await ponudimi.from("zahtevi").update({ ...values, budzet: amount }).eq("id", listingId);
         if (response.error) throw response.error;
       } else if (kind === "ponuda") {
-        const response = await supabase.from("ponude").insert({ ...common, cena: amount, istaknuto: false }).select("id").single();
+        const response = await ponudimi.from("ponude").insert({ ...common, cena: amount, istaknuto: false }).select("id").single();
         if (response.error) throw response.error;
         listingId = response.data.id;
         setCreatedId(listingId);
       } else {
-        const response = await supabase.from("zahtevi").insert({ ...common, budzet: amount }).select("id").single();
+        const response = await ponudimi.from("zahtevi").insert({ ...common, budzet: amount }).select("id").single();
         if (response.error) throw response.error;
         listingId = response.data.id;
         setCreatedId(listingId);

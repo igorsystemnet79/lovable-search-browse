@@ -1,0 +1,13 @@
+.git
+.gitignore
+node_modules
+.output
+dist
+coverage
+**/.env
+**/.env.*
+!**/.env.example
+**/uploads
+**/*.zip
+*.log
+.DS_Store

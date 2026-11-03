@@ -1,4 +1,4 @@
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 
 export type Ponuda = {
   id: string;
@@ -50,7 +50,7 @@ export function formatVreme(iso: string) {
 export const ponudeQuery = (limit?: number, samoIstaknute = false) => ({
   queryKey: ["ponude", limit ?? "sve", samoIstaknute],
   queryFn: async (): Promise<Ponuda[]> => {
-    let q = supabase.from("ponude").select("*").order("created_at", { ascending: false });
+    let q = ponudimi.from("ponude").select("*").order("created_at", { ascending: false });
     if (samoIstaknute) q = q.eq("istaknuto", true);
     if (limit) q = q.limit(limit);
     const { data, error } = await q;
@@ -62,7 +62,7 @@ export const ponudeQuery = (limit?: number, samoIstaknute = false) => ({
 export const zahteviQuery = (limit?: number) => ({
   queryKey: ["zahtevi", limit ?? "sve"],
   queryFn: async (): Promise<Zahtev[]> => {
-    let q = supabase.from("zahtevi").select("*").order("created_at", { ascending: false });
+    let q = ponudimi.from("zahtevi").select("*").order("created_at", { ascending: false });
     if (limit) q = q.limit(limit);
     const { data, error } = await q;
     if (error) throw error;
@@ -77,8 +77,8 @@ export const pretragaQuery = (q: string, lokacija: string) => ({
   queryFn: async (): Promise<SearchResults> => {
     const args = { q: q.slice(0, 200), mesto: lokacija.slice(0, 100) };
     const [ponude, zahtevi] = await Promise.all([
-      supabase.rpc("pretrazi_ponude", args),
-      supabase.rpc("pretrazi_zahteve", args),
+      ponudimi.rpc("pretrazi_ponude", args),
+      ponudimi.rpc("pretrazi_zahteve", args),
     ]);
     if (ponude.error) throw ponude.error;
     if (zahtevi.error) throw zahtevi.error;
@@ -91,7 +91,7 @@ export type Izmena = { id: string; oglas_id: string; opis: string; created_at: s
 export const izmeneQuery = (oglasId: string) => ({
   queryKey: ["izmene", oglasId],
   queryFn: async (): Promise<Izmena[]> => {
-    const { data, error } = await supabase.from("izmene_oglasa").select("id, oglas_id, opis, created_at").eq("oglas_id", oglasId).order("created_at", { ascending: false }).limit(10);
+    const { data, error } = await ponudimi.from("izmene_oglasa").select("id, oglas_id, opis, created_at").eq("oglas_id", oglasId).order("created_at", { ascending: false }).limit(10);
     if (error) throw error;
     return data ?? [];
   },

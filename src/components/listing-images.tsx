@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Link2, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 
 export type ListingPhoto = {
   id?: string;
@@ -196,12 +196,12 @@ export function ListingImages({
 
 export async function ucitajSlikeOglasa(kind: "ponuda" | "zahtev", id: string): Promise<ListingPhoto[]> {
   const column = kind === "ponuda" ? "ponuda_id" : "zahtev_id";
-  const { data, error } = await supabase.from("slike_oglasa").select("*").eq(column, id).order("pozicija");
+  const { data, error } = await ponudimi.from("slike_oglasa").select("*").eq(column, id).order("pozicija");
   if (error) throw error;
   return (data ?? []).map((row) => {
     const path = row.storage_path as string | null;
     const external = row.external_url as string | null;
-    const preview = external ?? (path ? supabase.storage.from("slike-oglasa").getPublicUrl(path).data.publicUrl : "");
+    const preview = external ?? (path ? ponudimi.storage.from("slike-oglasa").getPublicUrl(path).data.publicUrl : "");
     return { id: row.id as string, preview, externalUrl: external ?? undefined, storagePath: path ?? undefined };
   });
 }
@@ -209,36 +209,36 @@ export async function ucitajSlikeOglasa(kind: "ponuda" | "zahtev", id: string): 
 export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, userId: string, photos: ListingPhoto[]) {
   if (photos.length > MAX_PHOTOS) throw new Error("Dozvoljeno je najviše 7 fotografija.");
   const column = kind === "ponuda" ? "ponuda_id" : "zahtev_id";
-  const { data: existing, error: readError } = await supabase.from("slike_oglasa").select("*").eq(column, id);
+  const { data: existing, error: readError } = await ponudimi.from("slike_oglasa").select("*").eq(column, id);
   if (readError) throw readError;
   const keepIds = new Set(photos.map((p) => p.id).filter(Boolean));
   const removeRows = (existing ?? []).filter((row) => !keepIds.has(row.id));
   for (const row of removeRows) {
-    if (row.storage_path) await supabase.storage.from("slike-oglasa").remove([row.storage_path]);
-    const { error } = await supabase.from("slike_oglasa").delete().eq("id", row.id);
+    if (row.storage_path) await ponudimi.storage.from("slike-oglasa").remove([row.storage_path]);
+    const { error } = await ponudimi.from("slike_oglasa").delete().eq("id", row.id);
     if (error) throw error;
   }
   for (let index = 0; index < photos.length; index++) {
     const photo = photos[index];
     if (photo.id) {
-      const { error } = await supabase.from("slike_oglasa").update({ pozicija: index }).eq("id", photo.id);
+      const { error } = await ponudimi.from("slike_oglasa").update({ pozicija: index }).eq("id", photo.id);
       if (error) throw error;
       continue;
     }
     if (photo.externalUrl) {
       const payload = { [column]: id, external_url: photo.externalUrl, storage_path: null, pozicija: index };
-      const { error } = await supabase.from("slike_oglasa").insert(payload);
+      const { error } = await ponudimi.from("slike_oglasa").insert(payload);
       if (error) throw error;
       continue;
     }
     if (photo.file) {
       const path = `${userId}/${kind}/${id}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadError } = await supabase.storage.from("slike-oglasa").upload(path, photo.file, { contentType: "image/jpeg", upsert: false });
+      const { error: uploadError } = await ponudimi.storage.from("slike-oglasa").upload(path, photo.file, { contentType: "image/jpeg", upsert: false });
       if (uploadError) throw uploadError;
       const payload = { [column]: id, storage_path: path, external_url: null, pozicija: index };
-      const { error } = await supabase.from("slike_oglasa").insert(payload);
+      const { error } = await ponudimi.from("slike_oglasa").insert(payload);
       if (error) {
-        await supabase.storage.from("slike-oglasa").remove([path]);
+        await ponudimi.storage.from("slike-oglasa").remove([path]);
         throw error;
       }
     }
