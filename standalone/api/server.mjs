@@ -40,21 +40,24 @@ const safeObjectKey = value => String(value || '').replace(/^\/+/, '').split('/'
 async function saveImage(key, buffer, contentType) {
  if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
  if (s3) await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
- else { const target=path.resolve(uploadDir,key); if(!target.startsWith(path.resolve(uploadDir)+path.sep)) throw new Error('Nedozvoljena putanja fotografije.'); fs.mkdirSync(path.dirname(target),{recursive:true}); fs.writeFileSync(target,buffer); }
+ else { await pool.query('INSERT INTO storage_objects(object_key,content_type,body) VALUES($1,$2,$3) ON CONFLICT(object_key) DO UPDATE SET content_type=EXCLUDED.content_type,body=EXCLUDED.body,created_at=now()',[key,contentType,buffer]); }
 }
 async function removeImage(key) {
  if (s3) await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
- else { const target=path.resolve(uploadDir,key); if(target.startsWith(path.resolve(uploadDir)+path.sep) && fs.existsSync(target)) fs.unlinkSync(target); }
+ else { await pool.query('DELETE FROM storage_objects WHERE object_key=$1',[key]); const target=path.resolve(uploadDir,key); if(target.startsWith(path.resolve(uploadDir)+path.sep) && fs.existsSync(target)) fs.unlinkSync(target); }
 }
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
 const auth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (!token) return res.status(401).json({ error:'Prijava je obavezna.' }); try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); next(); } catch { res.status(401).json({ error:'Sesija je istekla.' }); } });
 const optionalAuth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (token) { try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); } catch { return res.status(401).json({ error:'Sesija je istekla.' }); } } next(); });
 const admin = asyncRoute(async (req,res,next) => { const { rows } = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[req.user.sub]); if (!rows.length) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
+const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
+const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at });
 const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JWT_SECRET, { expiresIn:'7d' });
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
-app.get('/api/health', (_req,res)=>res.json({ ok:true, service:'PonudiMi standalone API' }));
+app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
+app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
 app.post('/api/auth/register', asyncRoute(async(req,res)=>{
@@ -64,7 +67,7 @@ app.post('/api/auth/register', asyncRoute(async(req,res)=>{
  if(metadata.tip_lica==='pravno' && (!String(metadata.naziv_firme||'').trim() || !validPib(metadata.pib))) return res.status(400).json({error:'Naziv firme ili PIB nisu ispravni.'});
  const c=await pool.connect(); try { await c.query('BEGIN'); const {rows}=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,now(),$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify(metadata)]); const u=rows[0]; const m=metadata; const pib=m.tip_lica==='pravno'&&validPib(m.pib)?String(m.pib).replace(/\s/g,''):null; const verified=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount); await c.query(`INSERT INTO profiles(id,ime,telefon,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[u.id,m.ime||m.full_name||null,m.telefon||null,m.grad||null,m.adresa||null,m.tip_lica==='pravno'?'pravno':'fizicko',m.naziv_firme||null,pib,e,verified]); await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]); if(e===String(process.env.ADMIN_EMAIL||'').toLowerCase()) await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') ON CONFLICT DO NOTHING",[u.id]); await c.query('COMMIT'); const token=sign(u); res.status(201).json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}}); } catch(err){await c.query('ROLLBACK'); if(err.code==='23505') return res.status(409).json({error:'Nalog sa ovom e-mail adresom već postoji.'}); throw err;} finally{c.release();}
 }));
-app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
+app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});const adminEmail=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();if(adminEmail&&e===adminEmail)await pool.query("INSERT INTO user_roles(user_id,role) VALUES($1,'admin') ON CONFLICT DO NOTHING",[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT * FROM users WHERE id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:publicUser(rows[0])});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
@@ -88,6 +91,67 @@ for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.delete(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const {rowCount}=await pool.query(`DELETE FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json({ok:true});}));
 }
 app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';const table=kind==='ponuda'?'ponude':'zahtevi';const col=kind==='ponuda'?'ponuda_id':'zahtev_id';const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen.'});const old=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);if(old.rows[0].n+(req.files?.length||0)>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});const out=[];for(const [i,f] of (req.files||[]).entries()){const filename=`${randomUUID()}.jpg`;const key=`${req.user.sub}/${filename}`;const normalized=await normalizeImage(f.buffer);await saveImage(key,normalized,'image/jpeg');const p=`/uploads/${key}`;const {rows}=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,p,old.rows[0].n+i]);out.push(rows[0]);}res.status(201).json(out);}));
+
+app.post('/api/admin/listings/:kind/:id/images',auth,admin,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
+ const table=req.params.kind==='ponude'?'ponude':req.params.kind==='zahtevi'?'zahtevi':null;
+ if(!table)return res.status(400).json({error:'Nepoznat tip oglasa.'});
+ if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju.'});
+ const listing=await pool.query(`SELECT id,user_id FROM ${table} WHERE id=$1`,[req.params.id]);
+ if(!listing.rows[0])return res.status(404).json({error:'Oglas nije pronađen.'});
+ const col=table==='ponude'?'ponuda_id':'zahtev_id';
+ const count=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);
+ if(count.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});
+ const out=[];
+ for(const [i,file] of req.files.entries()){
+  const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
+  const normalized=await normalizeImage(file.buffer);
+  await saveImage(key,normalized,'image/jpeg');
+  try{
+   const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
+   out.push(inserted.rows[0]);
+  }catch(error){await removeImage(key);throw error;}
+ }
+ res.status(201).json(out);
+}));
+app.delete('/api/admin/images/:imageId',auth,admin,asyncRoute(async(req,res)=>{
+ const found=await pool.query('SELECT * FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
+ if(!found.rows[0])return res.status(404).json({error:'Fotografija nije pronađena.'});
+ const image=found.rows[0];
+ if(image.storage_path){
+  const parts=String(image.storage_path).split('/').filter(Boolean);
+  if(parts[0]==='uploads')parts.shift();
+  await removeImage(parts.join('/'));
+ }
+ await pool.query('DELETE FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
+ res.json({ok:true});
+}));
+
+const proposalFields = table => table==='ponude' ? ['naslov','opis','kategorija','lokacija','cena','valuta','kontakt_ime','telefon'] : ['naslov','opis','kategorija','lokacija','budzet','valuta','kontakt_ime','telefon'];
+app.post('/api/moderator/proposals',auth,moderatorOnly,asyncRoute(async(req,res)=>{
+ const {tabela,oglas_id,predlozeni_podaci}=req.body||{};
+ if(!['ponude','zahtevi'].includes(tabela)||!oglas_id||!predlozeni_podaci||typeof predlozeni_podaci!=='object'||Array.isArray(predlozeni_podaci))return res.status(400).json({error:'Nedostaju podaci predloga.'});
+ const allowed=proposalFields(tabela),keys=Object.keys(predlozeni_podaci);if(!keys.length||keys.some(k=>!allowed.includes(k)))return res.status(400).json({error:'Predlog sadrži nedozvoljena polja.'});
+ const current=await pool.query('SELECT * FROM '+tabela+' WHERE id=$1',[oglas_id]);if(!current.rows[0])return res.status(404).json({error:'Oglas nije pronađen.'});
+ const old=current.rows[0],proposed={};for(const key of keys)proposed[key]=predlozeni_podaci[key];
+ const title=String(proposed.naslov??old.naslov??'').trim(),category=String(proposed.kategorija??old.kategorija??'').trim(),location=String(proposed.lokacija??old.lokacija??'').trim();
+ if(title.length<3||title.length>150||!category||category.length>100||location.length<2||location.length>100||String(proposed.opis??old.opis??'').length>3000)return res.status(400).json({error:'Proveri naslov, kategoriju, lokaciju i opis.'});
+ const amount=tabela==='ponude'?'cena':'budzet';if(proposed[amount]!==undefined&&proposed[amount]!==null&&(!Number.isFinite(Number(proposed[amount]))||Number(proposed[amount])<0))return res.status(400).json({error:'Cena/budžet nije ispravan.'});
+ if(proposed.telefon!==undefined&&!/^[+0-9 ()-]{6,30}$/.test(String(proposed.telefon||'')))return res.status(400).json({error:'Telefon nije ispravan.'});if(proposed.valuta!==undefined&&!['EUR','RSD'].includes(proposed.valuta))return res.status(400).json({error:'Valuta nije ispravna.'});
+ const r=await pool.query('INSERT INTO moderator_proposals(tabela,oglas_id,moderator_id,trenutni_podaci,predlozeni_podaci) VALUES($1,$2,$3,$4,$5) RETURNING *',[tabela,oglas_id,req.user.sub,old,proposed]);res.status(201).json(r.rows[0]);
+}));
+app.get('/api/moderator/proposals',auth,moderatorOrAdmin,asyncRoute(async(req,res)=>{const r=await pool.query('SELECT * FROM moderator_proposals WHERE moderator_id=$1 ORDER BY created_at DESC LIMIT 200',[req.user.sub]);res.json(r.rows);}));
+app.get('/api/admin/proposals',auth,admin,asyncRoute(async(req,res)=>{const r=await pool.query("SELECT mp.*,u.email AS moderator_email,p.ime AS moderator_ime FROM moderator_proposals mp JOIN users u ON u.id=mp.moderator_id LEFT JOIN profiles p ON p.id=u.id ORDER BY CASE WHEN mp.status='na_cekanju' THEN 0 ELSE 1 END,mp.created_at DESC LIMIT 300");res.json(r.rows);}));
+app.post('/api/admin/proposals/:id/decision',auth,admin,asyncRoute(async(req,res)=>{
+ const decision=req.body?.decision;if(!['odobreno','odbijeno'].includes(decision))return res.status(400).json({error:'Izaberite odobrenje ili odbijanje.'});
+ const c=await pool.connect();try{await c.query('BEGIN');const found=await c.query('SELECT * FROM moderator_proposals WHERE id=$1 FOR UPDATE',[req.params.id]);const proposal=found.rows[0];
+ if(!proposal){await c.query('ROLLBACK');return res.status(404).json({error:'Predlog nije pronađen.'});}if(proposal.status!=='na_cekanju'){await c.query('ROLLBACK');return res.status(409).json({error:'O ovom predlogu je već odlučeno.'});}
+ if(decision==='odobreno'){const table=proposal.tabela,allowed=proposalFields(table),patch=proposal.predlozeni_podaci||{},keys=Object.keys(patch);if(!keys.length||keys.some(k=>!allowed.includes(k)))throw new Error('Predlog sadrži nedozvoljena polja.');
+ const current=await c.query('SELECT * FROM '+table+' WHERE id=$1 FOR UPDATE',[proposal.oglas_id]);if(!current.rows[0])throw new Error('Oglas više ne postoji.');
+ for(const key of keys)if(JSON.stringify(current.rows[0][key]??null)!==JSON.stringify(proposal.trenutni_podaci?.[key]??null))throw new Error('Oglas je u međuvremenu izmenjen. Predlog je potrebno ponovo proveriti.');
+ const vals=keys.map(k=>patch[k]);vals.push(proposal.oglas_id);const sets=keys.map((k,i)=>'"'+k+'"=$'+(i+1)).join(',');await c.query('UPDATE '+table+' SET '+sets+',updated_at=now() WHERE id=$'+(keys.length+1),vals);}
+ const updated=await c.query('UPDATE moderator_proposals SET status=$1,admin_napomena=$2,odlucio_id=$3,odluceno_at=now() WHERE id=$4 RETURNING *',[decision,String(req.body?.napomena||'').slice(0,1000)||null,req.user.sub,req.params.id]);await c.query('COMMIT');res.json(updated.rows[0]);
+ }catch(error){await c.query('ROLLBACK');if(['Oglas više ne postoji.','Oglas je u međuvremenu izmenjen. Predlog je potrebno ponovo proveriti.','Predlog sadrži nedozvoljena polja.'].includes(error.message))return res.status(409).json({error:error.message});throw error;}finally{c.release();}
+}));
 app.post('/api/podrska',asyncRoute(async(req,res)=>{const {ime,email,poruka}=req.body||{};if(!ime||!/^\S+@\S+\.\S+$/.test(email||'')||!poruka||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
@@ -122,7 +186,7 @@ const ownsImage = async (row,userId) => {
  if (row.zahtev_id) return (await pool.query('SELECT 1 FROM zahtevi WHERE id=$1 AND user_id=$2',[row.zahtev_id,userId])).rowCount>0;
  return false;
 };
-const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await pool.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);for(const row of rows){const rel=String(row.storage_path).replace(/^\/+/, '').replace(/^uploads\//, '');const full=path.resolve(uploadDir,rel);if(full.startsWith(path.resolve(uploadDir)+path.sep)&&fs.existsSync(full))fs.unlinkSync(full);} };
+const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await pool.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);for(const row of rows){const parts=String(row.storage_path).split('/').filter(Boolean);if(parts[0]==='uploads')parts.shift();await removeImage(parts.join('/'));} };
 app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  const {table,action='select',values,filters=[],orders=[],limit,single,count,or}=req.body||{};
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
@@ -220,7 +284,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
 }));
 app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
  const {fn,args={}}=req.body||{}; const userId=req.user?.sub||null;
- if(fn==='has_role'){const ok=userId&&args._user_id===userId?await isAdmin(userId):userId&&await isAdmin(userId);return res.json({data:!!ok});}
+ if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
  if(fn==='pretrazi_ponude'||fn==='pretrazi_zahteve'){
   const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';const term=String(args.q||'').trim();const mesto=String(args.mesto||'').trim();
   const {rows}=await pool.query(`SELECT * FROM ${table} WHERE pretraga_uslov(concat_ws(' ',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) ORDER BY created_at DESC LIMIT 200`,[term,mesto]);return res.json({data:rows});
@@ -240,8 +304,9 @@ app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
 app.get('/api/storage/public',asyncRoute(async(req,res)=>{
  const key=safeObjectKey(req.query.path);if(!key)return res.status(400).end();
  if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=86400');object.Body.pipe(res);}
- else {const target=path.resolve(uploadDir,key);if(!target.startsWith(path.resolve(uploadDir)+path.sep))return res.status(404).end();res.type('image/jpeg').sendFile(target);}
+ else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');return res.send(stored.rows[0].body);}const target=path.resolve(uploadDir,key);if(!target.startsWith(path.resolve(uploadDir)+path.sep))return res.status(404).end();res.type('image/jpeg').sendFile(target);}
 }));
+app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(!stored.rows[0])return res.status(404).end();res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');res.send(stored.rows[0].body);}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
