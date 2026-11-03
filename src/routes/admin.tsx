@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju } from "@/lib/admin.functions";
+import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
@@ -25,31 +25,36 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Odobrenja", "Poruke", "APR firme"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
 function AdminPage() {
-  const { user, isAdmin, checked } = useIsAdmin();
+  const { user, isAdmin, isModerator, checked } = useIsAdmin();
   const [tab, setTab] = useState<(typeof tabs)[number]>("Korisnici");
 
   let body;
   if (!checked) body = <p className="text-muted-foreground">Učitavanje...</p>;
   else if (!user) body = <p>Morate se <Link to="/prijava" className="font-semibold text-brand hover:underline">prijaviti</Link>.</p>;
-  else if (!isAdmin) body = <p>Nemate pristup administratorskom panelu.</p>;
+  else if (!isAdmin && !isModerator) body = <p>Nemate pristup administratorskom panelu.</p>;
   else
     body = (
       <>
-        <div className="mb-6 flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t}</button>
-          ))}
-        </div>
-        {tab === "Korisnici" && <Korisnici selfId={user.id} />}
-        {tab === "Ponude" && <Oglasi tabela="ponude" />}
-        {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
-        {tab === "Poruke" && <Poruke />}
-        {tab === "APR firme" && <Apr />}
+        {isAdmin ? (
+          <>
+            <div className="mb-6 flex flex-wrap gap-2">
+              {tabs.map((t) => (
+                <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t}</button>
+              ))}
+            </div>
+            {tab === "Korisnici" && <Korisnici selfId={user.id} />}
+            {tab === "Ponude" && <Oglasi tabela="ponude" />}
+            {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
+            {tab === "Odobrenja" && <PredloziZaOdobrenje />}
+            {tab === "Poruke" && <Poruke />}
+            {tab === "APR firme" && <Apr />}
+          </>
+        ) : <ModeratorWorkspace />}
       </>
     );
 
@@ -159,7 +164,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   );
 }
 
-type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null };
+type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; kategorija: string; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null; valuta?: string };
 type AdminImage = { id: string; storage_path: string | null; external_url: string | null; pozicija: number };
 
 function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
@@ -344,4 +349,37 @@ function Apr() {
       </div>
     </div>
   );
+}
+
+type Predlog = { id: string; tabela: "ponude" | "zahtevi"; oglas_id: string; moderator_id: string; moderator_email?: string; moderator_ime?: string; trenutni_podaci: Record<string, unknown>; predlozeni_podaci: Record<string, unknown>; status: "na_cekanju" | "odobreno" | "odbijeno"; admin_napomena?: string | null; created_at: string };
+
+function ModeratorWorkspace() {
+ const [kind,setKind]=useState<"ponude"|"zahtevi">("ponude");
+ const [rows,setRows]=useState<Oglas[]>([]); const [editing,setEditing]=useState<Oglas|null>(null);
+ const [msg,setMsg]=useState(""); const [busy,setBusy]=useState(false); const [filter,setFilter]=useState(""); const [proposals,setProposals]=useState<Predlog[]>([]);
+ const load=useCallback(async()=>{const result=await ponudimi.from(kind).select("*").order("created_at",{ascending:false}).limit(200);setRows((result.data??[]) as Oglas[]);try{setProposals(await ucitajPredlogeModeratora() as Predlog[]);}catch{}},[kind]);
+ useEffect(()=>{load();},[load]);
+ const q=filter.toLowerCase(); const visible=rows.filter(o=>!q||[o.naslov,o.kategorija,o.lokacija,o.user_id].some(v=>String(v??"").toLowerCase().includes(q)));
+ async function submit(){if(!editing)return;const amount=kind==="ponude"?"cena":"budzet";const payload={naslov:editing.naslov,opis:editing.opis,kategorija:editing.kategorija,lokacija:editing.lokacija,[amount]:editing[amount]??null,valuta:editing.valuta||"EUR",kontakt_ime:editing.kontakt_ime,telefon:editing.telefon};setBusy(true);setMsg("");try{await posaljiPredlogIzmene({tabela:kind,oglas_id:editing.id,predlozeni_podaci:payload});setMsg("Predlog je poslat administratoru. Oglas nije promenjen.");setEditing(null);await load();}catch(e){setMsg(e instanceof Error?e.message:"Slanje predloga nije uspelo.");}finally{setBusy(false);}}
+ return <div className="space-y-4">
+  <div className="flex flex-wrap items-center gap-2"><button className={kind==="ponude"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("ponude");setEditing(null);}}>Ponude</button><button className={kind==="zahtevi"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("zahtevi");setEditing(null);}}>Zahtevi</button><input className={inputCls+" max-w-sm"} placeholder="Pretraga oglasa ili ID korisnika" value={filter} onChange={e=>setFilter(e.target.value)}/></div>
+  <p className="text-sm text-muted-foreground">Pronađeno oglasa: {visible.length} · Tvoji predlozi: {proposals.length}</p>{msg&&<p className="rounded-xl bg-surface p-3 text-sm">{msg}</p>}
+  {editing&&<div className="rounded-2xl border border-brand/30 bg-surface p-4 shadow-card"><h2 className="mb-3 font-semibold">Predlog izmene: {editing.naslov}</h2><p className="mb-3 text-xs text-muted-foreground">Izmena neće biti objavljena dok je administrator ne odobri.</p>
+   <div className="grid gap-2 sm:grid-cols-2"><input className={inputCls} placeholder="Naslov" value={editing.naslov} onChange={e=>setEditing({...editing,naslov:e.target.value})}/><input className={inputCls} placeholder="Kategorija" value={editing.kategorija} onChange={e=>setEditing({...editing,kategorija:e.target.value})}/><input className={inputCls} placeholder="Lokacija" value={editing.lokacija} onChange={e=>setEditing({...editing,lokacija:e.target.value})}/><input className={inputCls} placeholder="Kontakt osoba" value={editing.kontakt_ime??""} onChange={e=>setEditing({...editing,kontakt_ime:e.target.value})}/><input className={inputCls} placeholder="Telefon" value={editing.telefon??""} onChange={e=>setEditing({...editing,telefon:e.target.value})}/><input className={inputCls} type="number" min="0" placeholder={kind==="ponude"?"Cena":"Budžet"} value={editing[kind==="ponude"?"cena":"budzet"]??""} onChange={e=>setEditing({...editing,[kind==="ponude"?"cena":"budzet"]:e.target.value===""?null:Number(e.target.value)})}/><select className={inputCls} value={editing.valuta||"EUR"} onChange={e=>setEditing({...editing,valuta:e.target.value})}><option value="EUR">EUR</option><option value="RSD">RSD</option></select><textarea className={inputCls+" sm:col-span-2"} rows={4} placeholder="Opis" value={editing.opis??""} onChange={e=>setEditing({...editing,opis:e.target.value})}/></div>
+   <div className="mt-3 flex gap-2"><button className={small} disabled={busy} onClick={submit}>{busy?"Šaljem...":"Pošalji administratoru na odobrenje"}</button><button className={small} onClick={()=>setEditing(null)}>Otkaži</button></div></div>}
+  <div className="space-y-2">{visible.map(o=><div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface p-4 shadow-card"><div className="text-sm"><p className="font-semibold">{o.naslov}</p><p className="text-muted-foreground">{o.kategorija} · {o.lokacija} · {kind==="ponude"?(o.cena??"po dogovoru"):(o.budzet??"po dogovoru")} {o.valuta||"EUR"}</p><p className="text-xs text-muted-foreground">Vlasnik naloga: {o.user_id}</p></div><button className={small} onClick={()=>setEditing(o)}>Predloži izmenu</button></div>)}{!visible.length&&<p className="text-sm text-muted-foreground">Nema oglasa za prikaz.</p>}</div>
+  <div className="border-t border-input pt-4"><h2 className="mb-3 font-semibold">Moji poslati predlozi</h2>{proposals.map(p=><div key={p.id} className="mb-2 rounded-xl bg-surface p-3 text-sm"><p className="font-medium">{p.tabela==="ponude"?"Ponuda":"Zahtev"} · {String(p.predlozeni_podaci?.naslov||p.oglas_id)}</p><p className="text-muted-foreground">Status: {p.status==="na_cekanju"?"Čeka administratora":p.status==="odobreno"?"Odobreno":"Odbijeno"} · {new Date(p.created_at).toLocaleString("sr-RS")}</p>{p.admin_napomena&&<p>Napomena: {p.admin_napomena}</p>}</div>)}</div>
+ </div>;
+}
+
+function PredloziZaOdobrenje() {
+ const [rows,setRows]=useState<Predlog[]>([]); const [msg,setMsg]=useState(""); const [busy,setBusy]=useState<string|null>(null);
+ const load=useCallback(async()=>{try{setRows(await ucitajAdminPredloge() as Predlog[]);}catch(e){setMsg(e instanceof Error?e.message:"Predlozi nisu učitani.");}},[]);useEffect(()=>{load();},[load]);
+ async function decide(p:Predlog,decision:"odobreno"|"odbijeno"){const note=decision==="odbijeno"?(prompt("Razlog odbijanja (opciono):")||""):"";setBusy(p.id);setMsg("");try{await odluciOPredlogu(p.id,decision,note);setMsg(decision==="odobreno"?"Izmena je odobrena i primenjena na oglas.":"Predlog je odbijen.");await load();}catch(e){setMsg(e instanceof Error?e.message:"Odluka nije sačuvana.");}finally{setBusy(null);}}
+ const pending=rows.filter(p=>p.status==="na_cekanju");
+ return <div className="space-y-3"><div className="flex flex-wrap items-center gap-3"><p className="font-semibold">Predlozi na čekanju: {pending.length}</p><button className={small} onClick={load}>Osveži</button>{msg&&<span className="text-sm text-brand">{msg}</span>}</div>
+ {rows.map(p=><div key={p.id} className="rounded-2xl bg-surface p-4 shadow-card"><div className="flex flex-wrap justify-between gap-2"><div><p className="font-semibold">{p.tabela==="ponude"?"Ponuda":"Zahtev"} · {String(p.predlozeni_podaci?.naslov||p.oglas_id)}</p><p className="text-xs text-muted-foreground">Moderator: {p.moderator_ime||p.moderator_email||p.moderator_id} · {new Date(p.created_at).toLocaleString("sr-RS")}</p></div><span className="text-sm">{p.status==="na_cekanju"?"Čeka odobrenje":p.status==="odobreno"?"Odobreno":"Odbijeno"}</span></div>
+  <div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Trenutni oglas</p>{Object.entries(p.trenutni_podaci||{}).filter(([k])=>["naslov","opis","kategorija","lokacija","cena","budzet","valuta","kontakt_ime","telefon"].includes(k)).map(([k,v])=><p key={k} className="text-sm"><b>{k}:</b> {String(v??"—")}</p>)}</div><div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Predložena izmena</p>{Object.entries(p.predlozeni_podaci||{}).map(([k,v])=><p key={k} className="text-sm"><b>{k}:</b> {String(v??"—")}</p>)}</div></div>
+  {p.status==="na_cekanju"&&<div className="mt-3 flex gap-2"><button className={small} disabled={busy===p.id} onClick={()=>decide(p,"odobreno")}>Odobri izmenu</button><button className={danger} disabled={busy===p.id} onClick={()=>decide(p,"odbijeno")}>Odbij</button></div>}{p.admin_napomena&&<p className="mt-2 text-sm text-muted-foreground">Napomena: {p.admin_napomena}</p>}</div>)}
+ {!rows.length&&<p className="text-sm text-muted-foreground">Trenutno nema predloga moderatora.</p>}</div>;
 }
