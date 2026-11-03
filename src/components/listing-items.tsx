@@ -44,7 +44,7 @@ export function PonudaItem({ ponuda, hideFollow }: { ponuda: Ponuda; hideFollow?
   );
 }
 
-export function ZahtevItem({ zahtev }: { zahtev: Zahtev }) {
+export function ZahtevItem({ zahtev, hideFollow }: { zahtev: Zahtev; hideFollow?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${zahtev.zavrseno ? "opacity-70" : ""}`}>
       <p className="font-medium">{zahtev.naslov}</p>
@@ -56,6 +56,7 @@ export function ZahtevItem({ zahtev }: { zahtev: Zahtev }) {
       {zahtev.opis ? <p className="mt-2 text-sm text-muted-foreground">{zahtev.opis}</p> : null}
       {zahtev.kontakt_ime && <p className="mt-2 text-sm">{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
+      {!hideFollow && <FollowButton zahtev={zahtev} />}
     </li>
   );
 }
