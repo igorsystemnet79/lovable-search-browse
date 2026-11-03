@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju } from "@/lib/admin.functions";
@@ -199,7 +199,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
     if (error) { setMsg("Fotografije nije moguće učitati."); return; }
     setImages((current) => ({ ...current, [o.id]: (data ?? []) as AdminImage[] }));
   }
-  async function uploadImages(o: Oglas, event: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadImages(o: Oglas, event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
     event.target.value = "";
     if (!files.length) return;
