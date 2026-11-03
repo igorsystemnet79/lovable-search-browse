@@ -249,7 +249,8 @@ export function ListingImageGallery({ kind, id }: { kind: "ponuda" | "zahtev"; i
   const q = useQuery({
     queryKey: ["slike-oglasa", kind, id],
     queryFn: () => ucitajSlikeOglasa(kind, id),
-    staleTime: 60_000,
+    staleTime: 0,
+    refetchOnMount: "always",
   });
   if (!q.data?.length) return null;
   return (
