@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr } from "@/lib/admin.functions";
+import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
@@ -159,13 +159,18 @@ function Korisnici({ selfId }: { selfId: string }) {
   );
 }
 
-type Oglas = { id: string; naslov: string; opis: string | null; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null };
+type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null };
+type AdminImage = { id: string; storage_path: string | null; external_url: string | null; pozicija: number };
 
 function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const [rows, setRows] = useState<Oglas[]>([]);
   const [edit, setEdit] = useState<Oglas | null>(null);
   const [msg, setMsg] = useState("");
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [images, setImages] = useState<Record<string, AdminImage[]>>({});
+  const [imageBusy, setImageBusy] = useState(false);
   const polje = tabela === "ponude" ? "cena" : "budzet";
+  const imageColumn = tabela === "ponude" ? "ponuda_id" : "zahtev_id";
   const load = useCallback(async () => {
     const { data } = await ponudimi.from(tabela).select("*").order("created_at", { ascending: false });
     setRows((data ?? []) as Oglas[]);
@@ -186,6 +191,39 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
     const { error } = await ponudimi.from(tabela).delete().eq("id", id);
     setMsg(error ? "Brisanje nije uspelo." : "Obrisano.");
     load();
+  }
+  async function toggleImages(o: Oglas) {
+    if (expandedId === o.id) { setExpandedId(null); return; }
+    setExpandedId(o.id);
+    const { data, error } = await ponudimi.from("slike_oglasa").select("*").eq(imageColumn, o.id).order("pozicija");
+    if (error) { setMsg("Fotografije nije moguće učitati."); return; }
+    setImages((current) => ({ ...current, [o.id]: (data ?? []) as AdminImage[] }));
+  }
+  async function uploadImages(o: Oglas, event: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    event.target.value = "";
+    if (!files.length) return;
+    setImageBusy(true);
+    setMsg("");
+    try {
+      await dodajAdminFotografije({ kind: tabela, listingId: o.id, files });
+      const { data } = await ponudimi.from("slike_oglasa").select("*").eq(imageColumn, o.id).order("pozicija");
+      setImages((current) => ({ ...current, [o.id]: (data ?? []) as AdminImage[] }));
+      setMsg("Fotografije su dodate.");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Dodavanje fotografija nije uspelo.");
+    } finally { setImageBusy(false); }
+  }
+  async function removeImage(o: Oglas, image: AdminImage) {
+    if (!confirm("Obrisati ovu fotografiju iz oglasa?")) return;
+    setImageBusy(true);
+    try {
+      await obrisiAdminFotografiju(image.id);
+      setImages((current) => ({ ...current, [o.id]: (current[o.id] ?? []).filter((item) => item.id !== image.id) }));
+      setMsg("Fotografija je obrisana.");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Brisanje fotografije nije uspelo.");
+    } finally { setImageBusy(false); }
   }
 
   return (
@@ -208,10 +246,33 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
               <div>
                 <p className="font-semibold">{o.naslov}</p>
                 <p className="text-muted-foreground">{o.lokacija} · {o.kontakt_ime ?? "—"} · {o.telefon ?? "—"} · {o[polje] ?? "po dogovoru"}</p>
+                <p className="mt-1 text-xs text-muted-foreground">ID vlasnika: {o.user_id}</p>
               </div>
               <div className="flex gap-2"><button className={small} onClick={() => setEdit(o)}>Izmeni</button><button className={danger} onClick={() => obrisi(o.id)}>Obriši</button></div>
             </div>
           )}
+          <div className="mt-3 border-t border-input pt-3">
+            <button className={small} onClick={() => toggleImages(o)}>{expandedId === o.id ? "Zatvori fotografije" : "Upravljaj fotografijama"}</button>
+            {expandedId === o.id && (
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-muted-foreground">Fotografije: {images[o.id]?.length ?? 0} / 7</p>
+                <div className="flex flex-wrap gap-3">
+                  {(images[o.id] ?? []).map((image) => (
+                    <div key={image.id} className="w-28">
+                      <img src={image.external_url || image.storage_path || ""} alt="Fotografija oglasa" className="h-24 w-28 rounded-lg border border-input object-cover" />
+                      <button className={`${danger} mt-2 w-full`} disabled={imageBusy} onClick={() => removeImage(o, image)}>Obriši sliku</button>
+                    </div>
+                  ))}
+                  {(images[o.id]?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">Oglas trenutno nema fotografija.</p>}
+                </div>
+                <label className="inline-flex cursor-pointer items-center rounded-full bg-highlight px-4 py-2 text-sm font-semibold text-highlight-foreground hover:opacity-90">
+                  {imageBusy ? "Sačekajte..." : "Dodaj fotografije"}
+                  <input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={imageBusy || (images[o.id]?.length ?? 0) >= 7} onChange={(event) => uploadImages(o, event)} />
+                </label>
+                <p className="text-xs text-muted-foreground">JPG, PNG ili WebP. Najviše 7 fotografija po oglasu.</p>
+              </div>
+            )}
+          </div>
         </div>
       ))}
     </div>
