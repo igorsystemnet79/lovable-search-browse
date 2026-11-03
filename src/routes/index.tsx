@@ -43,7 +43,7 @@ function Index() {
       if (draft.kind === "ponuda" || draft.kind === "zahtev") setListingKind(draft.kind);
     } catch { /* Draft restoration is optional. */ }
   }, []);
-  const ponude = useQuery(ponudeQuery(5, true));
+  const ponude = useQuery(ponudeQuery(5));
   const zahtevi = useQuery(zahteviQuery(5));
 
   return (
