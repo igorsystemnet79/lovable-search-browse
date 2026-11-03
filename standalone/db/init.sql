@@ -37,6 +37,21 @@ CREATE TABLE IF NOT EXISTS pracenja (
  ponuda_id uuid NOT NULL REFERENCES ponude(id) ON DELETE CASCADE, pocetna_cena numeric,
  created_at timestamptz NOT NULL DEFAULT now(), UNIQUE(user_id,ponuda_id)
 );
+CREATE TABLE IF NOT EXISTS moderator_proposals (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ tabela text NOT NULL CHECK (tabela IN ('ponude','zahtevi')),
+ oglas_id uuid NOT NULL,
+ moderator_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ trenutni_podaci jsonb NOT NULL,
+ predlozeni_podaci jsonb NOT NULL,
+ status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','odobreno','odbijeno')),
+ admin_napomena text,
+ odlucio_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ odluceno_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderator_proposals_status_idx ON moderator_proposals(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS moderator_proposals_moderator_idx ON moderator_proposals(moderator_id,created_at DESC);
 CREATE TABLE IF NOT EXISTS izmene_oglasa (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), oglas_id uuid NOT NULL, tabela text NOT NULL,
  opis text NOT NULL, created_at timestamptz NOT NULL DEFAULT now()
