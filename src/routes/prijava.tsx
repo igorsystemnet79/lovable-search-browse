@@ -34,6 +34,7 @@ function Prijava() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [lozinka, setLozinka] = useState("");
+  const [prikaziLozinku, setPrikaziLozinku] = useState(false);
   const [greska, setGreska] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,7 +94,30 @@ function Prijava() {
     <AuthShell title="Prijava" subtitle="Dobrodošao nazad!">
       <form onSubmit={onSubmit} className="space-y-3">
         <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className={inputCls} type="password" required autoComplete="current-password" placeholder="Lozinka" value={lozinka} onChange={(e) => setLozinka(e.target.value)} />
+        <div className="relative">
+          <input className={`${inputCls} pr-12`} type={prikaziLozinku ? "text" : "password"} required autoComplete="current-password" placeholder="Lozinka" value={lozinka} onChange={(e) => setLozinka(e.target.value)} />
+          <button
+            type="button"
+            onClick={() => setPrikaziLozinku((v) => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={prikaziLozinku ? "Sakrij lozinku" : "Prikaži lozinku"}
+            aria-pressed={prikaziLozinku}
+          >
+            {prikaziLozinku ? (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 3l18 18" />
+                <path d="M10.6 10.6a2 2 0 0 0 2.8 2.8" />
+                <path d="M9.9 5.2A10.8 10.8 0 0 1 12 5c5 0 8.5 4.5 9.5 7-.4 1-1.2 2.1-2.2 3.1" />
+                <path d="M6.2 6.2C3.9 7.6 2.8 9.5 2.5 12c1 2.5 4.5 7 9.5 7 1.1 0 2.1-.2 3-.6" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M2.5 12s3.5-7 9.5-7 9.5 7 9.5 7-3.5 7-9.5 7-9.5-7-9.5-7Z" />
+                <circle cx="12" cy="12" r="2.5" />
+              </svg>
+            )}
+          </button>
+        </div>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         {info && <p role="status" className="text-sm text-brand">{info}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Prijavljivanje..." : "Prijavi se"}</button>
