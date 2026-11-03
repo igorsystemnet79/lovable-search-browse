@@ -246,20 +246,119 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
 }
 
 export function ListingImageGallery({ kind, id }: { kind: "ponuda" | "zahtev"; id: string }) {
+  const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const touchStartX = useRef<number | null>(null);
   const q = useQuery({
     queryKey: ["slike-oglasa", kind, id],
     queryFn: () => ucitajSlikeOglasa(kind, id),
     staleTime: 0,
     refetchOnMount: "always",
   });
-  if (!q.data?.length) return null;
+  const photos = q.data ?? [];
+  const opened = activeIndex !== null && photos.length > 0;
+  const currentIndex = opened ? activeIndex % photos.length : 0;
+
+  useEffect(() => {
+    if (!opened) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") setActiveIndex(null);
+      if (event.key === "ArrowLeft") setActiveIndex((index) => index === null ? null : (index - 1 + photos.length) % photos.length);
+      if (event.key === "ArrowRight") setActiveIndex((index) => index === null ? null : (index + 1) % photos.length);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [opened, photos.length]);
+
+  if (!photos.length) return null;
+
+  function previousPhoto() {
+    setActiveIndex((index) => index === null ? null : (index - 1 + photos.length) % photos.length);
+  }
+  function nextPhoto() {
+    setActiveIndex((index) => index === null ? null : (index + 1) % photos.length);
+  }
+
   return (
-    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-      {q.data.map((photo, index) => (
-        <a key={photo.id ?? photo.preview} href={photo.preview} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-lg border border-border bg-secondary">
-          <img src={photo.preview} alt={`Fotografija oglasa ${index + 1}`} loading="lazy" className="aspect-[4/3] w-full object-contain" />
-        </a>
-      ))}
-    </div>
+    <>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {photos.map((photo, index) => (
+          <button
+            key={photo.id ?? photo.preview}
+            type="button"
+            onClick={() => setActiveIndex(index)}
+            aria-label={`Otvori fotografiju ${index + 1} od ${photos.length}`}
+            className="block overflow-hidden rounded-lg border border-border bg-secondary text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
+            <img src={photo.preview} alt={`Fotografija oglasa ${index + 1}`} loading="lazy" className="aspect-[4/3] w-full object-contain transition-transform duration-200 hover:scale-[1.03]" />
+          </button>
+        ))}
+      </div>
+
+      {opened && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 p-3 sm:p-6"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Pregled fotografija oglasa"
+          onClick={() => setActiveIndex(null)}
+          onTouchStart={(event) => { touchStartX.current = event.touches[0]?.clientX ?? null; }}
+          onTouchEnd={(event) => {
+            if (touchStartX.current === null) return;
+            const delta = event.changedTouches[0]?.clientX - touchStartX.current;
+            touchStartX.current = null;
+            if (delta < -45) nextPhoto();
+            if (delta > 45) previousPhoto();
+          }}
+        >
+          <button
+            type="button"
+            onClick={() => setActiveIndex(null)}
+            aria-label="Zatvori fotografije"
+            className="absolute right-3 top-3 z-10 rounded-full bg-white/15 p-3 text-white transition hover:bg-white/25 sm:right-6 sm:top-6"
+          >
+            <X className="h-6 w-6" />
+          </button>
+
+          {photos.length > 1 && (
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); previousPhoto(); }}
+              aria-label="Prethodna fotografija"
+              className="absolute left-2 z-10 rounded-full bg-white/15 p-3 text-white transition hover:bg-white/30 sm:left-6 sm:p-4"
+            >
+              <ChevronLeft className="h-7 w-7 sm:h-9 sm:w-9" />
+            </button>
+          )}
+
+          <div className="flex h-full w-full max-w-6xl flex-col items-center justify-center gap-3" onClick={(event) => event.stopPropagation()}>
+            <img
+              src={photos[currentIndex].preview}
+              alt={`Fotografija oglasa ${currentIndex + 1} od ${photos.length}`}
+              className="max-h-[82vh] max-w-full select-none object-contain"
+              draggable={false}
+            />
+            <p className="rounded-full bg-white/15 px-3 py-1 text-sm font-medium text-white">
+              {currentIndex + 1} / {photos.length}
+            </p>
+          </div>
+
+          {photos.length > 1 && (
+            <button
+              type="button"
+              onClick={(event) => { event.stopPropagation(); nextPhoto(); }}
+              aria-label="Sledeća fotografija"
+              className="absolute right-2 z-10 rounded-full bg-white/15 p-3 text-white transition hover:bg-white/30 sm:right-6 sm:p-4"
+            >
+              <ChevronRight className="h-7 w-7 sm:h-9 sm:w-9" />
+            </button>
+          )}
+        </div>
+      )}
+    </>
   );
 }
