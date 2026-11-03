@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { ListingFormDialog, type ListingEdit, type ListingKind } from "@/components/listing-form-dialog";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { mojiOglasiQuery } from "@/lib/my-listings";
 import type { Ponuda, Zahtev } from "@/lib/listings";
 
@@ -38,19 +38,19 @@ function MojiOglasi() {
   async function obrisi(table: "ponude" | "zahtevi", id: string) {
     if (!confirm("Da li sigurno želiš da obrišeš ovu objavu?")) return;
     const column = table === "ponude" ? "ponuda_id" : "zahtev_id";
-    const { data: photos, error: photosError } = await supabase.from("slike_oglasa").select("storage_path").eq(column, id);
+    const { data: photos, error: photosError } = await ponudimi.from("slike_oglasa").select("storage_path").eq(column, id);
     if (photosError) { alert("Fotografije nisu mogle da se pripreme za brisanje."); return; }
     const paths = (photos ?? []).map((photo) => photo.storage_path).filter((path): path is string => !!path);
     if (paths.length) {
-      const { error: storageError } = await supabase.storage.from("slike-oglasa").remove(paths);
+      const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove(paths);
       if (storageError) { alert("Fotografije nisu mogle da se obrišu. Oglas nije obrisan."); return; }
     }
-    const { error } = await supabase.from(table).delete().eq("id", id);
+    const { error } = await ponudimi.from(table).delete().eq("id", id);
     if (error) { alert("Oglas nije mogao da se obriše."); return; }
     await qc.invalidateQueries();
   }
   async function zavrsi(table: "ponude" | "zahtevi", id: string, v: boolean) {
-    await supabase.from(table).update({ zavrseno: v }).eq("id", id);
+    await ponudimi.from(table).update({ zavrseno: v }).eq("id", id);
     await qc.invalidateQueries();
   }
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (

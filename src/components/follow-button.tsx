@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { pracenjaQuery } from "@/lib/my-listings";
 import type { Ponuda } from "@/lib/listings";
 
@@ -13,8 +13,8 @@ export function FollowButton({ ponuda }: { ponuda: Ponuda }) {
 
   async function toggle() {
     if (!user) return;
-    if (f) await supabase.from("pracenja").delete().eq("id", f.id);
-    else await supabase.from("pracenja").insert({ user_id: user.id, ponuda_id: ponuda.id, pocetna_cena: ponuda.cena });
+    if (f) await ponudimi.from("pracenja").delete().eq("id", f.id);
+    else await ponudimi.from("pracenja").insert({ user_id: user.id, ponuda_id: ponuda.id, pocetna_cena: ponuda.cena });
     await qc.invalidateQueries({ queryKey: ["pracenja", user.id] });
   }
 

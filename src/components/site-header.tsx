@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import logo from "@/assets/ponudimi-logo.png";
 
 const outline =
@@ -35,7 +35,7 @@ export function SiteHeader() {
                 type="button"
                 className={solid}
                 onClick={async () => {
-                  await supabase.auth.signOut();
+                  await ponudimi.auth.signOut();
                   navigate({ to: "/" });
                 }}
               >

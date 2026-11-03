@@ -1,12 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
-import type { Tables } from "@/integrations/supabase/types";
+import type { Tables } from "@/integrations/standalone/types";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -74,8 +74,8 @@ function Korisnici({ selfId }: { selfId: string }) {
 
   const load = useCallback(async () => {
     const [p, r] = await Promise.all([
-      supabase.from("profiles").select("*").order("created_at", { ascending: false }),
-      supabase.from("user_roles").select("user_id, role"),
+      ponudimi.from("profiles").select("*").order("created_at", { ascending: false }),
+      ponudimi.from("user_roles").select("user_id, role"),
     ]);
     setProfili(p.data ?? []);
     const m: Record<string, Uloga[]> = {};
@@ -87,13 +87,13 @@ function Korisnici({ selfId }: { selfId: string }) {
   async function toggleUloga(id: string, role: Uloga) {
     const ima = uloge[id]?.includes(role);
     const { error } = ima
-      ? await supabase.from("user_roles").delete().eq("user_id", id).eq("role", role)
-      : await supabase.from("user_roles").insert({ user_id: id, role });
+      ? await ponudimi.from("user_roles").delete().eq("user_id", id).eq("role", role)
+      : await ponudimi.from("user_roles").insert({ user_id: id, role });
     setMsg(error ? "Izmena uloge nije uspela." : "Uloga izmenjena.");
     load();
   }
   async function update(id: string, patch: Partial<Profil>) {
-    const { error } = await supabase.from("profiles").update(patch).eq("id", id);
+    const { error } = await ponudimi.from("profiles").update(patch).eq("id", id);
     setMsg(error ? "Čuvanje nije uspelo." : "Sačuvano.");
     load();
   }
@@ -167,7 +167,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const [msg, setMsg] = useState("");
   const polje = tabela === "ponude" ? "cena" : "budzet";
   const load = useCallback(async () => {
-    const { data } = await supabase.from(tabela).select("*").order("created_at", { ascending: false });
+    const { data } = await ponudimi.from(tabela).select("*").order("created_at", { ascending: false });
     setRows((data ?? []) as Oglas[]);
   }, [tabela]);
   useEffect(() => { load(); }, [load]);
@@ -176,14 +176,14 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
     if (!edit) return;
     const iznos = edit[polje];
     const patch = { naslov: edit.naslov, opis: edit.opis, lokacija: edit.lokacija, kontakt_ime: edit.kontakt_ime, telefon: edit.telefon, [polje]: iznos === undefined || iznos === null || Number.isNaN(iznos) ? null : iznos };
-    const { error } = await supabase.from(tabela).update(patch as never).eq("id", edit.id);
+    const { error } = await ponudimi.from(tabela).update(patch as never).eq("id", edit.id);
     setMsg(error ? "Čuvanje nije uspelo." : "Sačuvano.");
     setEdit(null);
     load();
   }
   async function obrisi(id: string) {
     if (!confirm("Obrisati ovaj oglas?")) return;
-    const { error } = await supabase.from(tabela).delete().eq("id", id);
+    const { error } = await ponudimi.from(tabela).delete().eq("id", id);
     setMsg(error ? "Brisanje nije uspelo." : "Obrisano.");
     load();
   }
@@ -221,7 +221,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
 function Poruke() {
   const [rows, setRows] = useState<Tables<"poruke_podrske">[]>([]);
   const load = useCallback(async () => {
-    const { data } = await supabase.from("poruke_podrske").select("*").order("created_at", { ascending: false });
+    const { data } = await ponudimi.from("poruke_podrske").select("*").order("created_at", { ascending: false });
     setRows(data ?? []);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -231,7 +231,7 @@ function Poruke() {
       {rows.map((m) => (
         <div key={m.id} className="flex items-start justify-between gap-3 rounded-2xl bg-surface p-4 text-sm shadow-card">
           <div><p className="font-semibold">{m.ime} · {m.email}</p><p className="mt-1 whitespace-pre-wrap">{m.poruka}</p></div>
-          <button className={danger} onClick={async () => { if (confirm("Obrisati poruku?")) { await supabase.from("poruke_podrske").delete().eq("id", m.id); load(); } }}>Obriši</button>
+          <button className={danger} onClick={async () => { if (confirm("Obrisati poruku?")) { await ponudimi.from("poruke_podrske").delete().eq("id", m.id); load(); } }}>Obriši</button>
         </div>
       ))}
     </div>
@@ -247,9 +247,9 @@ function Apr() {
   const [msg, setMsg] = useState("");
   const load = useCallback(async () => {
     const term = q.trim().replace(/[%_,()]/g, "");
-    let query = supabase.from("apr_firme").select("*", { count: "exact" }).order("naziv").limit(100);
+    let query = ponudimi.from("apr_firme").select("*", { count: "exact" }).order("naziv").limit(100);
     if (term) query = query.or(`naziv.ilike.%${term}%,pib.ilike.%${term}%,maticni_broj.ilike.%${term}%`);
-    const [f, s] = await Promise.all([query, supabase.from("apr_sinhronizacije").select("*").order("created_at", { ascending: false }).limit(1)]);
+    const [f, s] = await Promise.all([query, ponudimi.from("apr_sinhronizacije").select("*").order("created_at", { ascending: false }).limit(1)]);
     setFirme(f.data ?? []);
     setBroj(f.count ?? 0);
     setZadnja(s.data?.[0] ?? null);

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls, btnCls } from "@/components/auth-shell";
@@ -32,7 +32,7 @@ function Podrska() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    const { error } = await supabase.from("poruke_podrske").insert(f);
+    const { error } = await ponudimi.from("poruke_podrske").insert(f);
     setStatus(error ? "err" : "ok");
     if (!error) setF({ ime: "", email: "", poruka: "" });
   }

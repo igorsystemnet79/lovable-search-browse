@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 
 export const Route = createFileRoute("/reset-lozinke")({
@@ -27,17 +27,16 @@ function Reset() {
   const [gotovo, setGotovo] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = ponudimi.auth.onAuthStateChange((event, session) => {
       if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) setSpreman("da");
     });
-    const hash = window.location.hash;
     const query = new URLSearchParams(window.location.search);
-    if (hash.includes("error") || query.get("error")) {
-      setSpreman("ne");
-    } else {
-      supabase.auth.getSession().then(({ data }) => {
+    if (query.get("token")) setSpreman("da");
+    else if (query.get("error")) setSpreman("ne");
+    else {
+      ponudimi.auth.getSession().then(({ data }) => {
         if (data.session) setSpreman("da");
-        else setTimeout(() => setSpreman((s) => (s === "ceka" ? "ne" : s)), 4000);
+        else setSpreman("ne");
       });
     }
     return () => sub.subscription.unsubscribe();
@@ -49,7 +48,7 @@ function Reset() {
     if (lozinka.length < 6) return setGreska("Lozinka mora imati najmanje 6 karaktera.");
     if (lozinka !== ponovo) return setGreska("Lozinke se ne poklapaju.");
     setBusy(true);
-    const { error } = await supabase.auth.updateUser({ password: lozinka });
+    const { error } = await ponudimi.auth.updateUser({ password: lozinka });
     setBusy(false);
     if (error) {
       if (/same|different/i.test(error.message)) return setGreska("Nova lozinka mora biti drugačija od stare.");

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 import { ispravanPib } from "@/lib/pib";
 
@@ -20,8 +20,8 @@ export const Route = createFileRoute("/registracija")({
 
 function porukaGreske(error: unknown) {
   if (error instanceof Error) {
-    if (error.message.includes("Missing Supabase environment")) {
-      return "Povezivanje sa servisom za naloge nije podešeno. Potrebno je povezati Supabase u Lovable Cloud-u.";
+    if (error.message.includes("Missing PonudiMi API environment")) {
+      return "Povezivanje sa servisom za naloge nije podešeno. Proveri da li je samostalni PonudiMi API pokrenut.";
     }
     if (/failed to fetch|network|fetch failed/i.test(error.message)) {
       return "Nije moguće povezati se sa servisom. Proveri internet vezu i pokušaj ponovo.";
@@ -56,7 +56,7 @@ function Registracija() {
     setBusy(true);
     setGreska("");
     try {
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await ponudimi.auth.signUp({
         email,
         password: f.lozinka,
         options: {
@@ -86,8 +86,8 @@ function Registracija() {
 
   if (uspeh)
     return (
-      <AuthShell title="Proveri email" subtitle="Poslali smo ti link za potvrdu naloga.">
-        <p className="text-sm">Klikni na link u emailu, zatim se <Link to="/prijava" className="font-semibold text-brand hover:underline">prijavi</Link>.</p>
+      <AuthShell title="Nalog je kreiran" subtitle="Registracija je uspešno završena.">
+        <p className="text-sm">Sada možeš da se <Link to="/prijava" className="font-semibold text-brand hover:underline">prijaviš</Link> svojim emailom i lozinkom.</p>
         {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">Firma se automatski verifikuje ako je PIB pronađen u APR registru, a u suprotnom je proverava administrator.</p>}
       </AuthShell>
     );

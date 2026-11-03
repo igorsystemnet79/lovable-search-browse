@@ -1,7 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { lovable } from "@/integrations/lovable";
+import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 
 export const Route = createFileRoute("/prijava")({
@@ -20,8 +19,8 @@ export const Route = createFileRoute("/prijava")({
 
 function porukaGreske(error: unknown, fallback: string) {
   if (error instanceof Error) {
-    if (error.message.includes("Missing Supabase environment")) {
-      return "Povezivanje sa servisom za naloge nije podešeno. Potrebno je povezati Supabase u Lovable Cloud-u.";
+    if (error.message.includes("Missing PonudiMi API environment")) {
+      return "Povezivanje sa servisom za naloge nije podešeno. Proveri da li je samostalni PonudiMi API pokrenut.";
     }
     if (/failed to fetch|network|fetch failed/i.test(error.message)) {
       return "Nije moguće povezati se sa servisom. Proveri internet vezu i pokušaj ponovo.";
@@ -46,7 +45,7 @@ function Prijava() {
     setGreska("");
     setInfo("");
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error } = await ponudimi.auth.signInWithPassword({
         email: email.trim().toLowerCase(),
         password: lozinka,
       });
@@ -76,7 +75,7 @@ function Prijava() {
     setGreska("");
     setInfo("");
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+      const { error } = await ponudimi.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
         redirectTo: `${window.location.origin}/reset-lozinke`,
       });
       if (error) throw error;
@@ -87,15 +86,7 @@ function Prijava() {
   }
 
   async function google() {
-    if (busy) return;
-    setGreska("");
-    try {
-      const r = await lovable.auth.signInWithOAuth("google", { redirect_uri: window.location.origin });
-      if (r.error) throw r.error;
-      if (!r.redirected) await navigate({ to: "/" });
-    } catch (error) {
-      setGreska(porukaGreske(error, "Prijava preko Google-a trenutno nije moguća."));
-    }
+    setGreska("Google prijava nije podešena na ovoj samostalnoj instalaciji. Prijavi se email adresom i lozinkom.");
   }
 
   return (
