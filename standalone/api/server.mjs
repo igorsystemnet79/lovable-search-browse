@@ -9,6 +9,7 @@ import sharp from 'sharp';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import path from 'node:path';
 import fs from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
@@ -245,4 +246,16 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
 }));
 
 app.use((err,_req,res,_next)=>{console.error(err);res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});});
-const port=Number(process.env.API_PORT||4000);app.listen(port,'0.0.0.0',()=>{console.log(`PonudiMi API sluša na ${port}`);const email=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();if(email)pool.query('INSERT INTO user_roles(user_id,role) SELECT id,\'admin\' FROM users WHERE email=$1 ON CONFLICT DO NOTHING',[email]).then(()=>console.log('Provera početnog administratora završena.')).catch(err=>console.error('Admin bootstrap:',err.message));});
+const port=Number(process.env.PORT||process.env.API_PORT||4000);
+async function startServer(){
+ const schemaPath=path.resolve(__dirname,'../db/init.sql');
+ const schema=await readFile(schemaPath,'utf8');
+ await pool.query(schema);
+ console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
+ app.listen(port,'0.0.0.0',()=>{
+  console.log(`PonudiMi API sluša na ${port}`);
+  const email=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
+  if(email)pool.query("INSERT INTO user_roles(user_id,role) SELECT id,'admin' FROM users WHERE email=$1 ON CONFLICT DO NOTHING",[email]).then(()=>console.log('Provera početnog administratora završena.')).catch(err=>console.error('Admin bootstrap:',err.message));
+ });
+}
+startServer().catch(err=>{console.error('Pokretanje PonudiMi API-ja nije uspelo:',err);process.exit(1);});
