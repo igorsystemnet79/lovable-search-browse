@@ -35,7 +35,7 @@ async function normalizeImage(buffer) {
 const s3Enabled = Boolean(process.env.S3_ENDPOINT && process.env.S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
 const s3 = s3Enabled ? new S3Client({ region: process.env.S3_REGION || 'auto', endpoint: process.env.S3_ENDPOINT, forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } }) : null;
 const imageMime = new Set(['image/jpeg','image/png','image/webp']);
-const safeObjectKey = value => String(value || '').replace(/^\\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
+const safeObjectKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 async function saveImage(key, buffer, contentType) {
  if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
  if (s3) await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
