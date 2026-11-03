@@ -259,7 +259,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
                 <div className="flex flex-wrap gap-3">
                   {(images[o.id] ?? []).map((image) => (
                     <div key={image.id} className="w-28">
-                      <img src={image.external_url || ponudimi.storage.from("listing-images").getPublicUrl((image.storage_path || "").replace(/^\\/uploads\\//, "")).data.publicUrl} alt="Fotografija oglasa" className="h-24 w-28 rounded-lg border border-input object-cover" />
+                      <img src={image.external_url || ponudimi.storage.from("listing-images").getPublicUrl((image.storage_path || "").replace("/uploads/", "")).data.publicUrl} alt="Fotografija oglasa" className="h-24 w-28 rounded-lg border border-input object-cover" />
                       <button className={`${danger} mt-2 w-full`} disabled={imageBusy} onClick={() => removeImage(o, image)}>Obriši sliku</button>
                     </div>
                   ))}
