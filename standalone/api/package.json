@@ -13,6 +13,7 @@
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "sharp": "^0.34.3",
     "pg": "^8.16.3",
     "nodemailer": "^7.0.5",
     "@aws-sdk/client-s3": "^3.883.0"
