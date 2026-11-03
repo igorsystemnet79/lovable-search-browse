@@ -96,7 +96,7 @@ const auth = {
 const storage = {
   from(bucket: string) {
     return {
-      getPublicUrl(path: string) { return { data: { publicUrl: `/uploads/${path.replace(/^\/+/, "")}` } }; },
+      getPublicUrl(path: string) { return { data: { publicUrl: `/api/storage/public?path=${encodeURIComponent(path.replace(/^\/+/, ""))}` } }; },
       async upload(path: string, file: File, options?: any) {
         try { const form = new FormData(); form.append("file", file); form.append("path", path); form.append("bucket", bucket); form.append("contentType", options?.contentType || file.type); await api("/api/storage/upload", { method: "POST", body: form }); return { data: { path }, error: null }; }
         catch (error: any) { return { data: null, error }; }
