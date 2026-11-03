@@ -14,19 +14,34 @@ export const mojiOglasiQuery = (userId: string) => ({
   },
 });
 
-export type Pracenje = { id: string; ponuda_id: string; pocetna_cena: number | null; ponude: Ponuda | null };
+export type Pracenje = {
+  id: string;
+  ponuda_id: string | null;
+  zahtev_id: string | null;
+  pocetna_cena: number | null;
+  pocetni_budzet: number | null;
+  ponude: Ponuda | null;
+  zahtevi: Zahtev | null;
+};
 
 export const pracenjaQuery = (userId: string) => ({
   queryKey: ["pracenja", userId],
   queryFn: async (): Promise<Pracenje[]> => {
-    const [{ data, error }, { data: offers, error: offersError }] = await Promise.all([
-      ponudimi.from("pracenja").select("id, ponuda_id, pocetna_cena").eq("user_id", userId).order("created_at", { ascending: false }),
+    const [{ data, error }, { data: offers, error: offersError }, { data: requests, error: requestsError }] = await Promise.all([
+      ponudimi.from("pracenja").select("id, ponuda_id, zahtev_id, pocetna_cena, pocetni_budzet, created_at").eq("user_id", userId).order("created_at", { ascending: false }),
       ponudimi.from("ponude").select("*"),
+      ponudimi.from("zahtevi").select("*"),
     ]);
     if (error) throw error;
     if (offersError) throw offersError;
-    const byId = new Map((offers ?? []).map((offer: Ponuda) => [offer.id, offer]));
-    return (data ?? []).map((follow: any) => ({ ...follow, ponude: byId.get(follow.ponuda_id) ?? null })) as Pracenje[];
+    if (requestsError) throw requestsError;
+    const offersById = new Map((offers ?? []).map((offer: Ponuda) => [offer.id, offer]));
+    const requestsById = new Map((requests ?? []).map((request: Zahtev) => [request.id, request]));
+    return (data ?? []).map((follow: any) => ({
+      ...follow,
+      ponude: follow.ponuda_id ? offersById.get(follow.ponuda_id) ?? null : null,
+      zahtevi: follow.zahtev_id ? requestsById.get(follow.zahtev_id) ?? null : null,
+    })) as Pracenje[];
   },
 });
 
