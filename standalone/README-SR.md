@@ -27,7 +27,10 @@ Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija ad
 ## Podaci i fotografije
 
 - PostgreSQL podaci su u Docker volumenu `postgres_data`.
-- Fotografije su u Docker volumenu `uploads_data`.
+- Fotografije se podrazumevano čuvaju na lokalnom disku u Docker volumenu `uploads_data`.
+- Za Render i druge platforme bez trajnog diska može se uključiti S3-kompatibilno skladište, uključujući Cloudflare R2, kroz promenljive `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` i `S3_REGION`.
+- API isporučuje fotografije preko iste javne putanje bez obzira na to da li su na lokalnom disku ili u R2. PostgreSQL tabela `slike_oglasa` čuva vezu fotografije sa oglasom, putanju ili URL i redosled. Sama binarna slika se ne upisuje u PostgreSQL.
+- Pri prelasku na sopstveni server isključuju se S3 promenljive i koristi se trajni disk; postojeće fotografije iz R2 treba prethodno kopirati na server i ažurirati njihove putanje u bazi.
 - Caddy sertifikati i podešavanja su u `caddy_data` i `caddy_config`.
 - Brisanje volumena može trajno obrisati podatke. Nemoj koristiti `docker compose down -v` osim ako namerno želiš potpuno brisanje instalacije.
 
@@ -62,6 +65,10 @@ Nova instalacija ne povezuje se sa starom Supabase bazom. Ne pokreći Supabase m
 - `docker compose ps` — proveri da su servisi pokrenuti.
 - `curl http://localhost/api/health` — API status (na serveru).
 - `docker compose logs -f web api db caddy` — pregled logova.
+
+## Cloudflare R2 (opciono)
+
+Za R2 napravi privatni bucket i S3 API token sa pravima čitanja i upisa samo za taj bucket. U Render API servisu postavi endpoint oblika `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, naziv bucket-a, Access Key ID, Secret Access Key i region `auto`. Tajne vrednosti unose se isključivo u Render Environment, ne u GitHub. Bez kompletne konfiguracije API koristi lokalni disk. R2 i dalje zahteva praćenje besplatnih kvota i eventualnih troškova ako se one prekorače.
 
 ## Status provere
 
