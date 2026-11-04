@@ -311,7 +311,7 @@ app.post('/api/storage/upload',auth,memoryUpload.single('file'),asyncRoute(async
  await saveImage(key,normalized,'image/jpeg');res.status(201).json({path:key,storage:s3?'r2':'local',width:800,height:600,format:'jpeg'});
 }));
 app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
- const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const key=safeObjectKey(item);if(!key.startsWith(`${req.user.sub}/`))continue;await removeImage(key);}res.json({ok:true});
+ const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const rawKey=safeObjectKey(item);const key=rawKey.startsWith('uploads/')?rawKey.slice('uploads/'.length):rawKey;if(!key.startsWith(`${req.user.sub}/`))continue;await removeImage(key);}res.json({ok:true});
 }));
 app.get('/api/storage/public',asyncRoute(async(req,res)=>{
  const key=safeObjectKey(req.query.path);if(!key)return res.status(400).end();
