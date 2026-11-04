@@ -268,7 +268,13 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    }
  }
  if(table==='slike_oglasa' && action==='update' && !adminUser){
-   for(const row of supplied){if(row.storage_path && (!String(row.storage_path).startsWith(`${userId}/`) || String(row.storage_path).includes('..')))return res.status(403).json({error:'Neispravna putanja fotografije.'});if(row.external_url){let u;try{u=new URL(row.external_url);}catch{return res.status(400).json({error:'Adresa fotografije nije ispravna.'});}if(!['http:','https:'].includes(u.protocol))return res.status(400).json({error:'Dozvoljene su samo HTTP/HTTPS adrese fotografija.'});}}
+   for(const row of supplied){
+     // A listing image must remain attached to its original listing. The owner
+     // may replace its file/URL or position, but cannot reassign it elsewhere.
+     if(row.ponuda_id!==undefined || row.zahtev_id!==undefined) return res.status(403).json({error:'Fotografija ne može biti premeštena u drugi oglas.'});
+     if(row.storage_path && (!String(row.storage_path).startsWith(`${userId}/`) || String(row.storage_path).includes('..')))return res.status(403).json({error:'Neispravna putanja fotografije.'});
+     if(row.external_url){let u;try{u=new URL(row.external_url);}catch{return res.status(400).json({error:'Adresa fotografije nije ispravna.'});}if(!['http:','https:'].includes(u.protocol))return res.status(400).json({error:'Dozvoljene su samo HTTP/HTTPS adrese fotografija.'});}
+   }
  }
  if(table==='ponude'||table==='zahtevi') {
    const amountField=table==='ponude'?'cena':'budzet';
