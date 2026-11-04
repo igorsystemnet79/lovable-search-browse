@@ -82,7 +82,7 @@ function PretragaPage() {
           </p>
         ) : null}
 
-        <div className="mt-10 grid gap-8 lg:grid-cols-2">
+        <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
           <section>
             <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
