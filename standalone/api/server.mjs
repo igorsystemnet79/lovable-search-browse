@@ -295,12 +295,12 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
      if(merged.tip_lica==='pravno') {
        if(!String(merged.naziv_firme||'').trim()) return res.status(400).json({error:'Za pravno lice obavezan je naziv firme.'});
        if(!validPib(merged.pib)) return res.status(400).json({error:'Za pravno lice potreban je ispravan PIB od 9 cifara.'});
-       merged.pib=String(merged.pib).replace(/\\s/g,'');
+       merged.pib=String(merged.pib).replace(/\s/g,'');
        row.tip_lica=merged.tip_lica; row.naziv_firme=merged.naziv_firme.trim(); row.pib=merged.pib;
      } else if(row.pib!==undefined && row.pib!==null && row.pib!=='' && !validPib(row.pib)) {
        return res.status(400).json({error:'PIB nije ispravan.'});
      }
-     if(row.telefon!==undefined && row.telefon!==null && row.telefon!=='' && (!/^[+0-9 ()-]{6,30}$/.test(String(row.telefon)) || String(row.telefon).replace(/\\D/g,'').length<6)) return res.status(400).json({error:'Broj telefona nije ispravan.'});
+     if(row.telefon!==undefined && row.telefon!==null && row.telefon!=='' && (!/^[+0-9 ()-]{6,30}$/.test(String(row.telefon)) || String(row.telefon).replace(/\D/g,'').length<6)) return res.status(400).json({error:'Broj telefona nije ispravan.'});
      if(row.ime!==undefined && String(row.ime||'').trim().length>100) return res.status(400).json({error:'Ime i prezime mogu imati najviše 100 karaktera.'});
      if(row.grad!==undefined && String(row.grad||'').length>60) return res.status(400).json({error:'Naziv grada može imati najviše 60 karaktera.'});
      if(row.adresa!==undefined && String(row.adresa||'').length>150) return res.status(400).json({error:'Adresa može imati najviše 150 karaktera.'});
