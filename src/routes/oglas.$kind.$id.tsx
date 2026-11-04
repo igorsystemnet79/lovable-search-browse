@@ -26,7 +26,7 @@ function OglasPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
-      <main className="container-page py-6 sm:py-10"><div className="mx-auto w-full max-w-4xl">
+      <main className="container-page py-6 sm:py-10"><div className="w-full min-w-0">
         <Link to="/" className="text-sm font-medium text-brand hover:underline">← Početna</Link>
         {isLoading && <p className="py-16 text-center text-muted-foreground">Učitavanje oglasa…</p>}
         {isError && <p className="py-16 text-center text-destructive">Oglas trenutno nije moguće učitati.</p>}
