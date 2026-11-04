@@ -133,7 +133,7 @@ function AdminChatGPT() {
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand"><span className="text-lg font-bold">GPT</span></div>
           <div><h2 className="font-semibold">ChatGPT — pomoć za administraciju</h2><p className="text-sm text-muted-foreground">Privatni razgovor dostupan samo administratorima.</p></div>
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Možeš da pitaš za greške, rad platforme, predloge unapređenja ili pomoć pri administraciji. Asistent ne može samostalno da menja, objavljuje ili briše podatke.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Može da proveri stanje API-ja i baze, prikaže statistiku i pretraži postojeće oglase i korisnike. Trenutno radi u režimu bezbedne provere (bez izmena podataka); sledeće faze dodaju odobrene administrativne radnje i upravljanje platformom.</p>
       </div>
       {configured === false && (
         <div className="rounded-2xl border border-input p-4 text-sm">
