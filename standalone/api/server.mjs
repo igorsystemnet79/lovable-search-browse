@@ -15,7 +15,17 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
+// Small bounded pool with explicit connection timeouts for hosted PostgreSQL.
+const pool = new pg.Pool({
+ connectionString: process.env.DATABASE_URL,
+ ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+ max: Number(process.env.PG_POOL_MAX || 5),
+ idleTimeoutMillis: 30000,
+ connectionTimeoutMillis: 8000,
+ keepAlive: true,
+ allowExitOnIdle: false,
+});
+pool.on('error', err => console.error('PostgreSQL idle connection error:', { code: err.code, message: err.message }));
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imati najmanje 32 karaktera.');
 app.set('trust proxy', 1);
@@ -48,8 +58,24 @@ async function removeImage(key) {
 }
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
-const auth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (!token) return res.status(401).json({ error:'Prijava je obavezna.' }); try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); next(); } catch { res.status(401).json({ error:'Sesija je istekla.' }); } });
-const optionalAuth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (token) { try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); } catch { return res.status(401).json({ error:'Sesija je istekla.' }); } } next(); });
+const auth = asyncRoute(async (req,res,next) => {
+ const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ if (!token) return res.status(401).json({ error:'Prijava je obavezna.' });
+ // A database outage is not an invalid token. Keep DB errors out of this catch.
+ try { req.user = jwt.verify(token, JWT_SECRET); }
+ catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
+ if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
+ next();
+});
+const optionalAuth = asyncRoute(async (req,res,next) => {
+ const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ if (token) {
+  try { req.user = jwt.verify(token, JWT_SECRET); }
+  catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
+  if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
+ }
+ next();
+});
 const admin = asyncRoute(async (req,res,next) => { const { rows } = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[req.user.sub]); if (!rows.length) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
@@ -316,7 +342,18 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  }catch(e){await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,0,false,$2)',[req.user.sub,e.message]);throw e;}
 }));
 
-app.use((err,_req,res,_next)=>{console.error(err);res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});});
+app.use((err,req,res,_next)=>{
+ const code = err?.code;
+ const transientDbCodes = new Set(['08000','08003','08006','08001','57P01','57P02','57P03','53300','53400']);
+ const dbUnavailable = transientDbCodes.has(code) || ['ECONNRESET','ECONNREFUSED','ETIMEDOUT','EHOSTUNREACH'].includes(err?.cause?.code || code);
+ const status = dbUnavailable ? 503 : (Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 ? err.status : 500);
+ console.error('PonudiMi API request failed:', { method:req.method, path:req.path, status, code:code || err?.cause?.code || null, message:err?.message || 'Unknown error' });
+ if (res.headersSent) return;
+ res.status(status).json({
+  error: dbUnavailable ? 'Baza je trenutno nedostupna. Pokušaj ponovo za nekoliko trenutaka.' : (status===500 && process.env.NODE_ENV==='production' ? 'Greška na serveru.' : err.message),
+  code: dbUnavailable ? 'DATABASE_UNAVAILABLE' : (code || undefined),
+ });
+});
 const port=Number(process.env.PORT||process.env.API_PORT||4000);
 async function startServer(){
  const schemaPath=path.resolve(__dirname,'../db/init.sql');
@@ -329,4 +366,15 @@ async function startServer(){
   if(email)pool.query("INSERT INTO user_roles(user_id,role) SELECT id,'admin' FROM users WHERE email=$1 ON CONFLICT DO NOTHING",[email]).then(()=>console.log('Provera početnog administratora završena.')).catch(err=>console.error('Admin bootstrap:',err.message));
  });
 }
-startServer().catch(err=>{console.error('Pokretanje PonudiMi API-ja nije uspelo:',err);process.exit(1);});
+startServer().catch(async err=>{
+ console.error('Pokretanje PonudiMi API-ja nije uspelo:', { code:err?.code, message:err?.message });
+ try { await pool.end(); } catch {}
+ process.exit(1);
+});
+for (const signal of ['SIGTERM','SIGINT']) {
+ process.once(signal, async () => {
+  console.log(`Primljen ${signal}; zatvaram API i PostgreSQL pool.`);
+  try { await pool.end(); } catch (err) { console.error('Greška pri zatvaranju PostgreSQL pool-a:', err.message); }
+  process.exit(0);
+ });
+}
