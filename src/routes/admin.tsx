@@ -87,7 +87,7 @@ function AdminChatGPT() {
     try {
       const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
       fetch("/api/admin/chatgpt/status", {
-        headers: session?.access_token ? { Authorization: \`Bearer \${session.access_token}\` } : {},
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       }).then(async (response) => {
         if (!response.ok) throw new Error("Status asistenta nije dostupan.");
         const data = await response.json();
@@ -112,7 +112,7 @@ function AdminChatGPT() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: \`Bearer \${session.access_token}\` } : {}),
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({ messages: next.slice(-12) }),
       });
@@ -144,7 +144,7 @@ function AdminChatGPT() {
       <div className="min-h-64 space-y-3 rounded-2xl bg-surface p-4 shadow-card">
         {!messages.length && <p className="py-12 text-center text-sm text-muted-foreground">Započni razgovor. Na primer: „Pomozi mi da proverim zašto dodavanje oglasa ne radi.“</p>}
         {messages.map((message, index) => (
-          <div key={index} className={\`max-w-[90%] whitespace-pre-wrap rounded-2xl p-3 text-sm \${message.role === "user" ? "ml-auto bg-brand text-brand-foreground" : "mr-auto border border-input bg-background"}\`}>
+          <div key={index} className={`max-w-[90%] whitespace-pre-wrap rounded-2xl p-3 text-sm ${message.role === "user" ? "ml-auto bg-brand text-brand-foreground" : "mr-auto border border-input bg-background"}`}>
             <p className="mb-1 text-xs font-semibold opacity-70">{message.role === "user" ? "Ti" : "ChatGPT"}</p>
             {message.content}
           </div>
