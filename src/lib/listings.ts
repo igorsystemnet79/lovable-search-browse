@@ -72,10 +72,12 @@ export const zahteviQuery = (limit?: number) => ({
 
 export type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[] };
 
-export const pretragaQuery = (q: string, lokacija: string) => ({
-  queryKey: ["pretraga", q, lokacija],
+export type SearchFilters = { kategorija?: string; minCena?: string; maxCena?: string; valuta?: string; sort?: string };
+
+export const pretragaQuery = (q: string, lokacija: string, filters: SearchFilters = {}) => ({
+  queryKey: ["pretraga", q, lokacija, filters],
   queryFn: async (): Promise<SearchResults> => {
-    const args = { q: q.slice(0, 200), mesto: lokacija.slice(0, 100) };
+    const args = { q: q.slice(0, 200), mesto: lokacija.slice(0, 100), kategorija: (filters.kategorija || "").slice(0, 100), minCena: filters.minCena || "", maxCena: filters.maxCena || "", valuta: filters.valuta || "", sort: filters.sort || "najnovije" };
     const [ponude, zahtevi] = await Promise.all([
       ponudimi.rpc("pretrazi_ponude", args),
       ponudimi.rpc("pretrazi_zahteve", args),
