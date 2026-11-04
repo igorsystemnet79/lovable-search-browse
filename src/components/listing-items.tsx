@@ -25,7 +25,7 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
   );
 }
 
-export function PonudaItem({ ponuda, hideFollow, compact = false }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean }) {
+export function PonudaItem({ ponuda, hideFollow, compact = true }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean }) {
   return (
     <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${compact ? "h-[390px] sm:h-[410px]" : ""} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
       <p className="font-medium">
@@ -44,7 +44,7 @@ export function PonudaItem({ ponuda, hideFollow, compact = false }: { ponuda: Po
   );
 }
 
-export function ZahtevItem({ zahtev, hideFollow, compact = false }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean }) {
+export function ZahtevItem({ zahtev, hideFollow, compact = true }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean }) {
   return (
     <li className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${compact ? "h-[390px] sm:h-[410px]" : ""} ${zahtev.zavrseno ? "opacity-70" : ""}`}>
       <p className="font-medium">{zahtev.naslov}</p>
