@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useAuth } from "@/hooks/use-auth";
 import { useQuery } from "@tanstack/react-query";
 
 import { SiteHeader } from "@/components/site-header";
@@ -38,7 +39,8 @@ export const Route = createFileRoute("/pretraga")({
 
 function PretragaPage() {
   const { q, lokacija, kategorija, minCena, maxCena, valuta, sort } = Route.useSearch();
-  const { data, isLoading, isError } = useQuery(pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }));
+  const { user, loading: authLoading } = useAuth();
+  const { data, isLoading, isError } = useQuery({ ...pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }), enabled: !authLoading && !!user });
 
   const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0);
 
@@ -70,19 +72,30 @@ function PretragaPage() {
           <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced />
         </div>
 
-        {isError ? (
+        {!authLoading && !user ? (
+          <section className="mt-8 rounded-2xl border border-border bg-surface p-6 text-center">
+            <h2 className="text-lg font-semibold">Prijava je potrebna za pretragu</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Prijavi se ili napravi nalog da bi pregledao rezultate pretrage.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Link to="/prijava" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Prijavi se</Link>
+              <Link to="/registracija" className="rounded-full border border-input px-5 py-2.5 text-sm font-semibold">Registruj se</Link>
+            </div>
+          </section>
+        ) : null}
+
+        {isError && user ? (
           <p className="mt-8 text-sm text-destructive">
             Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.
           </p>
         ) : null}
 
-        {!isLoading && ukupno === 0 && !isError ? (
+        {!authLoading && user && !isLoading && ukupno === 0 && !isError ? (
           <p className="mt-8 text-sm text-muted-foreground">
             Nema rezultata za ovu pretragu. Probaj drugi pojam ili lokaciju.
           </p>
         ) : null}
 
-        <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
+        {user && <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
           <section>
             <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
@@ -96,7 +109,7 @@ function PretragaPage() {
               {data?.zahtevi.map((z) => <ZahtevItem key={z.id} zahtev={z} />)}
             </ul>
           </section>
-        </div>
+        </div>}
       </main>
 
       <SiteFooter />
