@@ -38,7 +38,7 @@ function PonudePage() {
         </p>
 
         <ul className="mt-6 grid gap-3 md:grid-cols-2">
-          {data?.map((p) => <PonudaItem key={p.id} ponuda={p} />)}
+          {data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact />)}
         </ul>
       </main>
 
