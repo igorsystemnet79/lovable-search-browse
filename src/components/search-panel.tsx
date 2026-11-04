@@ -17,8 +17,6 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", defaultKatego
     <form
       action={searchPath}
       method="get"
-      target={newTab ? "_blank" : undefined}
-      rel={newTab ? "noopener" : undefined}
       className={`grid gap-3 rounded-2xl bg-surface p-4 shadow-panel ${advanced ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-[2fr_1fr_auto]"}`}
     >
       <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
