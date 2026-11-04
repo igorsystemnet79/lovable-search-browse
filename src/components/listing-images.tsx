@@ -245,7 +245,7 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
   }
 }
 
-export function ListingImageGallery({ kind, id }: { kind: "ponuda" | "zahtev"; id: string }) {
+export function ListingImageGallery({ kind, id, singlePreview = false }: { kind: "ponuda" | "zahtev"; id: string; singlePreview?: boolean }) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const touchStartX = useRef<number | null>(null);
   const q = useQuery({
@@ -285,16 +285,16 @@ export function ListingImageGallery({ kind, id }: { kind: "ponuda" | "zahtev"; i
 
   return (
     <>
-      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-        {photos.map((photo, index) => (
+      <div className={`mt-3 ${singlePreview ? "w-full" : "grid grid-cols-2 gap-2 sm:grid-cols-3"}`}>
+        {(singlePreview ? photos.slice(0, 1) : photos).map((photo, index) => (
           <button
             key={photo.id ?? photo.preview}
             type="button"
             onClick={() => setActiveIndex(index)}
-            aria-label={`Otvori fotografiju ${index + 1} od ${photos.length}`}
-            className="block overflow-hidden rounded-lg border border-border bg-secondary text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label={`Otvori fotografije oglasa; prikaz ${index + 1} od ${photos.length}`}
+            className={`block overflow-hidden rounded-lg border border-border bg-secondary text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary ${singlePreview ? "w-full" : ""}`}
           >
-            <img src={photo.preview} alt={`Fotografija oglasa ${index + 1}`} loading="lazy" className="aspect-[4/3] w-full object-contain transition-transform duration-200 hover:scale-[1.03]" />
+            <img src={photo.preview} alt={`Fotografija oglasa ${index + 1}`} loading="lazy" className={`aspect-[4/3] w-full object-contain transition-transform duration-200 hover:scale-[1.03] ${singlePreview ? "max-h-[150px] sm:max-h-[160px]" : ""}`} />
           </button>
         ))}
       </div>
