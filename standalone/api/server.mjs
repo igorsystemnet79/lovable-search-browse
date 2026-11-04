@@ -361,6 +361,36 @@ app.get('/api/storage/public',asyncRoute(async(req,res)=>{
  else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');return res.send(stored.rows[0].body);}const target=path.resolve(uploadDir,key);if(!target.startsWith(path.resolve(uploadDir)+path.sep))return res.status(404).end();res.type('image/jpeg').sendFile(target);}
 }));
 app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(!stored.rows[0])return res.status(404).end();res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');res.send(stored.rows[0].body);}));
+app.get('/api/admin/chatgpt/status',auth,admin,(_req,res)=>res.json({configured:Boolean(process.env.OPENAI_API_KEY)}));
+app.post('/api/admin/chatgpt',auth,admin,rateLimit({windowMs:60*1000,limit:12,standardHeaders:true,legacyHeaders:false}),asyncRoute(async(req,res)=>{
+ const apiKey=process.env.OPENAI_API_KEY;
+ if(!apiKey)return res.status(503).json({error:'ChatGPT povezivanje nije podešeno. Administrator treba da doda OPENAI_API_KEY u Render Environment.'});
+ const incoming=Array.isArray(req.body?.messages)?req.body.messages:[];
+ if(!incoming.length||incoming.length>12)return res.status(400).json({error:'Razgovor mora sadržati od 1 do 12 poruka.'});
+ const messages=[];
+ for(const item of incoming){
+  const role=item?.role;
+  const content=typeof item?.content==='string'?item.content.trim():'';
+  if(!['user','assistant'].includes(role)||!content||content.length>6000)return res.status(400).json({error:'Poruke nisu ispravne ili su predugačke.'});
+  messages.push({role,content});
+ }
+ if(messages[messages.length-1].role!=='user')return res.status(400).json({error:'Poslednja poruka mora biti korisničko pitanje.'});
+ const instructions='Ti si interni pomoćnik administratora platforme PonudiMi, marketplace aplikacije za Srbiju. Odgovaraj na srpskom jeziku, jasno i praktično. Pomaži u dijagnostici, razumevanju koda i planiranju bezbednih unapređenja. Nemaš pristup bazi, fajlovima ni administratorskim alatima i ne možeš da izvršavaš promene. Nikada ne traži lozinke, API ključeve, tokene ili podatke platnih kartica. Ne tvrdi da si pregledao platformu, logove ili podatke ako ti nisu dati u razgovoru. Za destruktivne operacije uvek upozori da je potrebna rezervna kopija i izričito odobrenje administratora.';
+ const response=await fetch('https://api.openai.com/v1/responses',{
+  method:'POST',
+  headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},
+  body:JSON.stringify({model:process.env.OPENAI_MODEL||'gpt-6-astra',instructions,input:messages,store:false,max_output_tokens:1200})
+ });
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok){
+  console.error('OpenAI admin assistant request failed:',{status:response.status,code:data?.error?.code||null});
+  return res.status(502).json({error:'ChatGPT trenutno nije dostupan. Proveri OpenAI API podešavanja i pokušaj ponovo.'});
+ }
+ const reply=typeof data.output_text==='string'?data.output_text:
+  (data.output||[]).filter(item=>item.type==='message').flatMap(item=>item.content||[]).filter(item=>item.type==='output_text').map(item=>item.text).join('\n');
+ if(!reply)return res.status(502).json({error:'ChatGPT nije vratio tekstualni odgovor. Pokušaj ponovo.'});
+ res.json({reply});
+}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
