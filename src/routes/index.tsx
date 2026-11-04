@@ -145,7 +145,7 @@ function Index() {
                   Pogledaj sve →
                 </Link>
               </div>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-4 w-full min-w-0 space-y-3">
                 {zahtevi.data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact featured />)}
               </ul>
             </article>
@@ -157,7 +157,7 @@ function Index() {
                   Prikaži još →
                 </Link>
               </div>
-              <ul className="mt-4 space-y-3">
+              <ul className="mt-4 w-full min-w-0 space-y-3">
                 {ponude.data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact featured />)}
               </ul>
             </article>
