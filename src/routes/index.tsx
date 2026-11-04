@@ -51,7 +51,7 @@ function Index() {
       <SiteHeader />
 
       <main>
-        <section className="relative isolate">
+        <section className="container-page relative isolate">
           <img
             src={heroImage}
             alt="Par pregledava ponude telefonom i laptopom ispred moderne kuće"
@@ -60,7 +60,7 @@ function Index() {
             className="h-[380px] w-full object-cover sm:h-[460px]"
           />
           <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent" />
-          <div className="container-page absolute inset-0 flex items-center">
+          <div className="absolute inset-0 flex items-center px-5">
             <div className="max-w-xl text-brand-foreground">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-highlight">
                 Ponude na jednom mestu
@@ -74,7 +74,7 @@ function Index() {
         </section>
 
         <section aria-label="Pretraga oglasa" className="container-page -mt-10 relative z-10">
-          <SearchPanel newTab />
+          <SearchPanel />
         </section>
 
         <div className="container-page">
@@ -137,7 +137,7 @@ function Index() {
             </div>
           </section>
 
-          <section className="mt-14 grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
+          <section className="mt-14 grid w-full min-w-0 grid-cols-1 gap-6">
             <article className="w-full min-w-0 overflow-hidden rounded-2xl bg-secondary/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Najnoviji zahtevi</h2>
