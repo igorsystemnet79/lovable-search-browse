@@ -146,6 +146,9 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 w-full min-w-0 space-y-3">
+                {zahtevi.isLoading && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Učitavanje najnovijih zahteva…</li>}
+                {zahtevi.isError && <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">Zahtevi trenutno nisu dostupni. Osveži stranicu i pokušaj ponovo.</li>}
+                {!zahtevi.isLoading && !zahtevi.isError && !zahtevi.data?.length && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Još nema postavljenih zahteva.</li>}
                 {zahtevi.data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact featured />)}
               </ul>
             </article>
@@ -158,6 +161,9 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 w-full min-w-0 space-y-3">
+                {ponude.isLoading && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Učitavanje najnovijih ponuda…</li>}
+                {ponude.isError && <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">Ponude trenutno nisu dostupne. Osveži stranicu i pokušaj ponovo.</li>}
+                {!ponude.isLoading && !ponude.isError && !ponude.data?.length && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Još nema objavljenih ponuda.</li>}
                 {ponude.data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact featured />)}
               </ul>
             </article>
