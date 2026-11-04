@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { FollowButton } from "@/components/follow-button";
 import { ListingImageGallery } from "@/components/listing-images";
@@ -25,18 +26,17 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
   );
 }
 
-export function PonudaItem({ ponuda, hideFollow, compact = true }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean }) {
+export function PonudaItem({ ponuda, hideFollow, compact = true, featured = false }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
   return (
-    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${compact ? "h-[390px] sm:h-[410px]" : ""} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
-      <p className="font-medium">
-        {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}
-        {ponuda.naslov}
-      </p>
+    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px]" : compact ? "h-[390px] sm:h-[410px]" : ""} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
+      <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className="block truncate font-semibold text-brand hover:underline">
+        {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}{ponuda.naslov}
+      </Link>
       <p className="mt-1 text-xs text-muted-foreground">
         {formatCena(ponuda.cena, ponuda.valuta)} · {ponuda.lokacija} · {formatVreme(ponuda.created_at)}
       </p>
       <ListingImageGallery kind="ponuda" id={ponuda.id} singlePreview={compact} />
-      {ponuda.opis ? <p className={`mt-2 text-sm text-muted-foreground ${compact ? "line-clamp-2" : ""}`}>{ponuda.opis}</p> : null}
+      {ponuda.opis ? <p className={`mt-2 text-sm text-muted-foreground ${featured || compact ? "line-clamp-2" : ""}`}>{ponuda.opis}</p> : null}
       {ponuda.kontakt_ime && <p className="mt-2 text-sm">{ponuda.kontakt_ime}{ponuda.telefon && <> · <a className="text-brand hover:underline" href={`tel:${ponuda.telefon.replace(/[^+0-9]/g, "")}`}>{ponuda.telefon}</a></>}</p>}
       <StatusIzmene id={ponuda.id} zavrseno={ponuda.zavrseno} updatedAt={ponuda.updated_at} />
       {!hideFollow && <FollowButton ponuda={ponuda} />}
@@ -44,10 +44,10 @@ export function PonudaItem({ ponuda, hideFollow, compact = true }: { ponuda: Pon
   );
 }
 
-export function ZahtevItem({ zahtev, hideFollow, compact = true }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean }) {
+export function ZahtevItem({ zahtev, hideFollow, compact = true, featured = false }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
   return (
     <li className={`flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${compact ? "h-[390px] sm:h-[410px]" : ""} ${zahtev.zavrseno ? "opacity-70" : ""}`}>
-      <p className="font-medium">{zahtev.naslov}</p>
+      <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className="block truncate font-semibold text-brand hover:underline">{zahtev.naslov}</Link>
       <p className="mt-1 text-xs text-muted-foreground">
         {zahtev.lokacija} · {formatVreme(zahtev.created_at)}
         {zahtev.budzet !== null ? ` · budžet ${formatCena(zahtev.budzet, zahtev.valuta)}` : ""}
