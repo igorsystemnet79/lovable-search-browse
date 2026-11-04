@@ -105,7 +105,7 @@ function KategorijaPage() {
           </nav>
         </section>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-2">
+        <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-6">
           <article className="rounded-2xl bg-secondary/60 p-5">
             <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
