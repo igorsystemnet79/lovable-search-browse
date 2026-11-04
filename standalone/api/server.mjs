@@ -296,6 +296,7 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
   if(maxCena!==null&&(!Number.isFinite(maxCena)||maxCena<0))return res.status(400).json({error:'Maksimalna cena nije ispravna.'});
   if(minCena!==null&&maxCena!==null&&minCena>maxCena)return res.status(400).json({error:'Minimalna cena ne može biti veća od maksimalne.'});
   if(valuta&&!['EUR','RSD'].includes(valuta))return res.status(400).json({error:'Izabrana valuta nije podržana.'});
+  if((minCena!==null||maxCena!==null)&&!valuta)return res.status(400).json({error:'Izaberi valutu za precizno filtriranje cene.'});
   const orderBy={najnovije:'created_at DESC',najstarije:'created_at ASC',cena_rastuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' ASC, created_at DESC',cena_opadajuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' DESC, created_at DESC'}[sort]||'created_at DESC';
   const sql='SELECT * FROM '+table+' WHERE pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
   const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:rows});
