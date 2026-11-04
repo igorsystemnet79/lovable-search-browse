@@ -286,8 +286,19 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
  const {fn,args={}}=req.body||{}; const userId=req.user?.sub||null;
  if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
  if(fn==='pretrazi_ponude'||fn==='pretrazi_zahteve'){
-  const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';const term=String(args.q||'').trim();const mesto=String(args.mesto||'').trim();
-  const {rows}=await pool.query(`SELECT * FROM ${table} WHERE pretraga_uslov(concat_ws(' ',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) ORDER BY created_at DESC LIMIT 200`,[term,mesto]);return res.json({data:rows});
+  const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';
+  const amount=table==='ponude'?'cena':'budzet';
+  const term=String(args.q||'').trim().slice(0,200), mesto=String(args.mesto||'').trim().slice(0,100);
+  const kategorija=String(args.kategorija||'').trim().slice(0,100), valuta=String(args.valuta||'').trim().toUpperCase();
+  const minRaw=String(args.minCena??'').trim(), maxRaw=String(args.maxCena??'').trim();
+  const minCena=minRaw===''?null:Number(minRaw), maxCena=maxRaw===''?null:Number(maxRaw), sort=String(args.sort||'najnovije');
+  if(minCena!==null&&(!Number.isFinite(minCena)||minCena<0))return res.status(400).json({error:'Minimalna cena nije ispravna.'});
+  if(maxCena!==null&&(!Number.isFinite(maxCena)||maxCena<0))return res.status(400).json({error:'Maksimalna cena nije ispravna.'});
+  if(minCena!==null&&maxCena!==null&&minCena>maxCena)return res.status(400).json({error:'Minimalna cena ne može biti veća od maksimalne.'});
+  if(valuta&&!['EUR','RSD'].includes(valuta))return res.status(400).json({error:'Izabrana valuta nije podržana.'});
+  const orderBy={najnovije:'created_at DESC',najstarije:'created_at ASC',cena_rastuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' ASC, created_at DESC',cena_opadajuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' DESC, created_at DESC'}[sort]||'created_at DESC';
+  const sql='SELECT * FROM '+table+' WHERE pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
+  const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:rows});
  }
  return res.status(400).json({error:'Nepoznata funkcija.'});
 }));
