@@ -59,10 +59,10 @@ function KategorijaPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
-      <section className="relative isolate">
+      <section className="container-page relative isolate">
         <img src={kat.slika} alt={kat.naziv} className="h-56 w-full object-cover" />
         <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent" />
-        <div className="container-page absolute inset-0 flex items-center">
+        <div className="absolute inset-0 flex items-center px-5">
           <div className="text-brand-foreground">
             <BackLink className="text-sm text-brand-foreground/80 hover:underline">← Nazad na početnu</BackLink>
             <h1 className="mt-2 text-4xl font-bold">{kat.naziv}</h1>
