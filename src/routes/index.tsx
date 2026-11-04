@@ -137,8 +137,8 @@ function Index() {
             </div>
           </section>
 
-          <section className="mt-14 grid gap-6 lg:grid-cols-2">
-            <article className="rounded-2xl bg-secondary/60 p-5">
+          <section className="mt-14 grid w-full min-w-0 grid-cols-1 gap-6 lg:grid-cols-2">
+            <article className="w-full min-w-0 overflow-hidden rounded-2xl bg-secondary/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Najnoviji zahtevi</h2>
                 <Link to="/zahtevi" className="text-sm font-semibold text-brand hover:underline">
@@ -150,7 +150,7 @@ function Index() {
               </ul>
             </article>
 
-            <article className="rounded-2xl bg-secondary/60 p-5">
+            <article className="w-full min-w-0 overflow-hidden rounded-2xl bg-secondary/60 p-5">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold">Istaknute ponude</h2>
                 <Link to="/ponude" className="text-sm font-semibold text-brand hover:underline">
