@@ -68,7 +68,7 @@ function MojiOglasi() {
         <h1 className="text-3xl font-bold">Moji oglasi</h1>
         {!loading && !user && <p className="mt-4">Da vidiš svoje oglase, <Link to="/prijava" className="font-semibold text-brand underline">prijavi se</Link>.</p>}
         {user && (
-          <div className="mt-6 grid gap-6 lg:grid-cols-2">
+          <div className="mt-6 grid w-full min-w-0 grid-cols-1 gap-6">
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
