@@ -59,7 +59,7 @@ async function removeImage(key) {
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
 const auth = asyncRoute(async (req,res,next) => {
- const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (!token) return res.status(401).json({ error:'Prijava je obavezna.' });
  // A database outage is not an invalid token. Keep DB errors out of this catch.
  try { req.user = jwt.verify(token, JWT_SECRET); }
@@ -68,7 +68,7 @@ const auth = asyncRoute(async (req,res,next) => {
  next();
 });
 const optionalAuth = asyncRoute(async (req,res,next) => {
- const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (token) {
   try { req.user = jwt.verify(token, JWT_SECRET); }
   catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
