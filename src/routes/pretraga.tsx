@@ -8,12 +8,17 @@ import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { pretragaQuery } from "@/lib/listings";
 
-type PretragaSearch = { q: string; lokacija: string };
+type PretragaSearch = { q: string; lokacija: string; kategorija: string; minCena: string; maxCena: string; valuta: string; sort: string };
 
 export const Route = createFileRoute("/pretraga")({
   validateSearch: (search: Record<string, unknown>): PretragaSearch => ({
     q: typeof search['q'] === "string" ? search['q'] : "",
     lokacija: typeof search['lokacija'] === "string" ? search['lokacija'] : "",
+    kategorija: typeof search['kategorija'] === "string" ? search['kategorija'] : "",
+    minCena: typeof search['minCena'] === "string" ? search['minCena'] : "",
+    maxCena: typeof search['maxCena'] === "string" ? search['maxCena'] : "",
+    valuta: typeof search['valuta'] === "string" ? search['valuta'] : "",
+    sort: typeof search['sort'] === "string" ? search['sort'] : "najnovije",
   }),
   head: () => ({
     meta: [
@@ -32,8 +37,8 @@ export const Route = createFileRoute("/pretraga")({
 });
 
 function PretragaPage() {
-  const { q, lokacija } = Route.useSearch();
-  const { data, isLoading, isError } = useQuery(pretragaQuery(q, lokacija));
+  const { q, lokacija, kategorija, minCena, maxCena, valuta, sort } = Route.useSearch();
+  const { data, isLoading, isError } = useQuery(pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }));
 
   const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0);
 
@@ -50,7 +55,7 @@ function PretragaPage() {
           {q || lokacija ? (
             <>
               Rezultati za{" "}
-              <span className="text-brand">{[q, lokacija].filter(Boolean).join(" · ")}</span>
+              <span className="text-brand">{[q, lokacija, kategorija].filter(Boolean).join(" · ")}</span>
             </>
           ) : (
             "Svi oglasi i zahtevi"
@@ -62,7 +67,7 @@ function PretragaPage() {
         </p>
 
         <div className="mt-6">
-          <SearchPanel defaultQ={q} defaultLokacija={lokacija} />
+          <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced />
         </div>
 
         {isError ? (
