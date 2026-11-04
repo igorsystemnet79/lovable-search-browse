@@ -175,3 +175,21 @@ CREATE TABLE IF NOT EXISTS admin_ai_audit (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS admin_ai_audit_created_idx ON admin_ai_audit(created_at DESC);
+
+
+-- Token usage and actual API cost per administrator conversation.
+CREATE TABLE IF NOT EXISTS chatgpt_usage (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ conversation_id uuid NOT NULL,
+ admin_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ model text NOT NULL,
+ input_tokens bigint NOT NULL DEFAULT 0,
+ output_tokens bigint NOT NULL DEFAULT 0,
+ cached_input_tokens bigint NOT NULL DEFAULT 0,
+ input_cost_usd numeric(14,8) NOT NULL DEFAULT 0,
+ output_cost_usd numeric(14,8) NOT NULL DEFAULT 0,
+ total_cost_usd numeric(14,8) NOT NULL DEFAULT 0,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS chatgpt_usage_admin_created_idx ON chatgpt_usage(admin_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS chatgpt_usage_conversation_idx ON chatgpt_usage(admin_id,conversation_id,created_at);
