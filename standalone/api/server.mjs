@@ -190,6 +190,7 @@ const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const 
 app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  const {table,action='select',values,filters=[],orders=[],limit,single,count,or}=req.body||{};
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
+ const supplied=Array.isArray(values)?values:[values||{}];
  const userId=req.user?.sub || null; const adminUser=userId ? await isAdmin(userId) : false;
  const write=action!=='select';
  if(write && !userId && !(table==='poruke_podrske' && action==='insert')) return res.status(401).json({error:'Prijava je obavezna.'});
@@ -209,7 +210,6 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const listing=hasOffer?await pool.query('SELECT id FROM ponude WHERE id=$1',[row.ponuda_id]):await pool.query('SELECT id FROM zahtevi WHERE id=$1',[row.zahtev_id]);
    if(!listing.rowCount) return res.status(404).json({error:'Oglas koji želiš da pratiš ne postoji.'});
  }
- const supplied=Array.isArray(values)?values:[values||{}];
  for(const item of supplied) for(const key of Object.keys(item||{})) {
    if(!columns.includes(key) || ['id','created_at','updated_at'].includes(key)) return res.status(400).json({error:`Polje ${key} nije dozvoljeno za izmenu.`});
    if(action!=='select' && !(WRITE_COLUMNS[table]||[]).includes(key) && !(adminUser && (table==='ponude'||table==='zahtevi'||table==='profiles'))) return res.status(400).json({error:`Polje ${key} ne može da se menja.`});
