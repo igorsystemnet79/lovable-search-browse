@@ -11,7 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, randomBytes, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -308,6 +308,26 @@ app.get('/api/storage/public',asyncRoute(async(req,res)=>{
 }));
 app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(!stored.rows[0])return res.status(404).end();res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');res.send(stored.rows[0].body);}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
+// PRIVREMENA funkcija za brisanje SAMO administratorskog naloga; ukloniti nakon upotrebe.
+app.delete('/api/admin/account/self',asyncRoute(async(req,res)=>{
+ const configuredEmail=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
+ const configuredKey=String(process.env.ADMIN_ACCOUNT_DELETE_KEY||'');
+ const suppliedKey=String(req.headers['x-account-delete-key']||'');
+ const confirmedEmail=String(req.body?.confirmEmail||'').trim().toLowerCase();
+ if(!configuredEmail||configuredKey.length<32) return res.status(503).json({error:'Privremeno brisanje nije aktivirano.'});
+ const a=Buffer.from(configuredKey); const b=Buffer.from(suppliedKey);
+ if(a.length!==b.length||!timingSafeEqual(a,b)) return res.status(403).json({error:'Neispravan sigurnosni ključ.'});
+ if(confirmedEmail!==configuredEmail) return res.status(400).json({error:'Potvrda email adrese nije ispravna.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const found=await c.query('SELECT id,email FROM users WHERE lower(email)=lower($1) FOR UPDATE',[configuredEmail]);
+  if(!found.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Administratorski nalog nije pronađen.'});}
+  await c.query('DELETE FROM users WHERE id=$1',[found.rows[0].id]);
+  await c.query('COMMIT');
+  res.json({ok:true,message:'Administratorski nalog je obrisan. Oglasi i fotografije su sačuvani.'});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
  try{const response=await fetch(url,{headers:{Authorization:`Bearer ${key}`,Accept:'application/json'}});if(!response.ok)throw new Error(`APR je vratio status ${response.status}`);const body=await response.json();const list=Array.isArray(body)?body:(body.data||[]);let n=0;
