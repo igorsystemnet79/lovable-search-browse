@@ -146,7 +146,7 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 space-y-3">
-                {zahtevi.data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact />)}
+                {zahtevi.data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact featured />)}
               </ul>
             </article>
 
@@ -158,7 +158,7 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 space-y-3">
-                {ponude.data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact />)}
+                {ponude.data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact featured />)}
               </ul>
             </article>
           </section>
