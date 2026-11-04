@@ -40,7 +40,7 @@ function Praceni() {
         {user && q.isError && <p className="mt-4 text-sm text-destructive">Praćeni oglasi trenutno ne mogu da se učitaju. Pokušaj ponovo.</p>}
         {ponude.length > 0 && <section className="mt-7">
           <h2 className="text-xl font-semibold">Ponude koje pratiš ({ponude.length})</h2>
-          <ul className="mt-4 grid gap-4 lg:grid-cols-2">
+          <ul className="mt-4 grid w-full min-w-0 grid-cols-1 gap-4">
             {ponude.map((f) => f.ponude && <div key={f.id}>
               <PonudaItem ponuda={f.ponude} />
               <p className="mt-2 px-4 text-sm">Kad si počeo: {formatCena(f.pocetna_cena, f.ponude.valuta)} · Sada: {formatCena(f.ponude.cena, f.ponude.valuta)} · <strong className={promenaCene(f.pocetna_cena, f.ponude.cena) === "pala" ? "text-brand" : ""}>{label[promenaCene(f.pocetna_cena, f.ponude.cena)]}</strong></p>
