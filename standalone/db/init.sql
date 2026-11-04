@@ -165,3 +165,13 @@ BEGIN
 END $$;
 DROP TRIGGER IF EXISTS ogranicenje_broj_slika_oglasa ON slike_oglasa;
 CREATE TRIGGER ogranicenje_broj_slika_oglasa BEFORE INSERT OR UPDATE OF ponuda_id,zahtev_id ON slike_oglasa FOR EACH ROW EXECUTE FUNCTION proveri_broj_slika_oglasa();
+
+-- Audit trail for the internal AI administrator. No secrets or message bodies are stored.
+CREATE TABLE IF NOT EXISTS admin_ai_audit (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ admin_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ action text NOT NULL,
+ details jsonb NOT NULL DEFAULT '{}'::jsonb,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS admin_ai_audit_created_idx ON admin_ai_audit(created_at DESC);
