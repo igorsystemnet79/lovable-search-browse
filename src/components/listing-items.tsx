@@ -28,7 +28,7 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
 
 export function PonudaItem({ ponuda, hideFollow, compact = true, featured = false }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
   return (
-    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] overflow-hidden" : compact ? "h-[390px] sm:h-[410px]" : ""} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
+    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] w-full min-w-0 overflow-hidden" : compact ? "h-[390px] sm:h-[410px] w-full min-w-0" : "w-full min-w-0"} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
       <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className="block truncate font-semibold text-brand hover:underline">
         {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}{ponuda.naslov}
       </Link>
