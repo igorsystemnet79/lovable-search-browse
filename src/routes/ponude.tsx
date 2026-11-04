@@ -52,7 +52,7 @@ function PonudePage() {
         </div>
         {isError && <p role="alert" className="mt-8 text-sm text-destructive">Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.</p>}
         {!isLoading && !isError && items.length === 0 && <p className="mt-8 text-sm text-muted-foreground">Nema rezultata za izabrane kriterijume. Promeni filtere i pokušaj ponovo.</p>}
-        <ul className="mt-6 grid gap-3 md:grid-cols-2">
+        <ul className="mt-6 grid w-full min-w-0 grid-cols-1 gap-3">
           {items.map((item) => <PonudaItem key={item.id} ponuda={item} compact />)}
         </ul>
       </main>
