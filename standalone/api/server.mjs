@@ -358,7 +358,32 @@ const port=Number(process.env.PORT||process.env.API_PORT||4000);
 async function startServer(){
  const schemaPath=path.resolve(__dirname,'../db/init.sql');
  const schema=await readFile(schemaPath,'utf8');
- await pool.query(schema);
+ let initialized=false;
+ let lastError;
+ for(let attempt=1;attempt<=12;attempt++){
+  const client=await pool.connect().catch(err=>{lastError=err;return null;});
+  if(client){
+   try{
+    await client.query('BEGIN');
+    await client.query('SELECT 1');
+    await client.query(schema);
+    await client.query('COMMIT');
+    initialized=true;
+    client.release();
+    break;
+   }catch(err){
+    lastError=err;
+    try{await client.query('ROLLBACK');}catch{}
+    client.release(err);
+   }
+  }
+  if(attempt<12){
+   const delay=Math.min(1000*attempt,10000);
+   console.error(`PostgreSQL još nije spreman (pokušaj ${attempt}/12): ${lastError?.code||lastError?.message||'nepoznata greška'}; novi pokušaj za ${delay} ms.`);
+   await new Promise(resolve=>setTimeout(resolve,delay));
+  }
+ }
+ if(!initialized)throw lastError||new Error('PostgreSQL nije dostupan nakon 12 pokušaja.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
  app.listen(port,'0.0.0.0',()=>{
   console.log(`PonudiMi API sluša na ${port}`);
