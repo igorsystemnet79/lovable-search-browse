@@ -41,7 +41,7 @@ function ZahteviPage() {
         </p>
 
         <ul className="mt-6 grid gap-3 md:grid-cols-2">
-          {data?.map((z) => <ZahtevItem key={z.id} zahtev={z} />)}
+          {data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact />)}
         </ul>
       </main>
 
