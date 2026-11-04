@@ -7,12 +7,10 @@ type SearchPanelProps = {
   defaultValuta?: string;
   defaultSort?: string;
   advanced?: boolean;
-  /** Otvori rezultate u novom tabu (početna strana). */
-  newTab?: boolean;
   searchPath?: "/pretraga" | "/ponude" | "/zahtevi";
 };
 
-export function SearchPanel({ defaultQ = "", defaultLokacija = "", defaultKategorija = "", defaultMinCena = "", defaultMaxCena = "", defaultValuta = "", defaultSort = "najnovije", advanced = false, newTab, searchPath = "/pretraga" }: SearchPanelProps) {
+export function SearchPanel({ defaultQ = "", defaultLokacija = "", defaultKategorija = "", defaultMinCena = "", defaultMaxCena = "", defaultValuta = "", defaultSort = "najnovije", advanced = false, searchPath = "/pretraga" }: SearchPanelProps) {
   return (
     <form
       action={searchPath}
