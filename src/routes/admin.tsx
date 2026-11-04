@@ -76,11 +76,26 @@ function AdminPage() {
 
 function AdminChatGPT() {
   type Message = { role: "user" | "assistant"; content: string };
+  type Usage = { input_tokens: number; output_tokens: number; cached_input_tokens: number; cost_usd: number | string };
   const [messages, setMessages] = useState<Message[]>([]);
   const [prompt, setPrompt] = useState("");
   const [busy, setBusy] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [error, setError] = useState("");
+  const [conversationId, setConversationId] = useState(() => crypto.randomUUID());
+  const [conversationUsage, setConversationUsage] = useState<Usage>({ input_tokens: 0, output_tokens: 0, cached_input_tokens: 0, cost_usd: 0 });
+  const [totalUsage, setTotalUsage] = useState<Usage>({ input_tokens: 0, output_tokens: 0, cached_input_tokens: 0, cost_usd: 0 });
+
+  const loadUsage = useCallback(async (id: string) => {
+    const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
+    const response = await fetch(`/api/admin/chatgpt/usage?conversation_id=${encodeURIComponent(id)}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    });
+    if (!response.ok) throw new Error("Potrošnja nije mogla da se učita.");
+    const data = await response.json();
+    setConversationUsage(data.conversation);
+    setTotalUsage(data.all_time);
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -91,11 +106,14 @@ function AdminChatGPT() {
       }).then(async (response) => {
         if (!response.ok) throw new Error("Status asistenta nije dostupan.");
         const data = await response.json();
-        if (active) setConfigured(Boolean(data.configured));
+        if (active) {
+          setConfigured(Boolean(data.configured));
+          if (data.configured) await loadUsage(conversationId);
+        }
       }).catch(() => { if (active) setConfigured(false); });
     } catch { setConfigured(false); }
     return () => { active = false; };
-  }, []);
+  }, [conversationId, loadUsage]);
 
   async function send(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -114,17 +132,28 @@ function AdminChatGPT() {
           "Content-Type": "application/json",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
-        body: JSON.stringify({ messages: next.slice(-12) }),
+        body: JSON.stringify({ messages: next.slice(-12), conversation_id: conversationId }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Poruka nije poslata.");
       setMessages((current) => [...current, { role: "assistant", content: data.reply }]);
+      await loadUsage(conversationId);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Greška u komunikaciji sa asistentom.");
     } finally {
       setBusy(false);
     }
   }
+
+  function newConversation() {
+    setMessages([]);
+    setError("");
+    const id = crypto.randomUUID();
+    setConversationId(id);
+    setConversationUsage({ input_tokens: 0, output_tokens: 0, cached_input_tokens: 0, cost_usd: 0 });
+  }
+  const money = (value: number | string) => `${Number(value || 0).toFixed(6)}`;
+  const tokens = (value: number | string) => Number(value || 0).toLocaleString("sr-RS");
 
   return (
     <section className="mx-auto max-w-4xl space-y-4">
@@ -133,7 +162,7 @@ function AdminChatGPT() {
           <div className="flex h-11 w-11 items-center justify-center rounded-full bg-brand/10 text-brand"><span className="text-lg font-bold">GPT</span></div>
           <div><h2 className="font-semibold">ChatGPT — pomoć za administraciju</h2><p className="text-sm text-muted-foreground">Privatni razgovor dostupan samo administratorima.</p></div>
         </div>
-        <p className="mt-3 text-sm text-muted-foreground">Može da proveri stanje API-ja i baze, prikaže statistiku i pretraži postojeće oglase i korisnike. Trenutno radi u režimu bezbedne provere (bez izmena podataka); sledeće faze dodaju odobrene administrativne radnje i upravljanje platformom.</p>
+        <p className="mt-3 text-sm text-muted-foreground">Može da proveri stanje API-ja i baze, prikaže statistiku i pretraži postojeće oglase i korisnike. Trenutno radi u režimu bezbedne provere (bez izmena podataka).</p>
       </div>
       {configured === false && (
         <div className="rounded-2xl border border-input p-4 text-sm">
@@ -141,6 +170,22 @@ function AdminChatGPT() {
           <p className="mt-1 text-muted-foreground">Na Render API servisu potrebno je dodati tajnu promenljivu OPENAI_API_KEY. Po želji se može podesiti i OPENAI_MODEL. Ključ se čuva isključivo na serveru i nikada se ne šalje pregledaču.</p>
         </div>
       )}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-2xl border border-input bg-surface p-4">
+          <p className="text-xs text-muted-foreground">Potrošnja ovog razgovora</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{money(conversationUsage.cost_usd)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Ulaz: {tokens(conversationUsage.input_tokens)} · Izlaz: {tokens(conversationUsage.output_tokens)} tokena</p>
+        </div>
+        <div className="rounded-2xl border border-input bg-surface p-4">
+          <p className="text-xs text-muted-foreground">Ukupna potrošnja svih razgovora</p>
+          <p className="mt-1 text-2xl font-bold tabular-nums">{money(totalUsage.cost_usd)}</p>
+          <p className="mt-2 text-xs text-muted-foreground">Ulaz: {tokens(totalUsage.input_tokens)} · Izlaz: {tokens(totalUsage.output_tokens)} tokena</p>
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-surface px-4 py-3 text-xs text-muted-foreground">
+        <span>Keširani ulazni tokeni: {tokens(totalUsage.cached_input_tokens)}</span>
+        <button type="button" className={small} onClick={() => loadUsage(conversationId)}>Osveži potrošnju</button>
+      </div>
       <div className="min-h-64 space-y-3 rounded-2xl bg-surface p-4 shadow-card">
         {!messages.length && <p className="py-12 text-center text-sm text-muted-foreground">Započni razgovor. Na primer: „Pomozi mi da proverim zašto dodavanje oglasa ne radi.“</p>}
         {messages.map((message, index) => (
@@ -155,9 +200,9 @@ function AdminChatGPT() {
       <form onSubmit={send} className="space-y-2">
         <textarea className={inputCls + " min-h-24 w-full"} placeholder="Napiši pitanje ili opiši problem..." value={prompt} onChange={(event) => setPrompt(event.target.value)} maxLength={6000} disabled={!configured || busy} />
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-muted-foreground">Ne šalji lozinke, API ključeve ni podatke o platnim karticama.</p>
+          <p className="text-xs text-muted-foreground">Iznosi su obračunati po cenama modela na serveru. Ne šalji lozinke, API ključeve ni podatke o platnim karticama.</p>
           <div className="flex gap-2">
-            <button type="button" className={small} onClick={() => { setMessages([]); setError(""); }}>Novi razgovor</button>
+            <button type="button" className={small} onClick={newConversation}>Novi razgovor</button>
             <button type="submit" className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={!configured || busy || !prompt.trim()}>{busy ? "Šaljem..." : "Pošalji"}</button>
           </div>
         </div>
@@ -165,7 +210,6 @@ function AdminChatGPT() {
     </section>
   );
 }
-
 function Korisnici({ selfId }: { selfId: string }) {
   const [profili, setProfili] = useState<Profil[]>([]);
   const [uloge, setUloge] = useState<Record<string, Uloga[]>>({});
