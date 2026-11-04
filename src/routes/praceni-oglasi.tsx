@@ -49,7 +49,7 @@ function Praceni() {
         </section>}
         {zahtevi.length > 0 && <section className="mt-7">
           <h2 className="text-xl font-semibold">Zahtevi koje pratiš ({zahtevi.length})</h2>
-          <ul className="mt-4 grid gap-4 lg:grid-cols-2">
+          <ul className="mt-4 grid w-full min-w-0 grid-cols-1 gap-4">
             {zahtevi.map((f) => f.zahtevi && <div key={f.id}>
               <ZahtevItem zahtev={f.zahtevi} />
               <p className="mt-2 px-4 text-sm text-muted-foreground">Početni budžet: {formatCena(f.pocetni_budzet, f.zahtevi.valuta)} · Trenutni budžet: {formatCena(f.zahtevi.budzet, f.zahtevi.valuta)}</p>
