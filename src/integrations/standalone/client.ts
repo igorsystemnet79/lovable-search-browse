@@ -74,8 +74,30 @@ const auth = {
   async getSession() {
     const session = readSession();
     if (!session?.access_token) return { data: { session: null }, error: null };
-    try { const result = await api("/api/auth/me"); const next = { ...session, user: result.user }; writeSession(next); return { data: { session: next }, error: null }; }
-    catch { writeSession(null); return { data: { session: null }, error: null }; }
+
+    try {
+      const result = await api("/api/auth/me");
+      const next = { ...session, user: result.user };
+      writeSession(next);
+      return { data: { session: next }, error: null };
+    } catch (error: any) {
+      // A sleeping/unavailable API or a temporary 5xx must never erase a
+      // still-stored login. Clear the token only when the API explicitly
+      // confirms that it is invalid, expired, or the account is blocked.
+      if (error?.status === 401 || error?.status === 403) {
+        writeSession(null);
+        return { data: { session: null }, error };
+      }
+
+      return {
+        data: { session },
+        error: {
+          message: error?.message || "Provera sesije trenutno nije dostupna.",
+          status: error?.status,
+          code: error?.code,
+        },
+      };
+    }
   },
   onAuthStateChange(callback: (event: string, session: any) => void) {
     listeners.add(callback); const subscription = { unsubscribe: () => { listeners.delete(callback); } };
