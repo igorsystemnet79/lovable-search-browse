@@ -284,7 +284,28 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
      if(String(merged.naslov||'').trim().length<3||String(merged.naslov).length>150||!String(merged.kategorija||'').trim()||String(merged.lokacija||'').trim().length<2||String(merged.lokacija).length>100||String(merged.kontakt_ime||'').trim().length<2||String(merged.kontakt_ime).length>100||! /^[+0-9 ()-]{6,30}$/.test(String(merged.telefon||''))||String(merged.opis||'').length>3000||(merged[amountField]!==null&&merged[amountField]!==undefined&&(!Number.isFinite(Number(merged[amountField]))||Number(merged[amountField])<0)))return res.status(400).json({error:'Izmenjeni podaci oglasa nisu ispravni.'});
    }
  }
- if(table==='profiles' && action==='update' && !adminUser) for(const row of supplied){delete row.blokiran;delete row.firma_verifikovana;delete row.email;delete row.id;if(row.pib!==undefined&&row.pib!==null&&row.pib!==''&&!validPib(row.pib))return res.status(400).json({error:'PIB nije ispravan.'});if(row.tip_lica==='pravno'&&row.naziv_firme!==undefined&&!String(row.naziv_firme||'').trim())return res.status(400).json({error:'Unesi naziv firme.'});}
+ if(table==='profiles' && action==='update' && !adminUser) {
+   for(const row of supplied) {
+     // Never allow a user to edit account identity, verification or moderation flags.
+     delete row.blokiran; delete row.firma_verifikovana; delete row.email; delete row.id;
+     const current=await pool.query('SELECT tip_lica,naziv_firme,pib FROM profiles WHERE id=$1',[userId]);
+     if(!current.rows[0]) return res.status(404).json({error:'Korisnički profil nije pronađen.'});
+     const merged={...current.rows[0],...row};
+     if(!['fizicko','pravno'].includes(merged.tip_lica)) return res.status(400).json({error:'Izaberi ispravan tip naloga.'});
+     if(merged.tip_lica==='pravno') {
+       if(!String(merged.naziv_firme||'').trim()) return res.status(400).json({error:'Za pravno lice obavezan je naziv firme.'});
+       if(!validPib(merged.pib)) return res.status(400).json({error:'Za pravno lice potreban je ispravan PIB od 9 cifara.'});
+       merged.pib=String(merged.pib).replace(/\\s/g,'');
+       row.tip_lica=merged.tip_lica; row.naziv_firme=merged.naziv_firme.trim(); row.pib=merged.pib;
+     } else if(row.pib!==undefined && row.pib!==null && row.pib!=='' && !validPib(row.pib)) {
+       return res.status(400).json({error:'PIB nije ispravan.'});
+     }
+     if(row.telefon!==undefined && row.telefon!==null && row.telefon!=='' && (!/^[+0-9 ()-]{6,30}$/.test(String(row.telefon)) || String(row.telefon).replace(/\\D/g,'').length<6)) return res.status(400).json({error:'Broj telefona nije ispravan.'});
+     if(row.ime!==undefined && String(row.ime||'').trim().length>100) return res.status(400).json({error:'Ime i prezime mogu imati najviše 100 karaktera.'});
+     if(row.grad!==undefined && String(row.grad||'').length>60) return res.status(400).json({error:'Naziv grada može imati najviše 60 karaktera.'});
+     if(row.adresa!==undefined && String(row.adresa||'').length>150) return res.status(400).json({error:'Adresa može imati najviše 150 karaktera.'});
+   }
+ }
  const whereSql=where.length?` WHERE ${where.join(' AND ')}`:'';
  let result;
  if(action==='select'){
