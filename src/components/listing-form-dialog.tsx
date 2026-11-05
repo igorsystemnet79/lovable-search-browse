@@ -23,6 +23,8 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [possibleDuplicates, setPossibleDuplicates] = useState<Array<{ id: string; naslov: string; kategorija: string; lokacija: string; kind: ListingKind }>>([]);
+  const [checkingDuplicates, setCheckingDuplicates] = useState(false);
 
   useEffect(() => {
     if (!kind) return;
@@ -49,6 +51,44 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
       .catch(() => { if (active) setError("Fotografije postojećeg oglasa nisu mogle da se učitaju."); });
     return () => { active = false; };
   }, [kind, edit?.id]);
+
+  useEffect(() => {
+    const naslov = form.naslov.trim();
+    if (!kind || edit?.id || naslov.length < 10) {
+      setPossibleDuplicates([]);
+      setCheckingDuplicates(false);
+      return;
+    }
+    let active = true;
+    setCheckingDuplicates(true);
+    const timer = window.setTimeout(async () => {
+      try {
+        const pattern = `%${naslov.replace(/[%_]/g, "")}%`;
+        const [ponude, zahtevi] = await Promise.all([
+          ponudimi.from("ponude").select("id,naslov,kategorija,lokacija").ilike("naslov", pattern).limit(4),
+          ponudimi.from("zahtevi").select("id,naslov,kategorija,lokacija").ilike("naslov", pattern).limit(4),
+        ]);
+        if (!active) return;
+        if (ponude.error || zahtevi.error) {
+          setPossibleDuplicates([]);
+          return;
+        }
+        const results = [
+          ...((ponude.data ?? []) as Array<{ id: string; naslov: string; kategorija: string; lokacija: string }>).map((item) => ({ ...item, kind: "ponuda" as const })),
+          ...((zahtevi.data ?? []) as Array<{ id: string; naslov: string; kategorija: string; lokacija: string }>).map((item) => ({ ...item, kind: "zahtev" as const })),
+        ].filter((item) => item.naslov.toLocaleLowerCase("sr-Latn").includes(naslov.toLocaleLowerCase("sr-Latn")) || naslov.toLocaleLowerCase("sr-Latn").includes(item.naslov.toLocaleLowerCase("sr-Latn")));
+        setPossibleDuplicates(results.slice(0, 5));
+      } catch {
+        if (active) setPossibleDuplicates([]);
+      } finally {
+        if (active) setCheckingDuplicates(false);
+      }
+    }, 450);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [form.naslov, kind, edit?.id]);
 
   function keepDraft() {
     try { sessionStorage.setItem("ponudimi-listing-draft", JSON.stringify({ kind, form })); } catch { /* Optional draft. */ }
@@ -186,7 +226,28 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
               )}
               <p className="text-xs text-muted-foreground">Ovo su preporuke za bolju vidljivost, ne dodatni uslovi za objavljivanje.</p>
             </section>
-            <label className="space-y-1 text-sm font-medium sm:col-span-2">
+                        {form.naslov.trim().length >= 10 && (checkingDuplicates || possibleDuplicates.length > 0) && (
+              <section aria-live="polite" className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-2">
+                <p className="text-sm font-semibold">Provera sličnih objava</p>
+                {checkingDuplicates ? (
+                  <p className="text-xs text-muted-foreground">Proveravam da li već postoji slična objava…</p>
+                ) : possibleDuplicates.length > 0 ? (
+                  <>
+                    <p className="text-xs text-muted-foreground">Pronađene su objave sa sličnim naslovom. Proveri da li je neka od njih već ono što želiš da ponudiš ili potražiš.</p>
+                    <ul className="space-y-1">
+                      {possibleDuplicates.map((item) => (
+                        <li key={item.kind + item.id} className="text-sm">
+                          <span className="font-medium">{item.naslov}</span>
+                          <span className="text-xs text-muted-foreground"> · {item.kind === "ponuda" ? "Ponuda" : "Zahtev"} · {item.kategorija} · {item.lokacija}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                ) : null}
+                <p className="text-xs text-muted-foreground">Ovo je samo upozorenje — objava nije blokirana.</p>
+              </section>
+            )}
+<label className="space-y-1 text-sm font-medium sm:col-span-2">
               Kategorija i potkategorija
               <select className={inputCls} required {...field("kategorija")}>
                 <option value="">Izaberi kategoriju</option>
