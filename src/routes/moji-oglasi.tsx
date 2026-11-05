@@ -93,6 +93,7 @@ function MojiOglasi() {
 
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 text-sm">
+      {x.pauziran && <span className="font-medium text-muted-foreground">Pauziran — nije javno vidljiv</span>}
       <button type="button" disabled={!!busyId} className="font-semibold text-brand hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => { setEdit({ id: x.id, values: toValues(x, iznos) }); setKind(k); }}>Izmeni</button>
       <button type="button" disabled={!!busyId} className="font-semibold text-destructive hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => obrisi(k === "ponuda" ? "ponude" : "zahtevi", x.id)}>{busyId === x.id ? "Sačekaj…" : "Obriši"}</button>
       <button type="button" disabled={!!busyId} className="font-semibold text-muted-foreground hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => zavrsi(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.zavrseno)}>{busyId === x.id ? "Čuvanje…" : x.zavrseno ? "Ponovo aktiviraj" : "Završi oglas"}</button>
