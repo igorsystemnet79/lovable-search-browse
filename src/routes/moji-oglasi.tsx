@@ -34,30 +34,53 @@ function MojiOglasi() {
   const q = useQuery({ ...mojiOglasiQuery(user?.id ?? ""), enabled: !!user });
   const [kind, setKind] = useState<ListingKind | null>(null);
   const [edit, setEdit] = useState<ListingEdit | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
 
   async function obrisi(table: "ponude" | "zahtevi", id: string) {
+    if (busyId) return;
     if (!confirm("Da li sigurno želiš da obrišeš ovu objavu?")) return;
-    const column = table === "ponude" ? "ponuda_id" : "zahtev_id";
-    const { data: photos, error: photosError } = await ponudimi.from("slike_oglasa").select("storage_path").eq(column, id);
-    if (photosError) { alert("Fotografije nisu mogle da se pripreme za brisanje."); return; }
-    const paths = (photos ?? []).map((photo) => photo.storage_path).filter((path): path is string => !!path);
-    if (paths.length) {
-      const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove(paths);
-      if (storageError) { alert("Fotografije nisu mogle da se obrišu. Oglas nije obrisan."); return; }
+    setBusyId(id);
+    setActionError("");
+    try {
+      const column = table === "ponude" ? "ponuda_id" : "zahtev_id";
+      const { data: photos, error: photosError } = await ponudimi.from("slike_oglasa").select("storage_path").eq(column, id);
+      if (photosError) throw new Error("Fotografije nisu mogle da se pripreme za brisanje.");
+      const paths = (photos ?? []).map((photo) => photo.storage_path).filter((path): path is string => !!path);
+      if (paths.length) {
+        const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove(paths);
+        if (storageError) throw new Error("Fotografije nisu mogle da se obrišu. Oglas nije obrisan.");
+      }
+      const { error } = await ponudimi.from(table).delete().eq("id", id);
+      if (error) throw error;
+      await qc.invalidateQueries();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : "Oglas nije mogao da se obriše. Pokušaj ponovo.");
+    } finally {
+      setBusyId(null);
     }
-    const { error } = await ponudimi.from(table).delete().eq("id", id);
-    if (error) { alert("Oglas nije mogao da se obriše."); return; }
-    await qc.invalidateQueries();
   }
+
   async function zavrsi(table: "ponude" | "zahtevi", id: string, v: boolean) {
-    await ponudimi.from(table).update({ zavrseno: v }).eq("id", id);
-    await qc.invalidateQueries();
+    if (busyId) return;
+    setBusyId(id);
+    setActionError("");
+    try {
+      const { error } = await ponudimi.from(table).update({ zavrseno: v }).eq("id", id);
+      if (error) throw error;
+      await qc.invalidateQueries();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : "Status oglasa nije mogao da se promeni. Pokušaj ponovo.");
+    } finally {
+      setBusyId(null);
+    }
   }
+
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
-    <div className="mt-2 flex gap-4 px-4 text-sm">
-      <button type="button" className="font-semibold text-brand hover:underline" onClick={() => { setEdit({ id: x.id, values: toValues(x, iznos) }); setKind(k); }}>Izmeni</button>
-      <button type="button" className="font-semibold text-destructive hover:underline" onClick={() => obrisi(k === "ponuda" ? "ponude" : "zahtevi", x.id)}>Obriši</button>
-      <button type="button" className="font-semibold text-muted-foreground hover:underline" onClick={() => zavrsi(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.zavrseno)}>{x.zavrseno ? "Ponovo aktiviraj" : "Završi oglas"}</button>
+    <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 text-sm">
+      <button type="button" disabled={!!busyId} className="font-semibold text-brand hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => { setEdit({ id: x.id, values: toValues(x, iznos) }); setKind(k); }}>Izmeni</button>
+      <button type="button" disabled={!!busyId} className="font-semibold text-destructive hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => obrisi(k === "ponuda" ? "ponude" : "zahtevi", x.id)}>{busyId === x.id ? "Sačekaj…" : "Obriši"}</button>
+      <button type="button" disabled={!!busyId} className="font-semibold text-muted-foreground hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => zavrsi(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.zavrseno)}>{busyId === x.id ? "Čuvanje…" : x.zavrseno ? "Ponovo aktiviraj" : "Završi oglas"}</button>
     </div>
   );
 
@@ -69,6 +92,8 @@ function MojiOglasi() {
         {!loading && !user && <p className="mt-4">Da vidiš svoje oglase, <Link to="/prijava" className="font-semibold text-brand underline">prijavi se</Link>.</p>}
         {user && (
           <div className="mt-6 grid w-full min-w-0 grid-cols-1 gap-6">
+            {actionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{actionError}</p>}
+            {q.isError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Tvoji oglasi trenutno nisu mogli da se učitaju. Osveži stranicu ili pokušaj ponovo.</p>}
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
