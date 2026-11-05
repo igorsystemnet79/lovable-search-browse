@@ -248,20 +248,31 @@ function Korisnici({ selfId }: { selfId: string }) {
     load();
   }
 
+  const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
   const q = filter.trim().toLocaleLowerCase("sr");
   const collator = new Intl.Collator("sr", { sensitivity: "base", numeric: true });
-  const lista = profili
-    .filter((p) => !q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLocaleLowerCase("sr").includes(q)))
-    .sort((a, b) => collator.compare(
-      (a.ime || a.naziv_firme || a.email || "").trim(),
-      (b.ime || b.naziv_firme || b.email || "").trim(),
-    ));
+  const filtrirani = profili.filter((p) =>
+    (prikaz === "firme" ? p.tip_lica === "pravno" : p.tip_lica !== "pravno") &&
+    (!q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLocaleLowerCase("sr").includes(q)))
+  );
+  const lista = [...filtrirani].sort((a, b) => {
+    if (prikaz === "firme") return collator.compare((a.naziv_firme || "").trim(), (b.naziv_firme || "").trim());
+    const deloviA = (a.ime || "").trim().split(/\s+/).filter(Boolean);
+    const deloviB = (b.ime || "").trim().split(/\s+/).filter(Boolean);
+    const prezimeA = deloviA.length > 1 ? deloviA[deloviA.length - 1] : (deloviA[0] || a.email || "");
+    const prezimeB = deloviB.length > 1 ? deloviB[deloviB.length - 1] : (deloviB[0] || b.email || "");
+    return collator.compare(prezimeA, prezimeB) || collator.compare(deloviA.slice(0, -1).join(" "), deloviB.slice(0, -1).join(" "));
+  });
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input className={`${inputCls} max-w-sm`} placeholder="Pretraga korisnika" value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <span className="text-sm text-muted-foreground">Ukupno: {profili.length}</span>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={prikaz === "fizicka" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("fizicka"); setFilter(""); setEdit(null); }}>Fizička lica</button>
+          <button type="button" className={prikaz === "firme" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("firme"); setFilter(""); setEdit(null); }}>Registrovane firme</button>
+        </div>
+        <input className={`${inputCls} max-w-sm`} placeholder={prikaz === "firme" ? "Pretraga firmi" : "Pretraga korisnika"} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <span className="text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
         {msg && <span className="text-sm text-brand">{msg}</span>}
       </div>
       <div className="space-y-3">
@@ -305,6 +316,7 @@ function Korisnici({ selfId }: { selfId: string }) {
             </div>
           );
         })}
+        {lista.length === 0 && <p className="rounded-2xl bg-surface p-4 text-sm text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</p>}
       </div>
     </div>
   );
