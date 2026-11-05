@@ -144,12 +144,14 @@ function MojiOglasi() {
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
-              <ul className="mt-4 space-y-4">{q.data?.ponude.map((p) => <div key={p.id}><PonudaItem ponuda={p} hideFollow />{actions("ponuda", p, p.cena)}</div>)}</ul>
+              {q.data && q.data.ponude.length > 0 && prikazi(q.data.ponude).length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nema ponuda u izabranom statusu.</p>}
+              <ul className="mt-4 space-y-4">{prikazi(q.data?.ponude ?? []).map((p) => <div key={p.id}><PonudaItem ponuda={p} hideFollow />{actions("ponuda", p, p.cena)}</div>)}</ul>
             </section>
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moji zahtevi</h2>
               {q.data?.zahtevi.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš postavljenih zahteva.</p>}
-              <ul className="mt-4 space-y-4">{q.data?.zahtevi.map((z) => <div key={z.id}><ZahtevItem zahtev={z} />{actions("zahtev", z, z.budzet)}</div>)}</ul>
+              {q.data && q.data.zahtevi.length > 0 && prikazi(q.data.zahtevi).length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nema zahteva u izabranom statusu.</p>}
+              <ul className="mt-4 space-y-4">{prikazi(q.data?.zahtevi ?? []).map((z) => <div key={z.id}><ZahtevItem zahtev={z} />{actions("zahtev", z, z.budzet)}</div>)}</ul>
             </section>
           </div>
         )}
