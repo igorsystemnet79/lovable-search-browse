@@ -268,9 +268,12 @@ function Korisnici({ selfId }: { selfId: string }) {
     if (prikaz === "firme") return collator.compare((a.naziv_firme || "").trim(), (b.naziv_firme || "").trim());
     const deloviA = (a.ime || "").trim().split(/\s+/).filter(Boolean);
     const deloviB = (b.ime || "").trim().split(/\s+/).filter(Boolean);
-    const prezimeA = deloviA.length > 1 ? deloviA[deloviA.length - 1] : (deloviA[0] || a.email || "");
-    const prezimeB = deloviB.length > 1 ? deloviB[deloviB.length - 1] : (deloviB[0] || b.email || "");
-    return collator.compare(prezimeA, prezimeB) || collator.compare(deloviA.slice(0, -1).join(" "), deloviB.slice(0, -1).join(" "));
+    // Sve reči posle imena tretiramo kao prezime, uključujući složena prezimena.
+    const prezimeA = deloviA.length > 1 ? deloviA.slice(1).join(" ") : (deloviA[0] || a.email || "");
+    const prezimeB = deloviB.length > 1 ? deloviB.slice(1).join(" ") : (deloviB[0] || b.email || "");
+    const poPrezimenu = collator.compare(prezimeA, prezimeB);
+    const poImenu = collator.compare(deloviA[0] || "", deloviB[0] || "");
+    return poPrezimenu || poImenu || collator.compare(a.email || "", b.email || "");
   });
 
   return (
