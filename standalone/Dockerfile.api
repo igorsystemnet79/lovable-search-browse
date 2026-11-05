@@ -3,6 +3,7 @@ WORKDIR /app
 COPY standalone/api/package.json ./package.json
 RUN npm install --omit=dev
 COPY standalone/api/server.mjs ./server.mjs
+COPY standalone/api/grant-admin.mjs ./grant-admin.mjs
 RUN mkdir -p /data/uploads && chown -R node:node /data
 USER node
 ENV UPLOAD_DIR=/data/uploads API_PORT=4000 NODE_ENV=production
