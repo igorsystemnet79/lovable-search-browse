@@ -1,6 +1,7 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { SiteHeader } from "@/components/site-header";
+import { useAuth } from "@/hooks/use-auth";
 import { SiteFooter } from "@/components/site-footer";
 import { ListingImageGallery } from "@/components/listing-images";
 import { FollowButton } from "@/components/follow-button";
@@ -15,6 +16,7 @@ export const Route = createFileRoute("/oglas/$kind/$id")({
 function OglasPage() {
   const { kind, id } = Route.useParams();
   const isOffer = kind === "ponuda";
+  const { user } = useAuth();
   const { data, isLoading, isError } = useQuery({
     queryKey: ["oglas-detalj", kind, id],
     queryFn: async () => {
@@ -39,8 +41,8 @@ function OglasPage() {
           <div className="space-y-6 p-5 sm:p-7">
             <section><h2 className="mb-3 text-lg font-semibold">Fotografije</h2><ListingImageGallery kind={kind as "ponuda" | "zahtev"} id={id} /></section>
             <section><h2 className="mb-3 text-lg font-semibold">Opis oglasa</h2><p className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground/85">{data.opis?.trim() || "Opis nije dodat."}</p></section>
-            {(data.kontakt_ime || data.telefon) && <section className="rounded-xl bg-secondary/60 p-4"><h2 className="mb-2 font-semibold">Kontakt</h2>{data.kontakt_ime && <p className="text-sm">{data.kontakt_ime}</p>}{data.telefon && <a className="text-sm font-semibold text-brand hover:underline" href={"tel:" + data.telefon.replace(/[^+0-9]/g, "")}>{data.telefon}</a>}</section>}
-            <div className="border-t border-border pt-4">{isOffer ? <FollowButton ponuda={data as Ponuda} /> : <FollowButton zahtev={data as Zahtev} />}</div>
+            {(data.kontakt_zasticen || data.ime_prezime || data.kontakt_ime || data.telefon || data.adresa) && <section className="rounded-xl bg-secondary/60 p-4"><h2 className="mb-2 font-semibold">Podaci o oglašivaču</h2><p className="text-sm"><span className="text-muted-foreground">Ime i prezime: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.ime_prezime || data.kontakt_ime || "••••••••"}</span></p><p className="mt-1 text-sm"><span className="text-muted-foreground">Telefon: </span>{data.kontakt_zasticen ? <span className="blur-[5px] select-none">••••••••</span> : data.telefon ? <a className="font-semibold text-brand hover:underline" href={"tel:" + data.telefon.replace(/[^+0-9]/g, "")}>{data.telefon}</a> : "Nije naveden"}</p><p className="mt-1 text-sm"><span className="text-muted-foreground">Adresa: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.adresa || (data.kontakt_zasticen ? "••••••••" : "Nije navedena")}</span></p>{data.kontakt_zasticen && <p className="mt-3 text-xs text-muted-foreground">Registruj se ili se prijavi da vidiš pune kontakt podatke oglašivača.</p>}</section>}
+            {user && <div className="border-t border-border pt-4">{isOffer ? <FollowButton ponuda={data as Ponuda} /> : <FollowButton zahtev={data as Zahtev} />}</div>}
           </div>
         </article>}
       </div></main>
