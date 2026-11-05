@@ -15,6 +15,9 @@ export type Ponuda = {
   updated_at?: string | null;
   kontakt_ime?: string | null;
   telefon?: string | null;
+  ime_prezime?: string | null;
+  adresa?: string | null;
+  kontakt_zasticen?: boolean;
   created_at: string;
 };
 
@@ -29,6 +32,9 @@ export type Zahtev = {
   updated_at?: string | null;
   kontakt_ime?: string | null;
   telefon?: string | null;
+  ime_prezime?: string | null;
+  adresa?: string | null;
+  kontakt_zasticen?: boolean;
   valuta: string;
   created_at: string;
 };
