@@ -85,7 +85,7 @@ app.post('/api/auth/reset-request',resetRequestLimiter,asyncRoute(async(req,res)
   resetUrl=new URL('/reset-lozinke',base.origin);
  } catch { return res.status(503).json({error:'Promena lozinke trenutno nije dostupna. Proveri adresu platforme u podešavanjima servera.'}); }
  const email=String(req.body?.email||'').trim().toLowerCase();
- if(!/^\\S+@\\S+\\.\\S+$/.test(email)) return res.status(400).json({error:'Unesi ispravnu email adresu.'});
+ if(!/^\S+@\S+\.\S+$/.test(email)) return res.status(400).json({error:'Unesi ispravnu email adresu.'});
  const {rows}=await pool.query('SELECT id,email FROM users WHERE email=$1',[email]);
  // Unknown addresses and successful requests receive the same public response.
  if(!rows[0]) return res.json({ok:true});
