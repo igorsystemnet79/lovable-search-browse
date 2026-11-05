@@ -250,8 +250,8 @@ function Korisnici({ selfId }: { selfId: string }) {
 
   const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
   const normalizujPretragu = (value: string) =>
-    value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
-  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\\s+/).filter(Boolean);
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
+  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\s+/).filter(Boolean);
   const collator = new Intl.Collator("sr", { sensitivity: "base", numeric: true });
   const filtrirani = profili.filter((p) => {
     if (prikaz === "firme" ? p.tip_lica !== "pravno" : p.tip_lica === "pravno") return false;
