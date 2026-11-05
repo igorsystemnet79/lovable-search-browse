@@ -37,4 +37,5 @@ ENV
 fi
 echo "Pokrećem PonudiMi servise. Prvo pokretanje može potrajati zbog preuzimanja Docker image-a i izgradnje aplikacije."
 docker compose up -d --build
-echo "Instalacija je pokrenuta. Prvo registruj nalog sa adresom iz ADMIN_EMAIL, pa mu dodeli admin prava komandom: docker compose exec api node grant-admin.mjs ADRESA_IZ_ADMIN_EMAIL"\necho "Status proveri komandom: docker compose ps"
+echo "Instalacija je pokrenuta. Prvo registruj nalog sa adresom iz ADMIN_EMAIL, pa mu dodeli admin prava komandom: docker compose exec api node grant-admin.mjs ADRESA_IZ_ADMIN_EMAIL"
+echo "Status proveri komandom: docker compose ps"
