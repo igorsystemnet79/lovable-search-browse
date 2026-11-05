@@ -11,6 +11,7 @@ export type Ponuda = {
   emoji: string | null;
   istaknuto: boolean;
   zavrseno?: boolean;
+  pauziran?: boolean;
   updated_at?: string | null;
   kontakt_ime?: string | null;
   telefon?: string | null;
