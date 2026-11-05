@@ -542,8 +542,7 @@ async function startServer(){
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
  app.listen(port,'0.0.0.0',()=>{
   console.log(`PonudiMi API sluša na ${port}`);
-  const email=String(process.env.ADMIN_EMAIL||'').trim().toLowerCase();
-  if(email)pool.query("INSERT INTO user_roles(user_id,role) SELECT id,'admin' FROM users WHERE email=$1 ON CONFLICT DO NOTHING",[email]).then(()=>console.log('Provera početnog administratora završena.')).catch(err=>console.error('Admin bootstrap:',err.message));
+  console.log('API spreman; administratorske uloge dodeljuju se isključivo ručnom serverskom komandom.');
  });
 }
 startServer().catch(async err=>{
