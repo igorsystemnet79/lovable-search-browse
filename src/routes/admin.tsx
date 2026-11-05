@@ -26,8 +26,8 @@ export const Route = createFileRoute("/admin")({
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
 const tabs = ["Korisnici", "Ponude", "Zahtevi", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
-const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
-const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
+const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
+const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
 function AdminPage() {
   const { user, isAdmin, isModerator, checked } = useIsAdmin();
@@ -46,7 +46,7 @@ function AdminPage() {
           <>
             <div className="mb-6 flex flex-wrap gap-2">
               {tabs.map((t) => (
-                <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t === "Odobrenja" && pendingCount > 0 ? `Odobrenja (${pendingCount})` : t}</button>
+                <button key={t} onClick={() => setTab(t)} className={`min-h-10 rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t === "Odobrenja" && pendingCount > 0 ? `Odobrenja (${pendingCount})` : t}</button>
               ))}
             </div>
             {tab === "Korisnici" && <Korisnici selfId={user.id} />}
@@ -283,8 +283,8 @@ function Korisnici({ selfId }: { selfId: string }) {
           <button type="button" className={prikaz === "fizicka" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("fizicka"); setFilter(""); setEdit(null); }}>Fizička lica</button>
           <button type="button" className={prikaz === "firme" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("firme"); setFilter(""); setEdit(null); }}>Registrovane firme</button>
         </div>
-        <input className={`${inputCls} max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <span className="text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
+        <input className={`${inputCls} min-w-0 w-full sm:max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <span className="whitespace-nowrap text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
         {msg && <span className="text-sm text-brand">{msg}</span>}
       </div>
       <div className="space-y-3">
