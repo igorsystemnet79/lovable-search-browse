@@ -26,13 +26,17 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
   );
 }
 
+const titleLinkClass =
+  "relative z-10 block min-h-6 shrink-0 whitespace-normal break-words text-left text-sm font-semibold leading-5 text-brand hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
 export function PonudaItem({ ponuda, hideFollow, compact = true, featured = false }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
+  const title = typeof ponuda.naslov === "string" && ponuda.naslov.trim() ? ponuda.naslov.trim() : "Oglas bez naslova";
   return (
     <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] w-full min-w-0 overflow-hidden" : compact ? "h-[390px] sm:h-[410px] w-full min-w-0" : "w-full min-w-0"} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
-      <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className="block truncate font-semibold text-brand hover:underline">
-        {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}{ponuda.naslov}
+      <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className={titleLinkClass} aria-label={`Otvori oglas: ${title}`}>
+        {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}{title}
       </Link>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <p className="mt-1 shrink-0 text-xs text-muted-foreground">
         {formatCena(ponuda.cena, ponuda.valuta)} · {ponuda.lokacija} · {formatVreme(ponuda.created_at)}
       </p>
       <ListingImageGallery kind="ponuda" id={ponuda.id} singlePreview={compact} />
@@ -45,10 +49,11 @@ export function PonudaItem({ ponuda, hideFollow, compact = true, featured = fals
 }
 
 export function ZahtevItem({ zahtev, hideFollow, compact = true, featured = false }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
+  const title = typeof zahtev.naslov === "string" && zahtev.naslov.trim() ? zahtev.naslov.trim() : "Zahtev bez naslova";
   return (
     <li className={`flex w-full min-w-0 min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] overflow-hidden" : compact ? "h-[390px] sm:h-[410px]" : ""} ${zahtev.zavrseno ? "opacity-70" : ""}`}>
-      <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className="block truncate font-semibold text-brand hover:underline">{zahtev.naslov}</Link>
-      <p className="mt-1 text-xs text-muted-foreground">
+      <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className={titleLinkClass} aria-label={`Otvori zahtev: ${title}`}>{title}</Link>
+      <p className="mt-1 shrink-0 text-xs text-muted-foreground">
         {zahtev.lokacija} · {formatVreme(zahtev.created_at)}
         {zahtev.budzet !== null ? ` · budžet ${formatCena(zahtev.budzet, zahtev.valuta)}` : ""}
       </p>
