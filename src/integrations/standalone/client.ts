@@ -30,7 +30,10 @@ async function ensureApiReady(): Promise<void> {
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const response = await fetch("/api/health", {
+        const healthTarget = typeof window === "undefined"
+          ? `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}/api/health`
+          : "/api/health";
+        const response = await fetch(healthTarget, {
           method: "GET",
           cache: "no-store",
           signal: AbortSignal.timeout(6000),
