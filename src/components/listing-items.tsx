@@ -29,10 +29,10 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
 export function PonudaItem({ ponuda, hideFollow, maskContacts = false }: { ponuda: Ponuda; hideFollow?: boolean; maskContacts?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${ponuda.zavrseno ? "opacity-70" : ""}`}>
-      <p className="font-medium">
+      <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className="font-medium hover:text-brand hover:underline">
         {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}
         {ponuda.naslov}
-      </p>
+      </Link>
       <p className="mt-1 text-xs text-muted-foreground">
         {formatCena(ponuda.cena, ponuda.valuta)} · {ponuda.lokacija} · {formatVreme(ponuda.created_at)}
       </p>
@@ -55,7 +55,7 @@ export function PonudaItem({ ponuda, hideFollow, maskContacts = false }: { ponud
 export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; maskContacts?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${zahtev.zavrseno ? "opacity-70" : ""}`}>
-      <p className="font-medium">{zahtev.naslov}</p>
+      <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className="font-medium hover:text-brand hover:underline">{zahtev.naslov}</Link>
       <p className="mt-1 text-xs text-muted-foreground">
         {zahtev.lokacija} · {formatVreme(zahtev.created_at)}
         {zahtev.budzet !== null ? ` · budžet ${formatCena(zahtev.budzet, zahtev.valuta)}` : ""}
