@@ -120,10 +120,11 @@ app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT * FROM users WHERE id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:publicUser(rows[0])});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
- const email=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT id,email FROM users WHERE email=$1',[email]);
- // Avoid disclosing whether an address has an account.
- if(!rows[0])return res.json({ok:true});
+ // Check mail configuration before looking up the account, so the response
+ // does not reveal whether a submitted email address is registered.
  if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return res.status(503).json({error:'Slanje email poruka nije podešeno. Administrator mora uneti SMTP podatke u .env fajl.'});
+ const email=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT id,email FROM users WHERE email=$1',[email]);
+ if(!rows[0])return res.json({ok:true});
  const raw=randomBytes(32).toString('hex');const hash=createHash('sha256').update(raw).digest('hex');
  await pool.query('DELETE FROM password_resets WHERE user_id=$1',[rows[0].id]);await pool.query('INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'1 hour\')',[rows[0].id,hash]);
  const nodemailer=(await import('nodemailer')).default;const transport=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
