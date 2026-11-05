@@ -62,7 +62,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     const template = kind === "zahtev"
       ? `Tražim: ${heading}\nPotrebne karakteristike: [navedi šta ti je važno]\nStanje / uslovi: [opiši željeno stanje ili uslove]\nKoličina / rok: [navedi količinu i kada ti je potrebno]\nDodatne informacije: [upiši druge važne detalje]`
       : `Predmet ponude: ${heading}\nStanje / opis: [opiši stvarno stanje proizvoda ili usluge]\nKarakteristike: [navedi dimenzije, model, materijal ili druge osobine]\nDostupnost: [navedi količinu ili raspoložive termine]\nPreuzimanje / isporuka: [navedi dostupne mogućnosti]\nDodatne informacije: [upiši sve što kupac treba da zna]`;
-    setForm((old) => ({ ...old, opis: old.opis.trim() ? old.opis.trimEnd() + "\\n\\n" + template : template }));
+    setForm((old) => ({ ...old, opis: old.opis.trim() ? old.opis.trimEnd() + "\n\n" + template : template }));
   }
 
   async function submit(e: React.FormEvent) {
@@ -129,7 +129,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const offer = kind === "ponuda";
   const qualityChecks = [
     { label: "Jasan i konkretan naslov", done: form.naslov.trim().length >= 12, points: 20 },
-    { label: "Detaljniji opis (najmanje 80 karaktera)", done: form.opis.replace(/\\[[^\\]]*\\]/g, "").trim().length >= 80, points: 25 },
+    { label: "Detaljniji opis (najmanje 80 karaktera)", done: form.opis.replace(/\[[^\]]*\]/g, "").trim().length >= 80, points: 25 },
     { label: "Dodate najmanje dve fotografije", done: photos.length >= 2, points: 20 },
     { label: "Izabrana odgovarajuća kategorija", done: Boolean(vrednostKategorije(form.kategorija)), points: 15 },
     { label: "Uneta lokacija", done: form.lokacija.trim().length >= 2, points: 10 },
