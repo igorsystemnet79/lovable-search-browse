@@ -191,6 +191,7 @@ const ownsImage = async (row,userId) => {
 const cleanupListingFiles = async (table, ids) => { if(!ids.length)return;const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await pool.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);for(const row of rows){const parts=String(row.storage_path).split('/').filter(Boolean);if(parts[0]==='uploads')parts.shift();await removeImage(parts.join('/'));} };
 app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  const {table,action='select',values,filters=[],orders=[],limit,single,count,or}=req.body||{};
+ if(!['select','insert','update','delete'].includes(action)) return res.status(400).json({error:'Nepoznata ili nedozvoljena operacija.'});
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
  const supplied=Array.isArray(values)?values:[values||{}];
  const userId=req.user?.sub || null; const adminUser=userId ? await isAdmin(userId) : false;
