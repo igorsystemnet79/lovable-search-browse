@@ -15,6 +15,28 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+// Permit the production frontend to call this standalone API directly.
+// Requests remain same-origin at the application layer; CORS is restricted
+// to the known PonudiMi frontend and local development origin.
+const allowedOrigins = new Set([
+ 'https://ponudimi-novo.onrender.com',
+ 'http://localhost:5173',
+ 'http://127.0.0.1:5173'
+]);
+app.use((req,res,next) => {
+ const origin = req.headers.origin;
+ if (origin && allowedOrigins.has(origin)) {
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
+  res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+ }
+ if (req.method === 'OPTIONS') {
+  if (origin && !allowedOrigins.has(origin)) return res.sendStatus(403);
+  return res.sendStatus(204);
+ }
+ next();
+});
 // Small bounded pool with explicit connection timeouts for hosted PostgreSQL.
 const pool = new pg.Pool({
  connectionString: process.env.DATABASE_URL,
