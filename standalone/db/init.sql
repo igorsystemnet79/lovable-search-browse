@@ -32,6 +32,9 @@ CREATE TABLE IF NOT EXISTS zahtevi (
  user_id uuid REFERENCES users(id) ON DELETE SET NULL, kontakt_ime text, telefon text,
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz
 );
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS pauziran boolean NOT NULL DEFAULT false;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS pauziran boolean NOT NULL DEFAULT false;
+
 CREATE TABLE IF NOT EXISTS pracenja (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  ponuda_id uuid REFERENCES ponude(id) ON DELETE CASCADE, zahtev_id uuid REFERENCES zahtevi(id) ON DELETE CASCADE,
