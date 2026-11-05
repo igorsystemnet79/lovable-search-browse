@@ -76,11 +76,27 @@ function MojiOglasi() {
     }
   }
 
+  async function pauziraj(table: "ponude" | "zahtevi", id: string, v: boolean) {
+    if (busyId) return;
+    setBusyId(id);
+    setActionError("");
+    try {
+      const { error } = await ponudimi.from(table).update({ pauziran: v }).eq("id", id);
+      if (error) throw error;
+      await qc.invalidateQueries();
+    } catch (error) {
+      setActionError(error instanceof Error && error.message ? error.message : "Status pauze nije mogao da se promeni. Pokušaj ponovo.");
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 text-sm">
       <button type="button" disabled={!!busyId} className="font-semibold text-brand hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => { setEdit({ id: x.id, values: toValues(x, iznos) }); setKind(k); }}>Izmeni</button>
       <button type="button" disabled={!!busyId} className="font-semibold text-destructive hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => obrisi(k === "ponuda" ? "ponude" : "zahtevi", x.id)}>{busyId === x.id ? "Sačekaj…" : "Obriši"}</button>
       <button type="button" disabled={!!busyId} className="font-semibold text-muted-foreground hover:underline disabled:cursor-wait disabled:opacity-50" onClick={() => zavrsi(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.zavrseno)}>{busyId === x.id ? "Čuvanje…" : x.zavrseno ? "Ponovo aktiviraj" : "Završi oglas"}</button>
+      <button type="button" disabled={!!busyId || !!x.zavrseno} className="font-semibold text-muted-foreground hover:underline disabled:cursor-not-allowed disabled:opacity-50" onClick={() => pauziraj(k === "ponuda" ? "ponude" : "zahtevi", x.id, !x.pauziran)}>{busyId === x.id ? "Čuvanje…" : x.pauziran ? "Nastavi oglas" : "Pauziraj oglas"}</button>
     </div>
   );
 
