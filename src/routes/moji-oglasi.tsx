@@ -36,6 +36,7 @@ function MojiOglasi() {
   const [edit, setEdit] = useState<ListingEdit | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"svi" | "aktivni" | "pauzirani" | "zavrseni">("svi");
 
   async function obrisi(table: "ponude" | "zahtevi", id: string) {
     if (busyId) return;
@@ -91,6 +92,20 @@ function MojiOglasi() {
     }
   }
 
+  const sveObjave = [...(q.data?.ponude ?? []), ...(q.data?.zahtevi ?? [])];
+  const brojPoStatusu = {
+    svi: sveObjave.length,
+    aktivni: sveObjave.filter((x) => !x.zavrseno && !x.pauziran).length,
+    pauzirani: sveObjave.filter((x) => !x.zavrseno && !!x.pauziran).length,
+    zavrseni: sveObjave.filter((x) => !!x.zavrseno).length,
+  };
+  const prikazi = <T extends Ponuda | Zahtev>(items: T[]) => items.filter((x) => {
+    if (statusFilter === "aktivni") return !x.zavrseno && !x.pauziran;
+    if (statusFilter === "pauzirani") return !x.zavrseno && !!x.pauziran;
+    if (statusFilter === "zavrseni") return !!x.zavrseno;
+    return true;
+  });
+
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
     <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 px-4 text-sm">
       {x.pauziran && <span className="font-medium text-muted-foreground">Pauziran — nije javno vidljiv</span>}
@@ -111,6 +126,21 @@ function MojiOglasi() {
           <div className="mt-6 grid w-full min-w-0 grid-cols-1 gap-6">
             {actionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{actionError}</p>}
             {q.isError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Tvoji oglasi trenutno nisu mogli da se učitaju. Osveži stranicu ili pokušaj ponovo.</p>}
+            <section className="rounded-2xl border border-border bg-card p-4">
+              <h2 className="text-base font-semibold">Filtriraj moje objave</h2>
+              <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtriranje objava po statusu">
+                {([
+                  ["svi", "Sve objave"],
+                  ["aktivni", "Aktivni"],
+                  ["pauzirani", "Pauzirani"],
+                  ["zavrseni", "Završeni"],
+                ] as const).map(([value, label]) => (
+                  <button key={value} type="button" aria-pressed={statusFilter === value} onClick={() => setStatusFilter(value)} className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${statusFilter === value ? "border-primary bg-primary text-primary-foreground" : "border-border bg-background text-foreground hover:bg-secondary"}`}>
+                    {label} ({brojPoStatusu[value]})
+                  </button>
+                ))}
+              </div>
+            </section>
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
