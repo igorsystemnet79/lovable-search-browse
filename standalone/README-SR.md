@@ -22,7 +22,13 @@ Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni 
 
 ## Prvi administratorski nalog
 
-Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija administratorsku ulogu. Registruj ga kroz stranicu Registracija nakon prvog pokretanja. Nemoj javno deliti tu adresu ili tajne iz `.env` fajla.
+Administratorska prava se ne dodeljuju automatski samo na osnovu e-mail adrese. Prvo registruj nalog sa adresom podešenom u `ADMIN_EMAIL`, a zatim na serveru, iz direktorijuma `standalone`, pokreni:
+
+```bash
+docker compose exec api node grant-admin.mjs admin@example.com
+```
+
+Umesto `admin@example.com` unesi tačnu adresu iz `ADMIN_EMAIL`. Komanda radi samo za tu adresu i zahteva pristup serveru/Docker-u. Time se sprečava da neko drugi registracijom tuđe e-mail adrese dobije administratorska prava. Nemoj javno deliti tu adresu ili tajne iz `.env` fajla.
 
 ## Podaci i fotografije
 
