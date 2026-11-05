@@ -213,9 +213,12 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const listing=hasOffer?await pool.query('SELECT id FROM ponude WHERE id=$1',[row.ponuda_id]):await pool.query('SELECT id FROM zahtevi WHERE id=$1',[row.zahtev_id]);
    if(!listing.rowCount) return res.status(404).json({error:'Oglas koji želiš da pratiš ne postoji.'});
  }
- for(const item of supplied) for(const key of Object.keys(item||{})) {
+ for(const item of supplied) {
+   if(table==='user_roles' && action==='insert' && !['admin','moderator','user'].includes(String(item?.role||''))) return res.status(400).json({error:'Nepoznata korisnička uloga.'});
+   for(const key of Object.keys(item||{})) {
    if(!columns.includes(key) || ['id','created_at','updated_at'].includes(key)) return res.status(400).json({error:`Polje ${key} nije dozvoljeno za izmenu.`});
    if(action!=='select' && !(WRITE_COLUMNS[table]||[]).includes(key) && !(adminUser && (table==='ponude'||table==='zahtevi'||table==='profiles'))) return res.status(400).json({error:`Polje ${key} ne može da se menja.`});
+   }
  }
  const where=[]; const params=[];
  const addWhere=(sql,val)=>{params.push(val);where.push(sql.replace('?',`$${params.length}`));};
