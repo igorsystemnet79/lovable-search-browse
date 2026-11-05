@@ -72,18 +72,39 @@ app.post('/api/auth/register', asyncRoute(async(req,res)=>{
 app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT * FROM users WHERE id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:publicUser(rows[0])});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
-app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
- const email=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT id,email FROM users WHERE email=$1',[email]);
- // Avoid disclosing whether an address has an account.
- if(!rows[0])return res.json({ok:true});
- if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return res.status(503).json({error:'Slanje email poruka nije podešeno. Administrator mora uneti SMTP podatke u .env fajl.'});
+const resetRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
+app.post('/api/auth/reset-request',resetRequestLimiter,asyncRoute(async(req,res)=>{
+ // Configuration is checked before account lookup so the response cannot reveal whether an email is registered.
+ if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS) return res.status(503).json({error:'Promena lozinke trenutno nije dostupna. Administrator mora podesiti slanje email poruka.'});
+ const configuredBase=String(process.env.PUBLIC_APP_URL||'').trim();
+ if(!configuredBase) return res.status(503).json({error:'Promena lozinke trenutno nije dostupna. Adresa platforme nije podešena.'});
+ let resetUrl;
+ try {
+  const base=new URL(configuredBase);
+  if(!['http:','https:'].includes(base.protocol)||(process.env.NODE_ENV==='production'&&base.protocol!=='https:')) throw new Error('Invalid public app URL');
+  resetUrl=new URL('/reset-lozinke',base.origin);
+ } catch { return res.status(503).json({error:'Promena lozinke trenutno nije dostupna. Proveri adresu platforme u podešavanjima servera.'}); }
+ const email=String(req.body?.email||'').trim().toLowerCase();
+ if(!/^\\S+@\\S+\\.\\S+$/.test(email)) return res.status(400).json({error:'Unesi ispravnu email adresu.'});
+ const {rows}=await pool.query('SELECT id,email FROM users WHERE email=$1',[email]);
+ // Unknown addresses and successful requests receive the same public response.
+ if(!rows[0]) return res.json({ok:true});
  const raw=randomBytes(32).toString('hex');const hash=createHash('sha256').update(raw).digest('hex');
- await pool.query('DELETE FROM password_resets WHERE user_id=$1',[rows[0].id]);await pool.query('INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'1 hour\')',[rows[0].id,hash]);
- const nodemailer=(await import('nodemailer')).default;const transport=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
- const configuredBase=process.env.PUBLIC_APP_URL||'http://localhost';const configuredOrigin=new URL(configuredBase).origin;const target=String(req.body?.redirectTo||`${configuredOrigin}/reset-lozinke`);const resetUrl=new URL(target,configuredOrigin);if(resetUrl.origin!==configuredOrigin) return res.status(400).json({error:'Adresa za promenu lozinke nije dozvoljena.'});resetUrl.searchParams.set('token',raw);const link=resetUrl.toString();
- await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — promena lozinke',text:`Za promenu lozinke otvori ovaj link (važi 1 sat): ${link}`,html:`<p>Za promenu lozinke klikni na sledeći link. Važi 1 sat.</p><p><a href="${link}">Postavi novu lozinku</a></p>`});res.json({ok:true});
+ await pool.query('DELETE FROM password_resets WHERE user_id=$1',[rows[0].id]);
+ await pool.query("INSERT INTO password_resets(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval '1 hour')",[rows[0].id,hash]);
+ resetUrl.searchParams.set('token',raw);
+ const nodemailer=(await import('nodemailer')).default;
+ const transport=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
+ const link=resetUrl.toString();
+ try {
+  await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — promena lozinke',text:`Za promenu lozinke otvori ovaj link (važi 1 sat): ${link}`,html:`<p>Za promenu lozinke klikni na sledeći link. Važi 1 sat.</p><p><a href="${link}">Postavi novu lozinku</a></p>`});
+ } catch(error) {
+  console.error('Slanje linka za promenu lozinke nije uspelo:',error.message);
+  await pool.query('DELETE FROM password_resets WHERE user_id=$1',[rows[0].id]);
+ }
+ res.json({ok:true});
 }));
-app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=String(req.body?.token||'');const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});const hash=createHash('sha256').update(token).digest('hex');const c=await pool.connect();try{await c.query('BEGIN');const r=await c.query('SELECT user_id FROM password_resets WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[hash]);if(!r.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});}await c.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),r.rows[0].user_id]);await c.query('DELETE FROM password_resets WHERE user_id=$1',[r.rows[0].user_id]);const u=await c.query('SELECT * FROM users WHERE id=$1',[r.rows[0].user_id]);await c.query('COMMIT');const tokenValue=sign(u.rows[0]);const userValue=publicUser(u.rows[0]);res.json({ok:true,session:{access_token:tokenValue,token_type:'bearer',expires_in:604800,user:userValue}});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
+app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=String(req.body?.token||'');const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});if(!/^[a-f0-9]{64}$/i.test(token))return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});const hash=createHash('sha256').update(token).digest('hex');const c=await pool.connect();try{await c.query('BEGIN');const r=await c.query('SELECT user_id FROM password_resets WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[hash]);if(!r.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});}await c.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),r.rows[0].user_id]);await c.query('DELETE FROM password_resets WHERE user_id=$1',[r.rows[0].user_id]);const u=await c.query('SELECT * FROM users WHERE id=$1',[r.rows[0].user_id]);await c.query('COMMIT');const tokenValue=sign(u.rows[0]);const userValue=publicUser(u.rows[0]);res.json({ok:true,session:{access_token:tokenValue,token_type:'bearer',expires_in:604800,user:userValue}});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
 app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
 app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
