@@ -249,12 +249,21 @@ function Korisnici({ selfId }: { selfId: string }) {
   }
 
   const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
-  const q = filter.trim().toLocaleLowerCase("sr");
+  const normalizujPretragu = (value: string) =>
+    value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
+  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\\s+/).filter(Boolean);
   const collator = new Intl.Collator("sr", { sensitivity: "base", numeric: true });
-  const filtrirani = profili.filter((p) =>
-    (prikaz === "firme" ? p.tip_lica === "pravno" : p.tip_lica !== "pravno") &&
-    (!q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLocaleLowerCase("sr").includes(q)))
-  );
+  const filtrirani = profili.filter((p) => {
+    if (prikaz === "firme" ? p.tip_lica !== "pravno" : p.tip_lica === "pravno") return false;
+    if (!pojmoviPretrage.length) return true;
+    const pretraziviTekst = normalizujPretragu(
+      [p.ime, p.email, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
+        .filter(Boolean)
+        .join(" ")
+    );
+    // Svaka uneta reč mora da postoji u podacima, bez obzira na redosled.
+    return pojmoviPretrage.every((pojam) => pretraziviTekst.includes(pojam));
+  });
   const lista = [...filtrirani].sort((a, b) => {
     if (prikaz === "firme") return collator.compare((a.naziv_firme || "").trim(), (b.naziv_firme || "").trim());
     const deloviA = (a.ime || "").trim().split(/\s+/).filter(Boolean);
@@ -271,7 +280,7 @@ function Korisnici({ selfId }: { selfId: string }) {
           <button type="button" className={prikaz === "fizicka" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("fizicka"); setFilter(""); setEdit(null); }}>Fizička lica</button>
           <button type="button" className={prikaz === "firme" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("firme"); setFilter(""); setEdit(null); }}>Registrovane firme</button>
         </div>
-        <input className={`${inputCls} max-w-sm`} placeholder={prikaz === "firme" ? "Pretraga firmi" : "Pretraga korisnika"} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <input className={`${inputCls} max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
         {msg && <span className="text-sm text-brand">{msg}</span>}
       </div>
