@@ -135,14 +135,14 @@ app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=Stri
 async function attachListingOwnerData(table, rows, authenticated) {
  if (!rows.length) return rows;
  const ids=[...new Set(rows.map(row=>row.user_id).filter(Boolean))];
- const profiles=ids.length ? await pool.query('SELECT id,ime,adresa FROM profiles WHERE id=ANY($1::uuid[])',[ids]) : {rows:[]};
+ const profiles=ids.length ? await pool.query('SELECT id,ime,telefon,adresa FROM profiles WHERE id=ANY($1::uuid[])',[ids]) : {rows:[]};
  const byId=new Map(profiles.rows.map(profile=>[profile.id,profile]));
  return rows.map(row=>{
   const profile=byId.get(row.user_id);
   const ownerName=profile?.ime || row.kontakt_ime || null;
   const ownerAddress=profile?.adresa || null;
   if (!authenticated) return {...row,user_id:null,ime_prezime:'••••••••',adresa:'••••••••',kontakt_ime:'••••••••',telefon:'••••••••',kontakt_zasticen:true};
-  return {...row,ime_prezime:ownerName,adresa:ownerAddress,kontakt_zasticen:false};
+  return {...row,ime_prezime:ownerName,telefon:profile?.telefon || row.telefon,adresa:ownerAddress,kontakt_zasticen:false};
  });
 }
 app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(await attachListingOwnerData('ponude',rows,Boolean(req.user)));}));
