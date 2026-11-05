@@ -41,7 +41,7 @@ export function PonudaItem({ ponuda, hideFollow, compact = true, featured = fals
       </p>
       <ListingImageGallery kind="ponuda" id={ponuda.id} singlePreview={compact} />
       {ponuda.opis ? <p className={`mt-2 text-sm text-muted-foreground ${featured || compact ? "line-clamp-2" : ""}`}>{ponuda.opis}</p> : null}
-      {ponuda.kontakt_ime && <p className="mt-2 text-sm">{ponuda.kontakt_ime}{ponuda.telefon && <> · <a className="text-brand hover:underline" href={`tel:${ponuda.telefon.replace(/[^+0-9]/g, "")}`}>{ponuda.telefon}</a></>}</p>}
+      {(ponuda.kontakt_zasticen || ponuda.ime_prezime || ponuda.kontakt_ime || ponuda.telefon || ponuda.adresa) && <div className="mt-2 space-y-1 text-sm"><p><span className="text-muted-foreground">Objavio: </span><span className={ponuda.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{ponuda.ime_prezime || ponuda.kontakt_ime || "••••••••"}</span></p>{(ponuda.telefon || ponuda.kontakt_zasticen) && <p><span className="text-muted-foreground">Telefon: </span><span className={ponuda.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{ponuda.telefon || "••••••••"}</span></p>}{(ponuda.adresa || ponuda.kontakt_zasticen) && <p><span className="text-muted-foreground">Adresa: </span><span className={ponuda.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{ponuda.adresa || "••••••••"}</span></p>}</div>}
       <StatusIzmene id={ponuda.id} zavrseno={ponuda.zavrseno} updatedAt={ponuda.updated_at} />
       {!hideFollow && <FollowButton ponuda={ponuda} />}
     </li>
@@ -59,7 +59,7 @@ export function ZahtevItem({ zahtev, hideFollow, compact = true, featured = fals
       </p>
       <ListingImageGallery kind="zahtev" id={zahtev.id} singlePreview={compact} />
       {zahtev.opis ? <p className={`mt-2 text-sm text-muted-foreground ${featured || compact ? "line-clamp-2" : ""}`}>{zahtev.opis}</p> : null}
-      {zahtev.kontakt_ime && <p className="mt-2 text-sm">{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
+      {(zahtev.kontakt_zasticen || zahtev.ime_prezime || zahtev.kontakt_ime || zahtev.telefon || zahtev.adresa) && <div className="mt-2 space-y-1 text-sm"><p><span className="text-muted-foreground">Objavio: </span><span className={zahtev.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{zahtev.ime_prezime || zahtev.kontakt_ime || "••••••••"}</span></p>{(zahtev.telefon || zahtev.kontakt_zasticen) && <p><span className="text-muted-foreground">Telefon: </span><span className={zahtev.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{zahtev.telefon || "••••••••"}</span></p>}{(zahtev.adresa || zahtev.kontakt_zasticen) && <p><span className="text-muted-foreground">Adresa: </span><span className={zahtev.kontakt_zasticen ? "blur-[4px] select-none" : ""}>{zahtev.adresa || "••••••••"}</span></p>}</div>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
       {!hideFollow && <FollowButton zahtev={zahtev} />}
     </li>
