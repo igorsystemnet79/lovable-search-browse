@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { ponudimi } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
@@ -88,7 +88,7 @@ function AdminChatGPT() {
 
   const loadUsage = useCallback(async (id: string) => {
     const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
-    const response = await fetch(`/api/admin/chatgpt/usage?conversation_id=${encodeURIComponent(id)}`, {
+    const response = await fetch(`${API_ORIGIN}/api/admin/chatgpt/usage?conversation_id=${encodeURIComponent(id)}`, {
       headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
     });
     if (!response.ok) throw new Error("Potrošnja nije mogla da se učita.");
@@ -101,7 +101,7 @@ function AdminChatGPT() {
     let active = true;
     try {
       const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
-      fetch("/api/admin/chatgpt/status", {
+      fetch(`${API_ORIGIN}/api/admin/chatgpt/status`, {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       }).then(async (response) => {
         if (!response.ok) throw new Error("Status asistenta nije dostupan.");
@@ -126,7 +126,7 @@ function AdminChatGPT() {
     setError("");
     try {
       const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
-      const response = await fetch("/api/admin/chatgpt", {
+      const response = await fetch(`${API_ORIGIN}/api/admin/chatgpt`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
