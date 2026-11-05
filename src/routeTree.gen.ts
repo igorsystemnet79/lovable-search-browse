@@ -165,6 +165,7 @@ export interface FileRouteTypes {
     | '/reset-lozinke'
     | '/zahtevi'
     | '/kategorija/$slug'
+    | '/oglas/$kind/$id'
   id:
     | '__root__'
     | '/'
@@ -179,6 +180,7 @@ export interface FileRouteTypes {
     | '/reset-lozinke'
     | '/zahtevi'
     | '/kategorija/$slug'
+    | '/oglas/$kind/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
