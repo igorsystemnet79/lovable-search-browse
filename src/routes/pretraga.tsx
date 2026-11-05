@@ -40,7 +40,7 @@ export const Route = createFileRoute("/pretraga")({
 function PretragaPage() {
   const { q, lokacija, kategorija, minCena, maxCena, valuta, sort } = Route.useSearch();
   const { user, loading: authLoading } = useAuth();
-  const { data, isLoading, isError } = useQuery({ ...pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }), enabled: !authLoading && !!user });
+  const { data, isLoading, isError } = useQuery({ ...pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }), enabled: !authLoading });
 
   const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0);
 
@@ -72,30 +72,21 @@ function PretragaPage() {
           <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced />
         </div>
 
-        {!authLoading && !user ? (
-          <section className="mt-8 rounded-2xl border border-border bg-surface p-6 text-center">
-            <h2 className="text-lg font-semibold">Prijava je potrebna za pretragu</h2>
-            <p className="mt-2 text-sm text-muted-foreground">Prijavi se ili napravi nalog da bi pregledao rezultate pretrage.</p>
-            <div className="mt-4 flex flex-wrap justify-center gap-3">
-              <Link to="/prijava" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Prijavi se</Link>
-              <Link to="/registracija" className="rounded-full border border-input px-5 py-2.5 text-sm font-semibold">Registruj se</Link>
-            </div>
-          </section>
-        ) : null}
 
-        {isError && user ? (
+
+        {isError && !authLoading ? (
           <p className="mt-8 text-sm text-destructive">
             Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.
           </p>
         ) : null}
 
-        {!authLoading && user && !isLoading && ukupno === 0 && !isError ? (
+        {!authLoading && !isLoading && ukupno === 0 && !isError ? (
           <p className="mt-8 text-sm text-muted-foreground">
             Nema rezultata za ovu pretragu. Probaj drugi pojam ili lokaciju.
           </p>
         ) : null}
 
-        {user && <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
+        {!authLoading && <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
           <section>
             <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
@@ -110,6 +101,7 @@ function PretragaPage() {
             </ul>
           </section>
         </div>}
+        {!authLoading && !user && ukupno > 0 && <section className="mt-8 rounded-2xl border border-border bg-secondary/60 p-5 text-center"><h2 className="font-semibold">Želiš da vidiš pune kontakt podatke?</h2><p className="mt-1 text-sm text-muted-foreground">Registruj se besplatno ili se prijavi da otkriješ ime, adresu i broj telefona oglašivača.</p><div className="mt-4 flex flex-wrap justify-center gap-3"><Link to="/registracija" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Registruj se</Link><Link to="/prijava" className="rounded-full border border-input px-5 py-2.5 text-sm font-semibold">Prijavi se</Link></div></section>}
       </main>
 
       <SiteFooter />
