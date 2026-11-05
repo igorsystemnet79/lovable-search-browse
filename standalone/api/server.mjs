@@ -163,16 +163,23 @@ app.post('/api/admin/listings/:kind/:id/images',auth,admin,memoryUpload.array('f
  const col=table==='ponude'?'ponuda_id':'zahtev_id';
  const count=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);
  if(count.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});
- const out=[];
- for(const [i,file] of req.files.entries()){
-  const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
-  const normalized=await normalizeImage(file.buffer);
-  await saveImage(key,normalized,'image/jpeg');
-  try{
-   const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
+ const out=[],saved=[],client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  for(const [i,file] of req.files.entries()){
+   const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
+   const normalized=await normalizeImage(file.buffer);
+   await saveImage(key,normalized,'image/jpeg');
+   saved.push(key);
+   const inserted=await client.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
    out.push(inserted.rows[0]);
-  }catch(error){await removeImage(key);throw error;}
- }
+  }
+  await client.query('COMMIT');
+ }catch(error){
+  try{await client.query('ROLLBACK');}catch{}
+  for(const key of saved){try{await removeImage(key);}catch(cleanupError){console.error('Neuspešno čišćenje nepotpune administratorske fotografije:',cleanupError.message);}}
+  throw error;
+ }finally{client.release();}
  res.status(201).json(out);
 }));
 app.delete('/api/admin/images/:imageId',auth,admin,asyncRoute(async(req,res)=>{
