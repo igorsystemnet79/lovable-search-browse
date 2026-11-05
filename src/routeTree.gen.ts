@@ -21,6 +21,7 @@ import { Route as RegistracijaRouteImport } from './routes/registracija'
 import { Route as ResetLozinkeRouteImport } from './routes/reset-lozinke'
 import { Route as ZahteviRouteImport } from './routes/zahtevi'
 import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
+import { Route as OglasKindIdRouteImport } from './routes/oglas.$kind.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -82,6 +83,11 @@ const KategorijaSlugRoute = KategorijaSlugRouteImport.update({
   path: '/kategorija/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const OglasKindIdRoute = OglasKindIdRouteImport.update({
+  id: '/oglas/$kind/$id',
+  path: '/oglas/$kind/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -96,6 +102,9 @@ export interface FileRoutesByFullPath {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/oglas/$kind/$id': typeof OglasKindIdRoute
+  '/oglas/$kind/$id': typeof OglasKindIdRoute
+  '/oglas/$kind/$id': typeof OglasKindIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -141,6 +150,7 @@ export interface FileRouteTypes {
     | '/reset-lozinke'
     | '/zahtevi'
     | '/kategorija/$slug'
+    | '/oglas/$kind/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -184,6 +194,7 @@ export interface RootRouteChildren {
   ResetLozinkeRoute: typeof ResetLozinkeRoute
   ZahteviRoute: typeof ZahteviRoute
   KategorijaSlugRoute: typeof KategorijaSlugRoute
+  OglasKindIdRoute: typeof OglasKindIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -272,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KategorijaSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/oglas/$kind/$id': {
+      id: '/oglas/$kind/$id'
+      path: '/oglas/$kind/$id'
+      fullPath: '/oglas/$kind/$id'
+      preLoaderRoute: typeof OglasKindIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -288,6 +306,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResetLozinkeRoute: ResetLozinkeRoute,
   ZahteviRoute: ZahteviRoute,
   KategorijaSlugRoute: KategorijaSlugRoute,
+  OglasKindIdRoute: OglasKindIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
