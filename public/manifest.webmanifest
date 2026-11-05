@@ -1,0 +1,29 @@
+{
+  "id": "/",
+  "name": "PonudiMi — oglasi i zahtevi",
+  "short_name": "PonudiMi",
+  "description": "Pronađi ponude, objavi oglas ili postavi zahtev na PonudiMi platformi.",
+  "lang": "sr-Latn",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait-primary",
+  "theme_color": "#173b67",
+  "background_color": "#ffffff",
+  "categories": [
+    "shopping",
+    "business"
+  ],
+  "icons": [
+    {
+      "src": "/ponudimi-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}
