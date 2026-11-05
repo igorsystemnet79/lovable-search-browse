@@ -1,6 +1,7 @@
 /* PonudiMi standalone client compatibility layer.
  * Keeps the existing application call sites while using the self-hosted API.
  */
+export const API_ORIGIN = "https://ponudimi-test-api.onrender.com";
 const SESSION_KEY = "ponudimi_session";
 type AnyRecord = Record<string, any>;
 
@@ -31,8 +32,8 @@ async function ensureApiReady(): Promise<void> {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const apiOrigin = typeof window === "undefined"
-          ? (process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com")
-          : "https://ponudimi-test-api.onrender.com";
+          ? (process.env.API_INTERNAL_URL || API_ORIGIN)
+          : API_ORIGIN;
         const healthTarget = `${apiOrigin}/api/health`;
         const response = await fetch(healthTarget, {
           method: "GET",
@@ -189,7 +190,7 @@ const auth = {
 const storage = {
   from(bucket: string) {
     return {
-      getPublicUrl(path: string) { const key = path.split("/").filter(Boolean).filter((part, index) => !(index === 0 && part === "uploads")).join("/"); return { data: { publicUrl: `/api/storage/public?path=${encodeURIComponent(key)}` } }; },
+      getPublicUrl(path: string) { const key = path.split("/").filter(Boolean).filter((part, index) => !(index === 0 && part === "uploads")).join("/"); return { data: { publicUrl: `${API_ORIGIN}/api/storage/public?path=${encodeURIComponent(key)}` } }; },
       async upload(path: string, file: File, options?: any) {
         try { const form = new FormData(); form.append("file", file); form.append("path", path); form.append("bucket", bucket); form.append("contentType", options?.contentType || file.type); await api("/api/storage/upload", { method: "POST", body: form }); return { data: { path }, error: null }; }
         catch (error: any) { return { data: null, error }; }
