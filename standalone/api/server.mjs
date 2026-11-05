@@ -132,8 +132,21 @@ app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
 }));
 app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=String(req.body?.token||'');const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});const hash=createHash('sha256').update(token).digest('hex');const c=await pool.connect();try{await c.query('BEGIN');const r=await c.query('SELECT user_id FROM password_resets WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[hash]);if(!r.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});}await c.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),r.rows[0].user_id]);await c.query('DELETE FROM password_resets WHERE user_id=$1',[r.rows[0].user_id]);const u=await c.query('SELECT * FROM users WHERE id=$1',[r.rows[0].user_id]);await c.query('COMMIT');const tokenValue=sign(u.rows[0]);const userValue=publicUser(u.rows[0]);res.json({ok:true,session:{access_token:tokenValue,token_type:'bearer',expires_in:604800,user:userValue}});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
-app.get('/api/ponude',asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(rows);}));
-app.get('/api/zahtevi',asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(rows);}));
+async function attachListingOwnerData(table, rows, authenticated) {
+ if (!rows.length) return rows;
+ const ids=[...new Set(rows.map(row=>row.user_id).filter(Boolean))];
+ const profiles=ids.length ? await pool.query('SELECT id,ime,adresa FROM profiles WHERE id=ANY($1::uuid[])',[ids]) : {rows:[]};
+ const byId=new Map(profiles.rows.map(profile=>[profile.id,profile]));
+ return rows.map(row=>{
+  const profile=byId.get(row.user_id);
+  const ownerName=profile?.ime || row.kontakt_ime || null;
+  const ownerAddress=profile?.adresa || null;
+  if (!authenticated) return {...row,user_id:null,ime_prezime:'••••••••',adresa:'••••••••',kontakt_ime:'••••••••',telefon:'••••••••',kontakt_zasticen:true};
+  return {...row,ime_prezime:ownerName,adresa:ownerAddress,kontakt_zasticen:false};
+ });
+}
+app.get('/api/ponude',asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(await attachListingOwnerData('ponude',rows,Boolean(req.headers.authorization)));}));
+app.get('/api/zahtevi',asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(await attachListingOwnerData('zahtevi',rows,Boolean(req.headers.authorization)));}));
 for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.post(`/api/${table}`,auth,asyncRoute(async(req,res)=>{const b=req.body||{};const required=['naslov','kategorija','lokacija'];if(required.some(k=>!String(b[k]||'').trim())||String(b.naslov).length>150||String(b.opis||'').length>3000)return res.status(400).json({error:'Proveri obavezna polja oglasa.'});const {rows}=await pool.query(`INSERT INTO ${table}(naslov,opis,kategorija,lokacija,${amount},valuta,emoji,user_id,kontakt_ime,telefon) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[b.naslov,b.opis||null,b.kategorija,b.lokacija,b[amount]??null,b.valuta||'EUR',b.emoji||null,req.user.sub,b.kontakt_ime||null,b.telefon||null]);res.status(201).json(rows[0]);}));
  app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno','pauziran'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json(rows[0]);}));
@@ -357,6 +370,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const r=await pool.query(`DELETE FROM ${ident(table)}${deleteWhere} RETURNING *`,params);result={data:r.rows};
  } else return res.status(400).json({error:'Nepoznata operacija.'});
  let data=result.data;
+ if(action==='select' && (table==='ponude'||table==='zahtevi') && Array.isArray(data)) data=await attachListingOwnerData(table,data,Boolean(userId));
  if(single){if(Array.isArray(data)){if(data.length!==1)return res.status(406).json({error:'Očekivan je jedan rezultat.'});data=data[0];}}
  res.json({...result,data});
 }));
@@ -364,7 +378,6 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
  const {fn,args={}}=req.body||{}; const userId=req.user?.sub||null;
  if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
  if(fn==='pretrazi_ponude'||fn==='pretrazi_zahteve'){
-  if(!userId)return res.status(401).json({error:'Za pretragu je potrebna prijava.'});
   const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';
   const amount=table==='ponude'?'cena':'budzet';
   const term=String(args.q||'').trim().slice(0,200), mesto=String(args.mesto||'').trim().slice(0,100);
@@ -378,7 +391,7 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
   if((minCena!==null||maxCena!==null)&&!valuta)return res.status(400).json({error:'Izaberi valutu za precizno filtriranje cene.'});
   const orderBy={najnovije:'created_at DESC',najstarije:'created_at ASC',cena_rastuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' ASC, created_at DESC',cena_opadajuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' DESC, created_at DESC'}[sort]||'created_at DESC';
   const sql='SELECT * FROM '+table+' WHERE pauziran=false AND pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
-  const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:rows});
+  const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:await attachListingOwnerData(table,rows,Boolean(userId))});
  }
  return res.status(400).json({error:'Nepoznata funkcija.'});
 }));
