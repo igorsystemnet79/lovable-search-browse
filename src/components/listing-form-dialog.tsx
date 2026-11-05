@@ -57,6 +57,14 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     return { value: form[key], onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => setForm((old) => ({ ...old, [key]: e.target.value })) };
   }
 
+  function insertDescriptionTemplate() {
+    const heading = form.naslov.trim() || (kind === "zahtev" ? "Tražim" : "Nudim");
+    const template = kind === "zahtev"
+      ? `Tražim: ${heading}\nPotrebne karakteristike: [navedi šta ti je važno]\nStanje / uslovi: [opiši željeno stanje ili uslove]\nKoličina / rok: [navedi količinu i kada ti je potrebno]\nDodatne informacije: [upiši druge važne detalje]`
+      : `Predmet ponude: ${heading}\nStanje / opis: [opiši stvarno stanje proizvoda ili usluge]\nKarakteristike: [navedi dimenzije, model, materijal ili druge osobine]\nDostupnost: [navedi količinu ili raspoložive termine]\nPreuzimanje / isporuka: [navedi dostupne mogućnosti]\nDodatne informacije: [upiši sve što kupac treba da zna]`;
+    setForm((old) => ({ ...old, opis: old.opis.trim() ? old.opis.trimEnd() + "\\n\\n" + template : template }));
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!user || !kind || busy) return;
@@ -121,7 +129,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const offer = kind === "ponuda";
   const qualityChecks = [
     { label: "Jasan i konkretan naslov", done: form.naslov.trim().length >= 12, points: 20 },
-    { label: "Detaljniji opis (najmanje 80 karaktera)", done: form.opis.trim().length >= 80, points: 25 },
+    { label: "Detaljniji opis (najmanje 80 karaktera)", done: form.opis.replace(/\\[[^\\]]*\\]/g, "").trim().length >= 80, points: 25 },
     { label: "Dodate najmanje dve fotografije", done: photos.length >= 2, points: 20 },
     { label: "Izabrana odgovarajuća kategorija", done: Boolean(vrednostKategorije(form.kategorija)), points: 15 },
     { label: "Uneta lokacija", done: form.lokacija.trim().length >= 2, points: 10 },
@@ -145,7 +153,11 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
         ) : (
           <form onSubmit={submit} className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
-            <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="block space-y-1 text-sm font-medium">Opis<textarea className={inputCls} rows={5} maxLength={3000} placeholder={offer ? "Opiši proizvod ili uslugu, stanje, karakteristike i dostupnost." : "Opiši šta ti je potrebno, željene karakteristike, količinu i rok."} {...field("opis")} /></label>
+              <Button type="button" variant="outline" size="sm" onClick={insertDescriptionTemplate} disabled={busy}>Ubaci predlog opisa</Button>
+              <p className="text-xs text-muted-foreground">Predlog je samo obrazac za popunjavanje. Zameni tekst u uglastim zagradama svojim stvarnim podacima.</p>
+            </div>
             <ListingImages value={photos} onChange={setPhotos} disabled={busy} />
             <section aria-live="polite" className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-2">
               <div className="flex items-center justify-between gap-3">
