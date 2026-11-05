@@ -12,7 +12,6 @@ export type ListingPhoto = {
 };
 
 const MAX_PHOTOS = 7;
-const MAX_FILE_BYTES = 10 * 1024 * 1024;
 const MIN_IMAGE_SIDE = 240;
 const MAX_IMAGE_SIDE = 12_000;
 const MAX_IMAGE_PIXELS = 40_000_000;
@@ -31,7 +30,6 @@ async function resizeImage(file: File): Promise<Blob> {
   if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     throw new Error("Dozvoljeni su JPG, PNG i WEBP formati.");
   }
-  if (file.size > MAX_FILE_BYTES) throw new Error("Fotografija ne sme biti veća od 10 MB.");
   let bitmap: ImageBitmap;
   try {
     bitmap = await createImageBitmap(file);
@@ -159,7 +157,7 @@ export function ListingImages({
       <div className="flex items-center justify-between gap-2">
         <div>
           <p className="text-sm font-semibold">Fotografije</p>
-          <p className="text-xs text-muted-foreground">Do 7 fotografija · JPG, PNG ili WEBP · najviše 10 MB po fajlu</p>
+          <p className="text-xs text-muted-foreground">Do 7 fotografija · JPG, PNG ili WEBP · bez ograničenja veličine fajla</p>
           <p className="text-xs text-muted-foreground">Najkraća stranica najmanje 240 px; najviše 12.000 px po stranici i 40 MP. Fotografije se automatski prilagođavaju formatu 800 × 600 px.</p>
         </div>
         <span className="text-xs font-medium text-muted-foreground">{value.length}/7</span>
@@ -170,7 +168,7 @@ export function ListingImages({
           <ImagePlus className="h-4 w-4" /> Izaberi sa uređaja
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">Kod fotografija dodatih internet adresom veličina fajla ne može uvek da se proveri unapred. Dimenzije fotografije se proveravaju pre dodavanja.</p>
+      <p className="text-xs text-muted-foreground">Fotografije se automatski smanjuju na 800 × 600 px pre slanja. Radi stabilnosti, najviše 40 megapiksela po fotografiji.</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Nalepi direktnu adresu fotografije (https://...)" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" disabled={disabled || busy || value.length >= MAX_PHOTOS} />
         <button type="button" onClick={() => void addUrl()} disabled={disabled || busy || !url.trim() || value.length >= MAX_PHOTOS} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50">
