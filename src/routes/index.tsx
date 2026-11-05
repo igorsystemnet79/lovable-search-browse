@@ -6,6 +6,7 @@ import { ListingFormDialog, type ListingKind } from "@/components/listing-form-d
 
 import heroImage from "@/assets/hero-home.jpg";
 import { SiteHeader } from "@/components/site-header";
+import { useAuth } from "@/hooks/use-auth";
 import { SiteFooter } from "@/components/site-footer";
 import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
@@ -34,6 +35,7 @@ export const Route = createFileRoute("/")({
 
 
 function Index() {
+  const { user } = useAuth();
   const [listingKind, setListingKind] = useState<ListingKind | null>(null);
   useEffect(() => {
     try {
@@ -78,33 +80,35 @@ function Index() {
         </section>
 
         <div className="container-page">
-          <section className="mt-12 grid gap-4 sm:grid-cols-2">
-            <Button
-              onClick={() => setListingKind("zahtev")}
-              className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-brand p-6 text-left text-brand-foreground shadow-card hover:bg-brand/90"
-            >
-              <div>
-                <h2 className="text-xl font-semibold">Postavi zahtev</h2>
-                <p className="mt-1 text-sm text-brand-foreground/70">Napiši šta tražiš.</p>
-              </div>
-              <span aria-hidden="true" className="text-2xl">
-                →
-              </span>
-            </Button>
-
-            <Button
-              onClick={() => setListingKind("ponuda")}
-              className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-highlight p-6 text-left text-highlight-foreground shadow-card hover:bg-highlight/90"
-            >
-              <div>
-                <h2 className="text-xl font-semibold">Objavi oglas</h2>
-                <p className="mt-1 text-sm text-highlight-foreground/70">Ponudi proizvod ili uslugu.</p>
-              </div>
-              <span aria-hidden="true" className="text-2xl">
-                →
-              </span>
-            </Button>
-          </section>
+          {user ? (
+            <section className="mt-12 grid gap-4 sm:grid-cols-2">
+              <Button
+                onClick={() => setListingKind("zahtev")}
+                className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-brand p-6 text-left text-brand-foreground shadow-card hover:bg-brand/90"
+              >
+                <div>
+                  <h2 className="text-xl font-semibold">Postavi zahtev</h2>
+                  <p className="mt-1 text-sm text-brand-foreground/70">Napiši šta tražiš.</p>
+                </div>
+                <span aria-hidden="true" className="text-2xl">
+                  →
+                </span>
+              </Button>
+  
+              <Button
+                onClick={() => setListingKind("ponuda")}
+                className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-highlight p-6 text-left text-highlight-foreground shadow-card hover:bg-highlight/90"
+              >
+                <div>
+                  <h2 className="text-xl font-semibold">Objavi oglas</h2>
+                  <p className="mt-1 text-sm text-highlight-foreground/70">Ponudi proizvod ili uslugu.</p>
+                </div>
+                <span aria-hidden="true" className="text-2xl">
+                  →
+                </span>
+              </Button>
+            </section>
+          ) : <section className="mt-12 rounded-2xl border border-border bg-secondary/60 p-5 text-center"><h2 className="text-lg font-semibold">Pronađi ono što ti treba</h2><p className="mt-1 text-sm text-muted-foreground">Pretražuj ponude i zahteve bez registracije. Za objavljivanje i praćenje oglasa napravi nalog.</p><Link to="/registracija" className="mt-4 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Registruj se</Link></section>}
 
           <section className="mt-14">
             <div className="flex flex-wrap items-end justify-between gap-2">
