@@ -23,15 +23,17 @@ CREATE TABLE IF NOT EXISTS user_roles (
 CREATE TABLE IF NOT EXISTS ponude (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), naslov text NOT NULL, opis text, kategorija text NOT NULL, lokacija text NOT NULL,
  cena numeric, valuta text NOT NULL DEFAULT 'EUR', emoji text, istaknuto boolean NOT NULL DEFAULT false,
- zavrseno boolean NOT NULL DEFAULT false, user_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ zavrseno boolean NOT NULL DEFAULT false, pauziran boolean NOT NULL DEFAULT false, user_id uuid REFERENCES users(id) ON DELETE SET NULL,
  kontakt_ime text, telefon text, created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz
 );
 CREATE TABLE IF NOT EXISTS zahtevi (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), naslov text NOT NULL, opis text, kategorija text NOT NULL, lokacija text NOT NULL,
- budzet numeric, valuta text NOT NULL DEFAULT 'EUR', zavrseno boolean NOT NULL DEFAULT false,
+ budzet numeric, valuta text NOT NULL DEFAULT 'EUR', zavrseno boolean NOT NULL DEFAULT false, pauziran boolean NOT NULL DEFAULT false,
  user_id uuid REFERENCES users(id) ON DELETE SET NULL, kontakt_ime text, telefon text,
  created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz
 );
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS pauziran boolean NOT NULL DEFAULT false;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS pauziran boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS pracenja (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  ponuda_id uuid REFERENCES ponude(id) ON DELETE CASCADE, zahtev_id uuid REFERENCES zahtevi(id) ON DELETE CASCADE,
@@ -139,6 +141,9 @@ BEGIN
   IF OLD.telefon IS DISTINCT FROM NEW.telefon OR OLD.kontakt_ime IS DISTINCT FROM NEW.kontakt_ime THEN promene := array_append(promene, 'Kontakt je izmenjen'); END IF;
   IF OLD.zavrseno IS DISTINCT FROM NEW.zavrseno THEN
     promene := array_append(promene, CASE WHEN NEW.zavrseno THEN 'Oglas je završen' ELSE 'Oglas je ponovo aktivan' END);
+  END IF;
+  IF OLD.pauziran IS DISTINCT FROM NEW.pauziran THEN
+    promene := array_append(promene, CASE WHEN NEW.pauziran THEN 'Oglas je pauziran' ELSE 'Oglas je ponovo aktiviran nakon pauze' END);
   END IF;
   IF cardinality(promene) > 0 THEN
     NEW.updated_at := now();
