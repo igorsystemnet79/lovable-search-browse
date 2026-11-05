@@ -119,6 +119,17 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   }
 
   const offer = kind === "ponuda";
+  const qualityChecks = [
+    { label: "Jasan i konkretan naslov", done: form.naslov.trim().length >= 12, points: 20 },
+    { label: "Detaljniji opis (najmanje 80 karaktera)", done: form.opis.trim().length >= 80, points: 25 },
+    { label: "Dodate najmanje dve fotografije", done: photos.length >= 2, points: 20 },
+    { label: "Izabrana odgovarajuća kategorija", done: Boolean(vrednostKategorije(form.kategorija)), points: 15 },
+    { label: "Uneta lokacija", done: form.lokacija.trim().length >= 2, points: 10 },
+    { label: offer ? "Uneta cena" : "Unet okvirni budžet", done: form.iznos.trim() !== "" && Number(form.iznos) >= 0, points: 10 },
+  ];
+  const qualityScore = qualityChecks.reduce((score, check) => score + (check.done ? check.points : 0), 0);
+  const qualityLabel = qualityScore >= 80 ? "Odlična priprema objave" : qualityScore >= 50 ? "Dobra osnova" : "Dodaj još informacija";
+  const qualitySuggestions = qualityChecks.filter((check) => !check.done);
   return (
     <Dialog open={kind !== null} onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
       <DialogContent className="max-h-[90dvh] w-[calc(100%-2rem)] max-w-2xl overflow-y-auto rounded-lg bg-surface">
@@ -136,6 +147,33 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
             <ListingImages value={photos} onChange={setPhotos} disabled={busy} />
+            <section aria-live="polite" className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 sm:col-span-2">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">Kvalitet objave</p>
+                  <p className="text-xs text-muted-foreground">{qualityLabel}</p>
+                </div>
+                <span className="text-sm font-semibold tabular-nums">{qualityScore}/100</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label="Procena kvaliteta objave"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={qualityScore}
+                className="h-2 overflow-hidden rounded-full bg-muted"
+              >
+                <div className="h-full rounded-full bg-highlight transition-all" style={{ width: qualityScore + "%" }} />
+              </div>
+              {qualitySuggestions.length > 0 ? (
+                <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                  {qualitySuggestions.map((check) => <li key={check.label}>• {check.label}</li>)}
+                </ul>
+              ) : (
+                <p className="text-xs text-muted-foreground">Objava sadrži sve preporučene informacije.</p>
+              )}
+              <p className="text-xs text-muted-foreground">Ovo su preporuke za bolju vidljivost, ne dodatni uslovi za objavljivanje.</p>
+            </section>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">
               Kategorija i potkategorija
               <select className={inputCls} required {...field("kategorija")}>
