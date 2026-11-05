@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { FollowButton } from "@/components/follow-button";
+import { Link } from "@tanstack/react-router";
 import { ListingImageGallery } from "@/components/listing-images";
 import { formatCena, formatVreme, izmeneQuery, type Ponuda, type Zahtev } from "@/lib/listings";
 
@@ -25,7 +26,7 @@ function StatusIzmene({ id, zavrseno, updatedAt }: { id: string; zavrseno?: bool
   );
 }
 
-export function PonudaItem({ ponuda, hideFollow }: { ponuda: Ponuda; hideFollow?: boolean }) {
+export function PonudaItem({ ponuda, hideFollow, maskContacts = false }: { ponuda: Ponuda; hideFollow?: boolean; maskContacts?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${ponuda.zavrseno ? "opacity-70" : ""}`}>
       <p className="font-medium">
@@ -37,14 +38,21 @@ export function PonudaItem({ ponuda, hideFollow }: { ponuda: Ponuda; hideFollow?
       </p>
       <ListingImageGallery kind="ponuda" id={ponuda.id} />
       {ponuda.opis ? <p className="mt-2 text-sm text-muted-foreground">{ponuda.opis}</p> : null}
-      {ponuda.kontakt_ime && <p className="mt-2 text-sm">{ponuda.kontakt_ime}{ponuda.telefon && <> · <a className="text-brand hover:underline" href={`tel:${ponuda.telefon.replace(/[^+0-9]/g, "")}`}>{ponuda.telefon}</a></>}</p>}
+      {ponuda.kontakt_ime && <div className="mt-2 text-sm">
+        {maskContacts ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span aria-label="Ime i telefon su sakriveni" className="select-none blur-[4px]">{ponuda.kontakt_ime}{ponuda.telefon ? ` · ${ponuda.telefon}` : ""}</span>
+            <Link to="/prijava" className="font-semibold text-brand hover:underline">Prijavi se za kontakt</Link>
+          </div>
+        ) : <p>{ponuda.kontakt_ime}{ponuda.telefon && <> · <a className="text-brand hover:underline" href={`tel:${ponuda.telefon.replace(/[^+0-9]/g, "")}`}>{ponuda.telefon}</a></>}</p>}
+      </div>}
       <StatusIzmene id={ponuda.id} zavrseno={ponuda.zavrseno} updatedAt={ponuda.updated_at} />
       {!hideFollow && <FollowButton ponuda={ponuda} />}
     </li>
   );
 }
 
-export function ZahtevItem({ zahtev }: { zahtev: Zahtev }) {
+export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; maskContacts?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${zahtev.zavrseno ? "opacity-70" : ""}`}>
       <p className="font-medium">{zahtev.naslov}</p>
@@ -54,7 +62,14 @@ export function ZahtevItem({ zahtev }: { zahtev: Zahtev }) {
       </p>
       <ListingImageGallery kind="zahtev" id={zahtev.id} />
       {zahtev.opis ? <p className="mt-2 text-sm text-muted-foreground">{zahtev.opis}</p> : null}
-      {zahtev.kontakt_ime && <p className="mt-2 text-sm">{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
+      {zahtev.kontakt_ime && <div className="mt-2 text-sm">
+        {maskContacts ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <span aria-label="Ime i telefon su sakriveni" className="select-none blur-[4px]">{zahtev.kontakt_ime}{zahtev.telefon ? ` · ${zahtev.telefon}` : ""}</span>
+            <Link to="/prijava" className="font-semibold text-brand hover:underline">Prijavi se za kontakt</Link>
+          </div>
+        ) : <p>{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
+      </div>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
     </li>
   );
