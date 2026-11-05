@@ -248,8 +248,14 @@ function Korisnici({ selfId }: { selfId: string }) {
     load();
   }
 
-  const q = filter.toLowerCase();
-  const lista = profili.filter((p) => !q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLowerCase().includes(q)));
+  const q = filter.trim().toLocaleLowerCase("sr");
+  const collator = new Intl.Collator("sr", { sensitivity: "base", numeric: true });
+  const lista = profili
+    .filter((p) => !q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLocaleLowerCase("sr").includes(q)))
+    .sort((a, b) => collator.compare(
+      (a.ime || a.naziv_firme || a.email || "").trim(),
+      (b.ime || b.naziv_firme || b.email || "").trim(),
+    ));
 
   return (
     <div>
