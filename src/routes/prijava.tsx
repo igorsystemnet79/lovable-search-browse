@@ -80,7 +80,7 @@ function Prijava() {
         redirectTo: `${window.location.origin}/reset-lozinke`,
       });
       if (error) throw error;
-      setInfo("Poslali smo ti email sa linkom. Otvori ga (proveri i spam) — vodi te na stranu gde upisuješ novu lozinku.");
+      setInfo("Ako je ova email adresa registrovana, zahtev za promenu lozinke je obrađen. Proveri prijemno sanduče i spam.");
     } catch (error) {
       setGreska(porukaGreske(error, "Slanje linka za promenu lozinke trenutno nije moguće."));
     }
