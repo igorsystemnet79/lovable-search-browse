@@ -30,9 +30,7 @@ async function ensureApiReady(): Promise<void> {
     let lastError: unknown;
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
-        const healthTarget = typeof window === "undefined"
-          ? `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}/api/health`
-          : "/api/health";
+        const healthTarget = `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}/api/health`;
         const response = await fetch(healthTarget, {
           method: "GET",
           cache: "no-store",
@@ -80,7 +78,7 @@ async function api(path: string, init: RequestInit = {}) {
   const headers = new Headers(init.headers);
   if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
   if (!(init.body instanceof FormData) && init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const target = typeof window === "undefined" ? `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}${path}` : path;
+  const target = `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}${path}`;
   const response = await fetch(target, { ...init, headers });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(body.error || `Greška servera (${response.status})`), { status: response.status, code: body.code });
