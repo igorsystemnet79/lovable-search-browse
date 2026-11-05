@@ -357,11 +357,6 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false':'';
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false`:''}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim}`;
    const {rows}=await pool.query(sql,params);
-   // Keep contact details private for visitors while allowing the existing
-   // listing cards and detail pages to render from the same response shape.
-   let data=(table==='ponude'||table==='zahtevi')
-     ? await attachListingOwnerData(table,rows,Boolean(userId))
-     : rows;
    if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data,count:c.rows[0].n};}else result={data};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
