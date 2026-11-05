@@ -357,7 +357,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false':'';
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false`:''}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim}`;
    const {rows}=await pool.query(sql,params);
-   if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data,count:c.rows[0].n};}else result={data};
+   if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data:rows,count:c.rows[0].n};}else result={data:rows};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
    for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);}
