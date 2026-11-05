@@ -11,7 +11,7 @@ else
   read DOMAIN
   DOMAIN=${DOMAIN:-:80}
   case "$DOMAIN" in :80|localhost) ;; *[!A-Za-z0-9.-]*|"") echo "Domen sadrži nedozvoljene znakove." >&2; exit 1 ;; esac
-  printf "Email adresa prvog administratora: "
+  printf "Email adresa za administratorski nalog (uloga se dodeljuje ručno na serveru): "
   read ADMIN_EMAIL
   case "$ADMIN_EMAIL" in *@*.*) ;; *) echo "Unesi ispravnu email adresu administratora." >&2; exit 1 ;; esac
   if [ "$DOMAIN" = ":80" ] || [ "$DOMAIN" = "localhost" ]; then PUBLIC_APP_URL="http://localhost"; DOMAIN=":80"; else PUBLIC_APP_URL="https://${DOMAIN}"; fi
