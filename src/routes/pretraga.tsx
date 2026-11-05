@@ -7,6 +7,7 @@ import { BackLink } from "@/components/back-link";
 import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { pretragaQuery } from "@/lib/listings";
+import { useAuth } from "@/hooks/use-auth";
 
 type PretragaSearch = { q: string; lokacija: string };
 
@@ -33,6 +34,8 @@ export const Route = createFileRoute("/pretraga")({
 
 function PretragaPage() {
   const { q, lokacija } = Route.useSearch();
+  const { user, loading: authLoading } = useAuth();
+  const maskContacts = authLoading || !user;
   const { data, isLoading, isError } = useQuery(pretragaQuery(q, lokacija));
 
   const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0);
@@ -81,14 +84,14 @@ function PretragaPage() {
           <section>
             <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
-              {data?.ponude.map((p) => <PonudaItem key={p.id} ponuda={p} />)}
+              {data?.ponude.map((p) => <PonudaItem key={p.id} ponuda={p} maskContacts={maskContacts} />)}
             </ul>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold">Zahtevi ({data?.zahtevi.length ?? 0})</h2>
             <ul className="mt-4 space-y-3">
-              {data?.zahtevi.map((z) => <ZahtevItem key={z.id} zahtev={z} />)}
+              {data?.zahtevi.map((z) => <ZahtevItem key={z.id} zahtev={z} maskContacts={maskContacts} />)}
             </ul>
           </section>
         </div>
