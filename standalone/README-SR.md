@@ -29,7 +29,7 @@ Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija ad
 - PostgreSQL podaci su u Docker volumenu `postgres_data`.
 - Fotografije se podrazumevano čuvaju na lokalnom disku u Docker volumenu `uploads_data`.
 - Za Render i druge platforme bez trajnog diska može se uključiti S3-kompatibilno skladište, uključujući Cloudflare R2, kroz promenljive `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` i `S3_REGION`.
-- API isporučuje fotografije preko iste javne putanje bez obzira na to da li su na lokalnom disku ili u R2. PostgreSQL tabela `slike_oglasa` čuva vezu fotografije sa oglasom, putanju ili URL i redosled. Sama binarna slika se ne upisuje u PostgreSQL.
+- API isporučuje fotografije preko iste javne putanje bez obzira na izabrano skladište. Kada S3 promenljive nisu podešene, binarni sadržaj fotografije (`bytea`) čuva se u PostgreSQL tabeli `storage_objects`, zajedno sa tipom sadržaja i ključem objekta. Kada je S3/R2 podešen, binarni sadržaj se čuva u tom skladištu. PostgreSQL tabela `slike_oglasa` u oba slučaja čuva vezu fotografije sa oglasom, ključ/putanju i redosled. Zato backup baze obuhvata fotografije u podrazumevanom PostgreSQL režimu; kod R2 režima backup fotografija mora obuhvatiti i R2 bucket.
 - Pri prelasku na sopstveni server isključuju se S3 promenljive i koristi se trajni disk; postojeće fotografije iz R2 treba prethodno kopirati na server i ažurirati njihove putanje u bazi.
 - Caddy sertifikati i podešavanja su u `caddy_data` i `caddy_config`.
 - Brisanje volumena može trajno obrisati podatke. Nemoj koristiti `docker compose down -v` osim ako namerno želiš potpuno brisanje instalacije.
