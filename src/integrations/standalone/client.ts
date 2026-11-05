@@ -16,42 +16,68 @@ function writeSession(session: any) {
 }
 const listeners = new Set<(event: string, session: any) => void>();
 function emit(event: string, session: any) { for (const listener of listeners) listener(event, session); }
-// Render Free may suspend the API while it is idle. Wake it only when a
-// user actually tries to authenticate; never keep the service alive all day.
-async function ensureApiReady() {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 12; attempt++) {
-    try {
-      const response = await fetch("/api/health", {
-        method: "GET",
-        cache: "no-store",
-        signal: AbortSignal.timeout(7000),
-      });
-      if (response.ok) {
-        const health = await response.json().catch(() => null);
-        if (health?.ok && health?.database === "connected") return;
+// Render Free may suspend the API while idle. Share one short wake-up
+// check across concurrent requests so login and homepage listings recover
+// together instead of each request waiting through its own retry loop.
+let apiReadyUntil = 0;
+let apiReadyPromise: Promise<void> | null = null;
+
+async function ensureApiReady(): Promise<void> {
+  if (Date.now() < apiReadyUntil) return;
+  if (apiReadyPromise) return apiReadyPromise;
+
+  apiReadyPromise = (async () => {
+    let lastError: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const response = await fetch("/api/health", {
+          method: "GET",
+          cache: "no-store",
+          signal: AbortSignal.timeout(6000),
+        });
+        if (response.ok) {
+          const health = await response.json().catch(() => null);
+          if (health?.ok && health?.database === "connected") {
+            apiReadyUntil = Date.now() + 45_000;
+            return;
+          }
+          lastError = new Error("API nije potvrdio vezu sa bazom.");
+        } else {
+          const error = Object.assign(
+            new Error(`Servis za naloge nije spreman (HTTP ${response.status}).`),
+            { status: response.status },
+          );
+          if (response.status >= 400 && response.status < 500 && response.status !== 429) {
+            throw Object.assign(error, { fatal: true });
+          }
+          lastError = error;
+        }
+      } catch (error: any) {
+        if (error?.fatal) throw error;
+        lastError = error;
       }
-      if (response.status < 500 && response.status !== 429) {
-        throw new Error("Servis za naloge nije spreman.");
-      }
-      lastError = new Error(`Servis se pokreće (HTTP ${response.status}).`);
-    } catch (error) {
-      lastError = error;
+      if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 1500));
     }
-    if (attempt < 11) await new Promise(resolve => setTimeout(resolve, 2500));
+    throw Object.assign(
+      new Error("Servis trenutno ne odgovara ili ne može da se poveže sa bazom. Pokušaj ponovo za minut."),
+      { status: 503, code: "API_STARTUP_TIMEOUT", cause: lastError },
+    );
+  })();
+
+  try {
+    await apiReadyPromise;
+  } finally {
+    apiReadyPromise = null;
   }
-  throw Object.assign(
-    new Error("Servis se još pokreće ili trenutno ne može da dođe do baze. Pokušaj ponovo za minut."),
-    { status: 503, code: "API_STARTUP_TIMEOUT", cause: lastError },
-  );
 }
 
 async function api(path: string, init: RequestInit = {}) {
+  await ensureApiReady();
   const session = readSession();
   const headers = new Headers(init.headers);
   if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
   if (!(init.body instanceof FormData) && init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
-  const target = typeof window === "undefined" ? `${process.env.API_INTERNAL_URL || "http://127.0.0.1:4000"}${path}` : path;
+  const target = typeof window === "undefined" ? `${process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com"}${path}` : path;
   const response = await fetch(target, { ...init, headers });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(body.error || `Greška servera (${response.status})`), { status: response.status, code: body.code });
