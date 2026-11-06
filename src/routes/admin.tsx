@@ -218,14 +218,28 @@ function Korisnici({ selfId }: { selfId: string }) {
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
-    const [p, r] = await Promise.all([
-      ponudimi.from("profiles").select("*").order("created_at", { ascending: false }),
-      ponudimi.from("user_roles").select("user_id, role"),
-    ]);
-    setProfili(p.data ?? []);
-    const m: Record<string, Uloga[]> = {};
-    for (const x of r.data ?? []) (m[x.user_id] ??= []).push(x.role);
-    setUloge(m);
+    const ucitajSve = async (tabela: "profiles" | "user_roles") => {
+      const svi: any[] = [];
+      for (let offset = 0; ; offset += 500) {
+        let query = ponudimi.from(tabela).select("*");
+        if (tabela === "profiles") query = query.order("created_at", { ascending: false });
+        const page = await query.range(offset, offset + 499);
+        if (page.error) throw new Error(page.error.message || "Učitavanje nije uspelo.");
+        const redovi = page.data ?? [];
+        svi.push(...redovi);
+        if (redovi.length < 500) break;
+      }
+      return svi;
+    };
+    try {
+      const [p, r] = await Promise.all([ucitajSve("profiles"), ucitajSve("user_roles")]);
+      setProfili(p as Profil[]);
+      const m: Record<string, Uloga[]> = {};
+      for (const x of r) (m[x.user_id] ??= []).push(x.role);
+      setUloge(m);
+    } catch {
+      setMsg("Učitavanje korisnika nije uspelo. Osvežite stranicu i pokušajte ponovo.");
+    }
   }, []);
   useEffect(() => { load(); }, [load]);
 
