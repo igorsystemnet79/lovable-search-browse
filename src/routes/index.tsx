@@ -33,7 +33,6 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
-
 function Index() {
   const { user } = useAuth();
   const [listingKind, setListingKind] = useState<ListingKind | null>(null);
@@ -43,7 +42,9 @@ function Index() {
       if (!raw) return;
       const draft = JSON.parse(raw);
       if (draft.kind === "ponuda" || draft.kind === "zahtev") setListingKind(draft.kind);
-    } catch { /* Draft restoration is optional. */ }
+    } catch {
+      /* Draft restoration is optional. */
+    }
   }, []);
   const ponude = useQuery(ponudeQuery(5));
   const zahtevi = useQuery(zahteviQuery(5));
@@ -53,7 +54,7 @@ function Index() {
       <SiteHeader />
 
       <main>
-        <section className="container-page relative isolate">
+        <section className="relative isolate">
           <img
             src={heroImage}
             alt="Par pregledava ponude telefonom i laptopom ispred moderne kuće"
@@ -61,7 +62,8 @@ function Index() {
             height={1088}
             className="h-[380px] w-full object-cover sm:h-[460px]"
           />
-          <div className="absolute inset-0 flex items-center px-5">
+          <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent" />
+          <div className="container-page absolute inset-0 flex items-center">
             <div className="max-w-xl text-brand-foreground">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-highlight">
                 Ponude na jednom mestu
@@ -93,7 +95,7 @@ function Index() {
                   →
                 </span>
               </Button>
-  
+
               <Button
                 onClick={() => setListingKind("ponuda")}
                 className="h-auto whitespace-normal flex items-center justify-between gap-4 rounded-2xl bg-highlight p-6 text-left text-highlight-foreground shadow-card hover:bg-highlight/90"
@@ -107,7 +109,20 @@ function Index() {
                 </span>
               </Button>
             </section>
-          ) : <section className="mt-12 rounded-2xl border border-border bg-secondary/60 p-5 text-center"><h2 className="text-lg font-semibold">Pronađi ono što ti treba</h2><p className="mt-1 text-sm text-muted-foreground">Pretražuj ponude i zahteve bez registracije. Za objavljivanje i praćenje oglasa napravi nalog.</p><Link to="/registracija" className="mt-4 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Registruj se</Link></section>}
+          ) : (
+            <section className="mt-12 rounded-2xl border border-border bg-secondary/60 p-5 text-center">
+              <h2 className="text-lg font-semibold">Pronađi ono što ti treba</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Pretražuj ponude i zahteve bez registracije. Za objavljivanje i praćenje oglasa napravi nalog.
+              </p>
+              <Link
+                to="/registracija"
+                className="mt-4 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground"
+              >
+                Registruj se
+              </Link>
+            </section>
+          )}
 
           <section className="mt-14">
             <div className="flex flex-wrap items-end justify-between gap-2">
@@ -149,9 +164,21 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 w-full min-w-0 space-y-3">
-                {zahtevi.isLoading && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Učitavanje najnovijih zahteva…</li>}
-                {zahtevi.isError && <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">Zahtevi trenutno nisu dostupni. Osveži stranicu i pokušaj ponovo.</li>}
-                {!zahtevi.isLoading && !zahtevi.isError && !zahtevi.data?.length && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Još nema postavljenih zahteva.</li>}
+                {zahtevi.isLoading && (
+                  <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">
+                    Učitavanje najnovijih zahteva…
+                  </li>
+                )}
+                {zahtevi.isError && (
+                  <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">
+                    Zahtevi trenutno nisu dostupni. Osveži stranicu i pokušaj ponovo.
+                  </li>
+                )}
+                {!zahtevi.isLoading && !zahtevi.isError && !zahtevi.data?.length && (
+                  <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">
+                    Još nema postavljenih zahteva.
+                  </li>
+                )}
                 {zahtevi.data?.map((z) => <ZahtevItem key={z.id} zahtev={z} compact featured />)}
               </ul>
             </article>
@@ -164,9 +191,21 @@ function Index() {
                 </Link>
               </div>
               <ul className="mt-4 w-full min-w-0 space-y-3">
-                {ponude.isLoading && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Učitavanje najnovijih ponuda…</li>}
-                {ponude.isError && <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">Ponude trenutno nisu dostupne. Osveži stranicu i pokušaj ponovo.</li>}
-                {!ponude.isLoading && !ponude.isError && !ponude.data?.length && <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">Još nema objavljenih ponuda.</li>}
+                {ponude.isLoading && (
+                  <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">
+                    Učitavanje najnovijih ponuda…
+                  </li>
+                )}
+                {ponude.isError && (
+                  <li role="alert" className="rounded-xl border border-destructive/30 bg-surface px-4 py-5 text-sm text-destructive">
+                    Ponude trenutno nisu dostupne. Osveži stranicu i pokušaj ponovo.
+                  </li>
+                )}
+                {!ponude.isLoading && !ponude.isError && !ponude.data?.length && (
+                  <li className="rounded-xl border border-border bg-surface px-4 py-5 text-sm text-muted-foreground">
+                    Još nema objavljenih ponuda.
+                  </li>
+                )}
                 {ponude.data?.map((p) => <PonudaItem key={p.id} ponuda={p} compact featured />)}
               </ul>
             </article>
