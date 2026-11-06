@@ -236,3 +236,19 @@ WHERE telefon_normalizovan IS NULL AND telefon IS NOT NULL;
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
 UPDATE profiles p SET email_confirmed_at=u.email_confirmed_at FROM users u WHERE u.id=p.id AND p.email_confirmed_at IS DISTINCT FROM u.email_confirmed_at;
+
+-- The previous standalone registration stamped email_confirmed_at at account creation
+-- without sending a confirmation link. Reset those legacy timestamps exactly once so
+-- existing accounts must complete the new real email + SMS verification flow.
+CREATE TABLE IF NOT EXISTS app_migrations (
+ migration_key text PRIMARY KEY,
+ applied_at timestamptz NOT NULL DEFAULT now()
+);
+DO $$
+BEGIN
+ IF NOT EXISTS (SELECT 1 FROM app_migrations WHERE migration_key='2026-11-account-verification-reset') THEN
+  UPDATE users SET email_confirmed_at=NULL;
+  UPDATE profiles SET email_confirmed_at=NULL;
+  INSERT INTO app_migrations(migration_key) VALUES('2026-11-account-verification-reset');
+ END IF;
+END $$;
