@@ -1,6 +1,12 @@
 export type ProfileRow = {
   id: string;
   ime: string | null;
+  prezime?: string | null;
+  telefon_normalizovan?: string | null;
+  telefon_verifikovan_at?: string | null;
+  email_confirmed_at?: string | null;
+  duplikat_sumnja?: boolean;
+  verifikacija_zapoceta_at?: string | null;
   telefon: string | null;
   grad: string | null;
   adresa: string | null;

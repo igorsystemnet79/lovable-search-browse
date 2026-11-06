@@ -37,6 +37,7 @@ function OglasPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-brand">{isOffer ? "Ponuda" : "Zahtev"} · {data.kategorija}</p>
             <h1 className="mt-2 break-words text-2xl font-bold sm:text-3xl">{data.naslov}</h1>
             <p className="mt-3 text-sm text-muted-foreground">{data.lokacija} · {formatVreme(data.created_at)} · {isOffer ? formatCena((data as Ponuda).cena, data.valuta) : (data as Zahtev).budzet !== null ? "Budžet " + formatCena((data as Zahtev).budzet, data.valuta) : "Budžet nije naveden"}</p>
+            {(data as any).verifikovan_korisnik && <span className="mt-3 inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span>}
           </header>
           <div className="space-y-6 p-5 sm:p-7">
             <section><h2 className="mb-3 text-lg font-semibold">Fotografije</h2><ListingImageGallery kind={kind as "ponuda" | "zahtev"} id={id} /></section>
