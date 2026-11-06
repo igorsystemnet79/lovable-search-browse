@@ -101,23 +101,129 @@ const optionalAuth = asyncRoute(async (req,res,next) => {
 const admin = asyncRoute(async (req,res,next) => { const { rows } = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[req.user.sub]); if (!rows.length) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
-const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at });
+const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at, email_verified:!!u.email_confirmed_at });
 const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JWT_SECRET, { expiresIn:'7d' });
+const signVerification = userId => jwt.sign({ sub:userId, purpose:'account-verification' }, JWT_SECRET, { expiresIn:'30m' });
+const normalizePhone = raw => {
+ let p=String(raw||'').replace(/[^0-9+]/g,'');
+ if(p.startsWith('00')) p='+'+p.slice(2);
+ if(p.startsWith('0')) p='+381'+p.slice(1);
+ if(/^381/.test(p)) p='+'+p;
+ if(!/^\+3816[0-9]{7,8}$/.test(p)) return null;
+ return p;
+};
+const mailTransport = () => {
+ if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS) throw Object.assign(new Error('Potvrda e-maila nije podešena. Administrator mora uneti SMTP podatke.'),{status:503});
+ return import('nodemailer').then(m=>m.default.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}}));
+};
+async function sendEmailVerification(userId,email){
+ const raw=randomBytes(32).toString('hex'),hash=createHash('sha256').update(raw).digest('hex');
+ await pool.query('UPDATE email_verification_tokens SET used_at=now() WHERE user_id=$1 AND used_at IS NULL',[userId]);
+ await pool.query('INSERT INTO email_verification_tokens(user_id,token_hash,expires_at) VALUES($1,$2,now()+interval \'24 hours\')',[userId,hash]);
+ const base=new URL(process.env.PUBLIC_APP_URL||'http://localhost').origin;
+ const link=new URL('/potvrda-email',base);link.searchParams.set('token',raw);
+ const transport=await mailTransport();
+ await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — potvrda e-mail adrese',text:'Potvrdi svoju e-mail adresu na PonudiMi platformi: '+link.toString()+' (link važi 24 sata).',html:'<p>Potvrdi svoju e-mail adresu na PonudiMi platformi.</p><p><a href="'+link.toString()+'">Potvrdi e-mail adresu</a></p><p>Link važi 24 sata.</p>'});
+}
+async function twilioVerify(phone,code){
+ const {TWILIO_ACCOUNT_SID:sid,TWILIO_AUTH_TOKEN:token,TWILIO_VERIFY_SERVICE_SID:service}=process.env;
+ if(!sid||!token||!service) throw Object.assign(new Error('SMS verifikacija nije podešena. Administrator mora uneti Twilio Verify podatke.'),{status:503});
+ const endpoint='https://verify.twilio.com/v2/Services/'+encodeURIComponent(service)+(code?'/VerificationCheck':'/Verifications');
+ const form=new URLSearchParams(code?{To:phone,Code:code}:{To:phone,Channel:'sms'});
+ const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Basic '+Buffer.from(sid+':'+token).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:form});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok) throw Object.assign(new Error(data.message||'Twilio nije uspeo da obradi SMS verifikaciju.'),{status:response.status===429?429:502});
+ return data;
+}
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
-app.post('/api/auth/register', asyncRoute(async(req,res)=>{
- const {email,password,metadata={}}=req.body||{}; const e=String(email||'').trim().toLowerCase();
- if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<6) return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 6 karaktera.'});
- if(!/^[+0-9 ()-]{6,30}$/.test(String(metadata.telefon||'')) || String(metadata.telefon||'').replace(/\D/g,'').length<6) return res.status(400).json({error:'Unesi ispravan broj telefona.'});
- if(!['fizicko','pravno'].includes(metadata.tip_lica)) return res.status(400).json({error:'Izaberi da li se registruješ kao fizičko ili pravno lice.'});
- if(metadata.tip_lica==='pravno' && (!String(metadata.naziv_firme||'').trim() || !validPib(metadata.pib))) return res.status(400).json({error:'Naziv firme ili PIB nisu ispravni.'});
- const c=await pool.connect(); try { await c.query('BEGIN'); const {rows}=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,now(),$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify(metadata)]); const u=rows[0]; const m=metadata; const pib=m.tip_lica==='pravno'&&validPib(m.pib)?String(m.pib).replace(/\s/g,''):null; const verified=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount); await c.query(`INSERT INTO profiles(id,ime,telefon,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,[u.id,m.ime||m.full_name||null,m.telefon||null,m.grad||null,m.adresa||null,m.tip_lica==='pravno'?'pravno':'fizicko',m.naziv_firme||null,pib,e,verified]); await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]); await c.query('COMMIT'); const token=sign(u); res.status(201).json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}}); } catch(err){await c.query('ROLLBACK'); if(err.code==='23505') return res.status(409).json({error:'Nalog sa ovom e-mail adresom već postoji.'}); throw err;} finally{c.release();}
+app.post('/api/auth/register',asyncRoute(async(req,res)=>{
+ const {email,password,metadata={}}=req.body||{},e=String(email||'').trim().toLowerCase();
+ const first=String(metadata.ime||'').trim(),last=String(metadata.prezime||'').trim(),city=String(metadata.grad||'').trim(),phone=normalizePhone(metadata.telefon);
+ if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<8)return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera.'});
+ if(first.length<2||first.length>60||last.length<2||last.length>60)return res.status(400).json({error:'Ime i prezime su obavezni.'});
+ if(!phone)return res.status(400).json({error:'Unesi ispravan mobilni broj u formatu +3816xxxxxxx ili 06xxxxxxx.'});
+ if(city.length<2||city.length>60)return res.status(400).json({error:'Mesto stanovanja je obavezno.'});
+ if(!['fizicko','pravno'].includes(metadata.tip_lica))return res.status(400).json({error:'Izaberi tip naloga.'});
+ if(metadata.tip_lica==='pravno'&&(!String(metadata.naziv_firme||'').trim()||!validPib(metadata.pib)))return res.status(400).json({error:'Naziv firme ili PIB nisu ispravni.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 LIMIT 1',[phone]);
+  if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovaj broj telefona je već povezan sa nalogom. Prijavi se na postojeći nalog ili kontaktiraj podršku.'});}
+  const created=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,NULL,$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,ime:first,prezime:last,telefon:phone,grad:city})]);
+  const u=created.rows[0],pib=metadata.tip_lica==='pravno'&&validPib(metadata.pib)?String(metadata.pib).replace(/\s/g,''):null;
+  const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
+  const sameName=await c.query("SELECT 1 FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
+  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first+' '+last,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
+  await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
+  await c.query('COMMIT');
+  await sendEmailVerification(u.id,e);
+  res.status(201).json({ok:true,pending_verification:true,message:'Nalog je kreiran. Potvrdi e-mail adresu preko linka koji smo poslali.',email:e});
+ }catch(err){
+  try{await c.query('ROLLBACK');}catch{}
+  if(err.code==='23505')return res.status(409).json({error:'E-mail ili broj telefona je već povezan sa nalogom.'});
+  throw err;
+ }finally{c.release();}
 }));
-app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
-app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT * FROM users WHERE id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:publicUser(rows[0])});}));
+app.post('/api/auth/email/confirm',asyncRoute(async(req,res)=>{
+ const raw=String(req.body?.token||'');if(raw.length<32)return res.status(400).json({error:'Link za potvrdu nije ispravan.'});
+ const hash=createHash('sha256').update(raw).digest('hex'),c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const found=await c.query('SELECT user_id FROM email_verification_tokens WHERE token_hash=$1 AND used_at IS NULL AND expires_at>now() FOR UPDATE',[hash]);
+  if(!found.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen. Zatraži novu potvrdu e-maila.'});}
+  const userId=found.rows[0].user_id;
+  await c.query('UPDATE users SET email_confirmed_at=coalesce(email_confirmed_at,now()) WHERE id=$1',[userId]);
+  await c.query('UPDATE email_verification_tokens SET used_at=now() WHERE token_hash=$1',[hash]);
+  await c.query('COMMIT');
+  res.json({ok:true,verification_token:signVerification(userId),message:'E-mail je potvrđen. Sada potvrdi broj telefona.'});
+ }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+}));
+app.post('/api/auth/phone/start',asyncRoute(async(req,res)=>{
+ let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET);}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
+ if(decoded.purpose!=='account-verification')return res.status(401).json({error:'Nedozvoljena sesija za verifikaciju.'});
+ const p=await pool.query('SELECT telefon,telefon_normalizovan,telefon_verifikovan_at FROM profiles WHERE id=$1',[decoded.sub]);
+ if(!p.rows[0])return res.status(404).json({error:'Korisnički profil nije pronađen.'});
+ if(p.rows[0].telefon_verifikovan_at)return res.json({ok:true,verified:true,message:'Broj telefona je već potvrđen.'});
+ const result=await twilioVerify(p.rows[0].telefon_normalizovan||normalizePhone(p.rows[0].telefon),null);
+ await pool.query('UPDATE profiles SET verifikacija_zapoceta_at=now() WHERE id=$1',[decoded.sub]);
+ res.json({ok:true,status:result.status||'pending',message:'SMS kod je poslat.'});
+}));
+app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
+ let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET);}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
+ if(decoded.purpose!=='account-verification')return res.status(401).json({error:'Nedozvoljena sesija za verifikaciju.'});
+ const code=String(req.body?.code||'').replace(/\s/g,'');if(!/^\d{4,10}$/.test(code))return res.status(400).json({error:'Unesi SMS kod koji si dobio.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const p=await c.query('SELECT telefon_normalizovan,telefon_verifikovan_at FROM profiles WHERE id=$1 FOR UPDATE',[decoded.sub]);
+  if(!p.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički profil nije pronađen.'});}
+  if(p.rows[0].telefon_verifikovan_at){await c.query('COMMIT');return res.json({ok:true,verified:true});}
+  const check=await twilioVerify(p.rows[0].telefon_normalizovan,code);
+  if(check.status!=='approved'){await c.query('ROLLBACK');return res.status(400).json({error:'SMS kod nije ispravan ili je istekao.'});}
+  const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 AND id<>$2 AND telefon_verifikovan_at IS NOT NULL',[p.rows[0].telefon_normalizovan,decoded.sub]);
+  if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovaj broj telefona je već verifikovan na drugom nalogu.'});}
+  await c.query('UPDATE profiles SET telefon_verifikovan_at=now() WHERE id=$1',[decoded.sub]);
+  const u=await c.query('SELECT * FROM users WHERE id=$1',[decoded.sub]);
+  await c.query('COMMIT');
+  const session={access_token:sign(u.rows[0]),token_type:'bearer',expires_in:604800,user:publicUser(u.rows[0])};
+  res.json({ok:true,verified:true,session,message:'Broj telefona je potvrđen. Tvoj nalog je sada verifikovan.'});
+ }catch(e){await c.query('ROLLBACK');if(e.code==='23505')return res.status(409).json({error:'Ovaj broj telefona je već verifikovan na drugom nalogu.'});throw e;}finally{c.release();}
+}));
+app.post('/api/auth/login',asyncRoute(async(req,res)=>{
+ const e=String(req.body?.email||'').trim().toLowerCase(),{rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]),u=rows[0];
+ if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});
+ const p=await pool.query('SELECT blokiran,telefon_verifikovan_at FROM profiles WHERE id=$1',[u.id]);
+ if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});
+ if(!u.email_confirmed_at)return res.status(403).json({error:'E-mail adresa nije potvrđena. Otvori link koji smo poslali na e-mail.'});
+ if(!p.rows[0]?.telefon_verifikovan_at)return res.status(403).json({error:'Broj telefona nije potvrđen. Otvori link iz e-maila i završi SMS verifikaciju.'});
+ const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});
+}));
+app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
  // Check mail configuration before looking up the account, so the response
@@ -224,14 +330,14 @@ app.post('/api/admin/proposals/:id/decision',auth,admin,asyncRoute(async(req,res
 }));
 const supportMessageLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 app.post('/api/podrska',supportMessageLimiter,asyncRoute(async(req,res)=>{const ime=typeof req.body?.ime==='string'?req.body.ime.trim():'';const email=typeof req.body?.email==='string'?req.body.email.trim().toLowerCase():'';const poruka=typeof req.body?.poruka==='string'?req.body.poruka.trim():'';if(ime.length<2||ime.length>100||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||poruka.length<5||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci. Ime, email i poruka moraju biti ispravno uneti.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
-app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
+app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email,u.email_confirmed_at FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
 
 // Data API used by the existing React screens through the standalone client adapter.
 const TABLE_COLUMNS = {
  ponude: ['id','naslov','opis','kategorija','lokacija','cena','valuta','emoji','istaknuto','zavrseno','pauziran','user_id','kontakt_ime','telefon','created_at','updated_at'],
  zahtevi: ['id','naslov','opis','kategorija','lokacija','budzet','valuta','zavrseno','pauziran','user_id','kontakt_ime','telefon','created_at','updated_at'],
- profiles: ['id','ime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email','created_at'],
+ profiles: ['id','ime','prezime','telefon','telefon_normalizovan','telefon_verifikovan_at','duplikat_sumnja','verifikacija_zapoceta_at','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email','created_at'],
  user_roles: ['id','user_id','role'],
  pracenja: ['id','user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet','created_at'],
  slike_oglasa: ['id','ponuda_id','zahtev_id','storage_path','external_url','pozicija','created_at'],
@@ -243,7 +349,7 @@ const TABLE_COLUMNS = {
 const WRITE_COLUMNS = {
  ponude: ['naslov','opis','kategorija','lokacija','cena','valuta','emoji','kontakt_ime','telefon','zavrseno','pauziran','user_id','istaknuto'],
  zahtevi: ['naslov','opis','kategorija','lokacija','budzet','valuta','kontakt_ime','telefon','zavrseno','pauziran','user_id'],
- profiles: ['ime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email'],
+ profiles: ['ime','prezime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email'],
  user_roles: ['user_id','role'], pracenja: ['user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet'],
  slike_oglasa: ['ponuda_id','zahtev_id','storage_path','external_url','pozicija'],
  poruke_podrske: ['ime','email','poruka'],
