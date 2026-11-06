@@ -205,7 +205,6 @@ table { max-width: 100%; }
 }
 
 @media (max-width: 640px) {
-  .container-page { padding-inline: 1rem; }
   body { font-size: 15px; }
   input, select, textarea {
     min-height: 44px;
@@ -218,20 +217,10 @@ table { max-width: 100%; }
     overflow-x: auto;
     -webkit-overflow-scrolling: touch;
   }
-  [role="dialog"] {
-    width: calc(100vw - 1rem);
-    padding: 1rem;
-  }
   h1 { overflow-wrap: anywhere; }
 }
 
-@media (min-width: 641px) and (max-width: 1024px) {
-  .container-page { padding-inline: 1.5rem; }
-}
-
-@media (min-width: 1440px) {
-  .container-page { max-width: 1280px; }
-}
+/* Keep the established .container-page width and horizontal gutters on every device. */
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
