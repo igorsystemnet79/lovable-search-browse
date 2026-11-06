@@ -83,3 +83,19 @@ Provereni su JavaScript sintaksa API servera, JSON konfiguracije, Compose YAML i
 ## Bezbednost
 
 Promeni sve početne tajne pre pokretanja. Ne izlaži PostgreSQL port internetu. Redovno čuvaj backup baze i fotografija. Obezbedi ažuriranje operativnog sistema i Docker image-a.
+
+## Potvrda identiteta korisnika (e-mail + SMS)
+
+Registracija fizičkih i pravnih lica traži ime, prezime, e-mail, mobilni telefon i mesto. Ulica i broj su opcioni. Novi nalog se ne može koristiti za prijavu dok korisnik ne potvrdi e-mail link i SMS kod. Oznaka „Verifikovan korisnik“ prikazuje se tek kada su obe provere završene.
+
+Za slanje e-mail potvrde podesi postojeće SMTP promenljive. Za SMS kodove koristi Twilio Verify i u `.env` (ili Render Environment) unesi sledeće vrednosti:
+
+```env
+TWILIO_ACCOUNT_SID=AC...
+TWILIO_AUTH_TOKEN=...
+TWILIO_VERIFY_SERVICE_SID=VA...
+```
+
+U Twilio konzoli napravi Verify Service sa SMS kanalom. Telefoni se čuvaju u međunarodnom formatu E.164; za Srbiju je podržan format `+3816xxxxxxx`, a lokalni unos `06xxxxxxx` automatski se normalizuje. Nikada ne stavljaj Twilio tajne u frontend ili javni GitHub repozitorijum.
+
+Jedinstvenost e-maila obezbeđuje baza. Verifikovani broj telefona ima jedinstveni indeks; ime, prezime i mesto koji liče na postojeći profil samo označavaju nalog za administratorsku proveru i ne izazivaju automatsko blokiranje. Postojeći nalozi i oglasi se ne brišu. Postojeći korisnici bez SMS potvrde dobijaju SMS korak pri sledećoj prijavi, a nepotvrđeni e-mail može ponovo dobiti potvrdu.
