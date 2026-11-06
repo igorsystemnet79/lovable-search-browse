@@ -20,8 +20,8 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", newTab }: Sea
       rel={newTab ? "noopener" : undefined}
       className="grid gap-3 rounded-2xl bg-surface p-4 shadow-panel sm:grid-cols-[2fr_1fr_auto]"
     >
-      <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
-        <span aria-hidden="true" className="text-muted-foreground">⌕</span>
+      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
+        <span aria-hidden="true" className="shrink-0 text-muted-foreground">⌕</span>
         <ClearableSearchInput
           value={q}
           onChange={setQ}
@@ -29,10 +29,10 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", newTab }: Sea
           ariaLabel="Pretraži oglase"
           className="text-sm"
         />
-      </label>
+      </div>
 
-      <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
-        <span aria-hidden="true">📍</span>
+      <div className="flex min-w-0 items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
+        <span aria-hidden="true" className="shrink-0">📍</span>
         <ClearableSearchInput
           value={lokacija}
           onChange={setLokacija}
@@ -40,7 +40,7 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", newTab }: Sea
           ariaLabel="Lokacija"
           className="text-sm"
         />
-      </label>
+      </div>
 
       <button
         type="submit"
