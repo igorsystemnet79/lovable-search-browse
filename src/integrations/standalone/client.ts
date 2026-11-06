@@ -64,7 +64,7 @@ class QueryBuilder implements PromiseLike<any> {
 
 const auth = {
   async signUp({ email, password, options }: any) {
-    try { const result = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password, metadata: options?.data || {} }) }); return { data: { user: result.user, session: null }, error: null }; }
+    try { const result = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password, metadata: options?.data || {} }) }); return { data: { user: result.user || null, session: null, pending_verification: !!result.pending_verification, email: result.email }, error: null }; }
     catch (error: any) { return { data: { user: null, session: null }, error }; }
   },
   async signInWithPassword({ email, password }: any) {
