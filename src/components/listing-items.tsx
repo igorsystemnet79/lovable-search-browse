@@ -38,8 +38,8 @@ export function PonudaItem({ ponuda, hideFollow, maskContacts = false }: { ponud
       </p>
       <ListingImageGallery kind="ponuda" id={ponuda.id} />
       {ponuda.opis ? <p className="mt-2 text-sm text-muted-foreground">{ponuda.opis}</p> : null}
+      {ponuda.verifikovan_korisnik && <div className="mt-2"><span className="mr-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span></div>}
       {ponuda.kontakt_ime && <div className="mt-2 text-sm">
-        {ponuda.verifikovan_korisnik && <span className="mr-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span>}
         {maskContacts ? (
           <div className="flex flex-wrap items-center gap-2">
             <span aria-label="Ime i telefon su sakriveni" className="select-none blur-[4px]">{ponuda.kontakt_ime}{ponuda.telefon ? ` · ${ponuda.telefon}` : ""}</span>
@@ -63,8 +63,8 @@ export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; m
       </p>
       <ListingImageGallery kind="zahtev" id={zahtev.id} />
       {zahtev.opis ? <p className="mt-2 text-sm text-muted-foreground">{zahtev.opis}</p> : null}
+      {zahtev.verifikovan_korisnik && <div className="mt-2"><span className="mr-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span></div>}
       {zahtev.kontakt_ime && <div className="mt-2 text-sm">
-        {zahtev.verifikovan_korisnik && <span className="mr-2 inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span>}
         {maskContacts ? (
           <div className="flex flex-wrap items-center gap-2">
             <span aria-label="Ime i telefon su sakriveni" className="select-none blur-[4px]">{zahtev.kontakt_ime}{zahtev.telefon ? ` · ${zahtev.telefon}` : ""}</span>
