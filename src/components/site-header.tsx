@@ -14,12 +14,12 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-30 bg-brand text-brand-foreground">
-      <div className="container-page flex flex-wrap items-center justify-between gap-3 py-4">
+      <div className="site-header-inner container-page flex flex-wrap items-center justify-between gap-3 py-4">
         <Link to="/" aria-label="PonudiMi — početna" className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md bg-surface">
           <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
         </Link>
 
-        <nav aria-label="Korisničke opcije" className="flex flex-wrap items-center gap-2 text-sm">
+        <nav aria-label="Korisničke opcije" className="site-header-nav flex min-w-0 flex-wrap items-center gap-2 text-sm">
           <Link to="/podrska" className={outline}>
             Podrška
           </Link>
