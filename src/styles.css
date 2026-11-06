@@ -261,3 +261,83 @@ table { max-width: 100%; }
     white-space: nowrap;
   }
 }
+
+
+/* Compatibility palette for Android/WebViews without OKLCH color support. */
+@supports not (color: oklch(0 0 0)) {
+  :root {
+    --background: #f8f9fc;
+    --foreground: #292b3e;
+    --surface: #ffffff;
+    --card: #ffffff;
+    --card-foreground: #292b3e;
+    --popover: #ffffff;
+    --popover-foreground: #292b3e;
+    --brand: #191a3e;
+    --brand-foreground: #fbfbfd;
+    --brand-muted: #29294f;
+    --highlight: #f5a742;
+    --highlight-foreground: #29233b;
+    --primary: #191a3e;
+    --primary-foreground: #fbfbfd;
+    --secondary: #f1f2f6;
+    --secondary-foreground: #191a3e;
+    --muted: #f1f2f6;
+    --muted-foreground: #77798a;
+    --accent: #eceef5;
+    --accent-foreground: #191a3e;
+    --destructive: #dc2626;
+    --destructive-foreground: #ffffff;
+    --border: #dfe2eb;
+    --input: #dfe2eb;
+    --ring: #77798a;
+    --chart-1: #d97706;
+    --chart-2: #0d9488;
+    --chart-3: #315b83;
+    --chart-4: #eab308;
+    --chart-5: #f59e0b;
+    --sidebar: #fbfcfe;
+    --sidebar-foreground: #202238;
+    --sidebar-primary: #292b4c;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f1f2f6;
+    --sidebar-accent-foreground: #292b4c;
+    --sidebar-border: #e1e4ec;
+    --sidebar-ring: #8b91a2;
+  }
+
+  .dark {
+    --background: #202238;
+    --foreground: #f8f9fc;
+    --card: #292b4c;
+    --card-foreground: #f8f9fc;
+    --popover: #292b4c;
+    --popover-foreground: #f8f9fc;
+    --primary: #e1e4ec;
+    --primary-foreground: #292b4c;
+    --secondary: #373a55;
+    --secondary-foreground: #f8f9fc;
+    --muted: #373a55;
+    --muted-foreground: #b7bdcc;
+    --accent: #373a55;
+    --accent-foreground: #f8f9fc;
+    --destructive: #ef7777;
+    --destructive-foreground: #ffffff;
+    --border: rgba(255, 255, 255, 0.12);
+    --input: rgba(255, 255, 255, 0.18);
+    --ring: #8b91a2;
+    --chart-1: #7897ed;
+    --chart-2: #5ac5a4;
+    --chart-3: #f5a742;
+    --chart-4: #b18be8;
+    --chart-5: #e87979;
+    --sidebar: #292b4c;
+    --sidebar-foreground: #f8f9fc;
+    --sidebar-primary: #7897ed;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #373a55;
+    --sidebar-accent-foreground: #f8f9fc;
+    --sidebar-border: rgba(255, 255, 255, 0.12);
+    --sidebar-ring: #8b91a2;
+  }
+}
