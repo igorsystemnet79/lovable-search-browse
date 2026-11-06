@@ -6,6 +6,7 @@ import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFoto
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
+import { Input } from "@/components/ui/input";
 import type { Tables } from "@/integrations/standalone/types";
 
 export const Route = createFileRoute("/admin")({
@@ -297,7 +298,7 @@ function Korisnici({ selfId }: { selfId: string }) {
           <button type="button" className={prikaz === "fizicka" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("fizicka"); setFilter(""); setEdit(null); }}>Fizička lica</button>
           <button type="button" className={prikaz === "firme" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("firme"); setFilter(""); setEdit(null); }}>Registrovane firme</button>
         </div>
-        <input className={`${inputCls} min-w-0 w-full sm:max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <Input className={`${inputCls} min-w-0 w-full sm:max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
         <span className="whitespace-nowrap text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
         {msg && <span className="text-sm text-brand">{msg}</span>}
       </div>
@@ -327,7 +328,7 @@ function Korisnici({ selfId }: { selfId: string }) {
               {edit?.id === p.id && (
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {(["ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
-                    <input key={k} className={inputCls} placeholder={k} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null })} />
+                    <Input key={k} className={inputCls} placeholder={k} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null })} />
                   ))}
                   <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value })}>
                     <option value="fizicko">Fizičko lice</option>
@@ -422,11 +423,11 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
         <div key={o.id} className="rounded-2xl bg-surface p-4 shadow-card">
           {edit?.id === o.id ? (
             <div className="grid gap-2 sm:grid-cols-2">
-              <input className={inputCls} value={edit.naslov} onChange={(e) => setEdit({ ...edit, naslov: e.target.value })} />
-              <input className={inputCls} value={edit.lokacija} onChange={(e) => setEdit({ ...edit, lokacija: e.target.value })} />
-              <input className={inputCls} placeholder="Kontakt" value={edit.kontakt_ime ?? ""} onChange={(e) => setEdit({ ...edit, kontakt_ime: e.target.value })} />
-              <input className={inputCls} placeholder="Telefon" value={edit.telefon ?? ""} onChange={(e) => setEdit({ ...edit, telefon: e.target.value })} />
-              <input className={inputCls} type="number" min={0} placeholder={tabela === "ponude" ? "Cena" : "Budžet"} value={edit[polje] ?? ""} onChange={(e) => setEdit({ ...edit, [polje]: e.target.value === "" ? null : Number(e.target.value) })} />
+              <Input className={inputCls} value={edit.naslov} onChange={(e) => setEdit({ ...edit, naslov: e.target.value })} />
+              <Input className={inputCls} value={edit.lokacija} onChange={(e) => setEdit({ ...edit, lokacija: e.target.value })} />
+              <Input className={inputCls} placeholder="Kontakt" value={edit.kontakt_ime ?? ""} onChange={(e) => setEdit({ ...edit, kontakt_ime: e.target.value })} />
+              <Input className={inputCls} placeholder="Telefon" value={edit.telefon ?? ""} onChange={(e) => setEdit({ ...edit, telefon: e.target.value })} />
+              <Input className={inputCls} type="number" min={0} placeholder={tabela === "ponude" ? "Cena" : "Budžet"} value={edit[polje] ?? ""} onChange={(e) => setEdit({ ...edit, [polje]: e.target.value === "" ? null : Number(e.target.value) })} />
               <textarea className={`${inputCls} sm:col-span-2`} rows={3} value={edit.opis ?? ""} onChange={(e) => setEdit({ ...edit, opis: e.target.value })} />
               <div className="flex gap-2"><button className={small} onClick={sacuvaj}>Sačuvaj</button><button className={small} onClick={() => setEdit(null)}>Otkaži</button></div>
             </div>
@@ -518,7 +519,7 @@ function Apr() {
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button onClick={sync} disabled={busy} className="rounded-full bg-highlight px-5 py-2 text-sm font-semibold text-highlight-foreground hover:opacity-90 disabled:opacity-60">{busy ? "Sinhronizacija..." : "Sinhronizuj sa APR-om"}</button>
-        <input className={`${inputCls} max-w-xs`} placeholder="Naziv, PIB ili matični broj" value={q} onChange={(e) => setQ(e.target.value)} />
+        <Input className={`${inputCls} max-w-xs`} placeholder="Naziv, PIB ili matični broj" value={q} onChange={(e) => setQ(e.target.value)} />
         <span className="text-sm text-muted-foreground">Firmi u bazi: {broj}{zadnja && ` · poslednja sinhronizacija: ${new Date(zadnja.created_at).toLocaleString("sr-RS")} (${zadnja.uspeh ? "uspešna" : zadnja.poruka})`}</span>
       </div>
       {msg && <p className="mb-3 text-sm text-brand">{msg}</p>}
@@ -546,10 +547,10 @@ function ModeratorWorkspace() {
  const q=filter.toLowerCase(); const visible=rows.filter(o=>!q||[o.naslov,o.kategorija,o.lokacija,o.user_id].some(v=>String(v??"").toLowerCase().includes(q)));
  async function submit(){if(!editing)return;const amount=kind==="ponude"?"cena":"budzet";const payload={naslov:editing.naslov,opis:editing.opis,kategorija:editing.kategorija,lokacija:editing.lokacija,[amount]:editing[amount]??null,valuta:editing.valuta||"EUR",kontakt_ime:editing.kontakt_ime,telefon:editing.telefon};setBusy(true);setMsg("");try{await posaljiPredlogIzmene({tabela:kind,oglas_id:editing.id,predlozeni_podaci:payload});setMsg("Predlog je poslat administratoru. Oglas nije promenjen.");setEditing(null);await load();}catch(e){setMsg(e instanceof Error?e.message:"Slanje predloga nije uspelo.");}finally{setBusy(false);}}
  return <div className="space-y-4">
-  <div className="flex flex-wrap items-center gap-2"><button className={kind==="ponude"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("ponude");setEditing(null);}}>Ponude</button><button className={kind==="zahtevi"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("zahtevi");setEditing(null);}}>Zahtevi</button><input className={inputCls+" max-w-sm"} placeholder="Pretraga oglasa ili ID korisnika" value={filter} onChange={e=>setFilter(e.target.value)}/></div>
+  <div className="flex flex-wrap items-center gap-2"><button className={kind==="ponude"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("ponude");setEditing(null);}}>Ponude</button><button className={kind==="zahtevi"?small:"rounded-full border border-input px-3 py-1 text-xs"} onClick={()=>{setKind("zahtevi");setEditing(null);}}>Zahtevi</button><Input className={inputCls+" max-w-sm"} placeholder="Pretraga oglasa ili ID korisnika" value={filter} onChange={e=>setFilter(e.target.value)}/></div>
   <p className="text-sm text-muted-foreground">Pronađeno oglasa: {visible.length} · Tvoji predlozi: {proposals.length}</p>{msg&&<p className="rounded-xl bg-surface p-3 text-sm">{msg}</p>}
   {editing&&<div className="rounded-2xl border border-brand/30 bg-surface p-4 shadow-card"><h2 className="mb-3 font-semibold">Predlog izmene: {editing.naslov}</h2><p className="mb-3 text-xs text-muted-foreground">Izmena neće biti objavljena dok je administrator ne odobri.</p>
-   <div className="grid gap-2 sm:grid-cols-2"><input className={inputCls} placeholder="Naslov" value={editing.naslov} onChange={e=>setEditing({...editing,naslov:e.target.value})}/><input className={inputCls} placeholder="Kategorija" value={editing.kategorija} onChange={e=>setEditing({...editing,kategorija:e.target.value})}/><input className={inputCls} placeholder="Lokacija" value={editing.lokacija} onChange={e=>setEditing({...editing,lokacija:e.target.value})}/><input className={inputCls} placeholder="Kontakt osoba" value={editing.kontakt_ime??""} onChange={e=>setEditing({...editing,kontakt_ime:e.target.value})}/><input className={inputCls} placeholder="Telefon" value={editing.telefon??""} onChange={e=>setEditing({...editing,telefon:e.target.value})}/><input className={inputCls} type="number" min="0" placeholder={kind==="ponude"?"Cena":"Budžet"} value={editing[kind==="ponude"?"cena":"budzet"]??""} onChange={e=>setEditing({...editing,[kind==="ponude"?"cena":"budzet"]:e.target.value===""?null:Number(e.target.value)})}/><select className={inputCls} value={editing.valuta||"EUR"} onChange={e=>setEditing({...editing,valuta:e.target.value})}><option value="EUR">EUR</option><option value="RSD">RSD</option></select><textarea className={inputCls+" sm:col-span-2"} rows={4} placeholder="Opis" value={editing.opis??""} onChange={e=>setEditing({...editing,opis:e.target.value})}/></div>
+   <div className="grid gap-2 sm:grid-cols-2"><Input className={inputCls} placeholder="Naslov" value={editing.naslov} onChange={e=>setEditing({...editing,naslov:e.target.value})}/><Input className={inputCls} placeholder="Kategorija" value={editing.kategorija} onChange={e=>setEditing({...editing,kategorija:e.target.value})}/><Input className={inputCls} placeholder="Lokacija" value={editing.lokacija} onChange={e=>setEditing({...editing,lokacija:e.target.value})}/><Input className={inputCls} placeholder="Kontakt osoba" value={editing.kontakt_ime??""} onChange={e=>setEditing({...editing,kontakt_ime:e.target.value})}/><Input className={inputCls} placeholder="Telefon" value={editing.telefon??""} onChange={e=>setEditing({...editing,telefon:e.target.value})}/><Input className={inputCls} type="number" min="0" placeholder={kind==="ponude"?"Cena":"Budžet"} value={editing[kind==="ponude"?"cena":"budzet"]??""} onChange={e=>setEditing({...editing,[kind==="ponude"?"cena":"budzet"]:e.target.value===""?null:Number(e.target.value)})}/><select className={inputCls} value={editing.valuta||"EUR"} onChange={e=>setEditing({...editing,valuta:e.target.value})}><option value="EUR">EUR</option><option value="RSD">RSD</option></select><textarea className={inputCls+" sm:col-span-2"} rows={4} placeholder="Opis" value={editing.opis??""} onChange={e=>setEditing({...editing,opis:e.target.value})}/></div>
    <div className="mt-3 flex gap-2"><button className={small} disabled={busy} onClick={submit}>{busy?"Šaljem...":"Pošalji administratoru na odobrenje"}</button><button className={small} onClick={()=>setEditing(null)}>Otkaži</button></div></div>}
   <div className="space-y-2">{visible.map(o=><div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface p-4 shadow-card"><div className="text-sm"><p className="font-semibold">{o.naslov}</p><p className="text-muted-foreground">{o.kategorija} · {o.lokacija} · {kind==="ponude"?(o.cena??"po dogovoru"):(o.budzet??"po dogovoru")} {o.valuta||"EUR"}</p><p className="text-xs text-muted-foreground">Vlasnik naloga: {o.user_id}</p></div><button className={small} onClick={()=>setEditing(o)}>Predloži izmenu</button></div>)}{!visible.length&&<p className="text-sm text-muted-foreground">Nema oglasa za prikaz.</p>}</div>
   <div className="border-t border-input pt-4"><h2 className="mb-3 font-semibold">Moji poslati predlozi</h2>{proposals.map(p=><div key={p.id} className="mb-2 rounded-xl bg-surface p-3 text-sm"><p className="font-medium">{p.tabela==="ponude"?"Ponuda":"Zahtev"} · {String(p.predlozeni_podaci?.naslov||p.oglas_id)}</p><p className="text-muted-foreground">Status: {p.status==="na_cekanju"?"Čeka administratora":p.status==="odobreno"?"Odobreno":"Odbijeno"} · {new Date(p.created_at).toLocaleString("sr-RS")}</p>{p.admin_napomena&&<p>Napomena: {p.admin_napomena}</p>}</div>)}</div>
