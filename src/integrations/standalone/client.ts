@@ -106,8 +106,15 @@ const storage = {
   },
 };
 
+const verification = {
+  async confirmEmail(token: string) { return api("/api/auth/email/confirm", { method: "POST", body: JSON.stringify({ token }) }); },
+  async startPhone(verificationToken: string) { return api("/api/auth/phone/start", { method: "POST", body: JSON.stringify({ verification_token: verificationToken }) }); },
+  async checkPhone(verificationToken: string, code: string) { return api("/api/auth/phone/check", { method: "POST", body: JSON.stringify({ verification_token: verificationToken, code }) }); },
+};
+
 export const ponudimi: any = {
   auth,
+  verification,
   storage,
   from: (table: string) => new QueryBuilder(table),
   async rpc(fn: string, args: AnyRecord = {}) { try { const result = await api("/api/db/rpc", { method: "POST", body: JSON.stringify({ fn, args }) }); return { data: result.data, error: null }; } catch (error: any) { return { data: null, error }; } },
