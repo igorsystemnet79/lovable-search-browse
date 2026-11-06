@@ -309,12 +309,19 @@ function Korisnici({ selfId }: { selfId: string }) {
             <div key={p.id} className="rounded-2xl bg-surface p-4 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="text-sm">
-                  <p className="font-semibold">{p.ime || "—"} <span className="font-normal text-muted-foreground">· {p.email}</span></p>
+                  <p className="font-semibold">{[p.ime, p.prezime].filter(Boolean).join(" ") || "—"} <span className="font-normal text-muted-foreground">· {p.email}</span></p>
                   <p className="text-muted-foreground">
                     {p.tip_lica === "pravno" ? `Pravno lice: ${p.naziv_firme ?? "—"}, PIB ${p.pib ?? "—"} ${p.firma_verifikovana ? "✔ verifikovano" : "✖ nije verifikovano"}` : "Fizičko lice"}
                     {" · "}{p.telefon ?? "bez telefona"}{" · "}{[p.grad, p.adresa].filter(Boolean).join(", ") || "bez adrese"}
                   </p>
-                  <p className="mt-1 text-xs">Uloge: {r.join(", ") || "nema"} {p.blokiran && <span className="font-semibold text-destructive">· BLOKIRAN</span>}</p>
+                  <p className="mt-1 flex flex-wrap gap-2 text-xs">
+                    <span className={p.email_confirmed_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.email_confirmed_at ? `E-mail potvrđen · ${new Date(p.email_confirmed_at).toLocaleString("sr-RS")}` : "E-mail nije potvrđen"}</span>
+                    <span className={p.telefon_verifikovan_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.telefon_verifikovan_at ? `Telefon potvrđen · ${new Date(p.telefon_verifikovan_at).toLocaleString("sr-RS")}` : "Telefon nije potvrđen"}</span>
+                    {p.email_confirmed_at && p.telefon_verifikovan_at && <span className="font-bold text-green-700">✓ VERIFIKOVAN KORISNIK</span>}
+                    {p.duplikat_sumnja && <span className="font-semibold text-amber-700">PROVERITI MOGUĆI DUPLIKAT</span>}
+                    {p.blokiran && <span className="font-semibold text-destructive">BLOKIRAN</span>}
+                  </p>
+                  <p className="mt-1 text-xs">Uloge: {r.join(", ") || "nema"}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
