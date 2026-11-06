@@ -6,6 +6,7 @@ import { obrisiKorisnika, sinhronizujApr } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
+import { ClearableSearchInput } from "@/components/clearable-search-input";
 import type { Tables } from "@/integrations/standalone/types";
 
 export const Route = createFileRoute("/admin")({
@@ -109,7 +110,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        <input className={`${inputCls} max-w-sm`} placeholder="Pretraga korisnika" value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <ClearableSearchInput className={inputCls} placeholder="Pretraga korisnika" ariaLabel="Pretraga korisnika" value={filter} onChange={setFilter} />
         <span className="text-sm text-muted-foreground">Ukupno: {profili.length}</span>
         {msg && <span className="text-sm text-brand">{msg}</span>}
       </div>
@@ -268,7 +269,7 @@ function Apr() {
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <button onClick={sync} disabled={busy} className="rounded-full bg-highlight px-5 py-2 text-sm font-semibold text-highlight-foreground hover:opacity-90 disabled:opacity-60">{busy ? "Sinhronizacija..." : "Sinhronizuj sa APR-om"}</button>
-        <input className={`${inputCls} max-w-xs`} placeholder="Naziv, PIB ili matični broj" value={q} onChange={(e) => setQ(e.target.value)} />
+        <ClearableSearchInput className={inputCls} placeholder="Naziv, PIB ili matični broj" ariaLabel="Pretraga APR firmi" value={q} onChange={setQ} />
         <span className="text-sm text-muted-foreground">Firmi u bazi: {broj}{zadnja && ` · poslednja sinhronizacija: ${new Date(zadnja.created_at).toLocaleString("sr-RS")} (${zadnja.uspeh ? "uspešna" : zadnja.poruka})`}</span>
       </div>
       {msg && <p className="mb-3 text-sm text-brand">{msg}</p>}
