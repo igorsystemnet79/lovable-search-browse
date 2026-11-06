@@ -32,7 +32,7 @@ const titleLinkClass =
 export function PonudaItem({ ponuda, hideFollow, compact = true, featured = false }: { ponuda: Ponuda; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
   const title = typeof ponuda.naslov === "string" && ponuda.naslov.trim() ? ponuda.naslov.trim() : "Oglas bez naslova";
   return (
-    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] w-full min-w-0 overflow-hidden" : compact ? "h-[390px] sm:h-[410px] w-full min-w-0" : "w-full min-w-0"} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
+    <li className={`flex min-h-0 flex-col rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "min-h-[250px] sm:min-h-[270px] w-full min-w-0 overflow-hidden" : compact ? "min-h-[390px] sm:min-h-[410px] w-full min-w-0" : "w-full min-w-0"} ${ponuda.zavrseno ? "opacity-70" : ""}`}>
       <Link to="/oglas/$kind/$id" params={{ kind: "ponuda", id: ponuda.id }} className={titleLinkClass} aria-label={`Otvori oglas: ${title}`}>
         {ponuda.emoji ? <span className="mr-2">{ponuda.emoji}</span> : null}{title}
       </Link>
@@ -51,7 +51,7 @@ export function PonudaItem({ ponuda, hideFollow, compact = true, featured = fals
 export function ZahtevItem({ zahtev, hideFollow, compact = true, featured = false }: { zahtev: Zahtev; hideFollow?: boolean; compact?: boolean; featured?: boolean }) {
   const title = typeof zahtev.naslov === "string" && zahtev.naslov.trim() ? zahtev.naslov.trim() : "Zahtev bez naslova";
   return (
-    <li className={`flex w-full min-w-0 min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "h-[250px] sm:h-[270px] overflow-hidden" : compact ? "h-[390px] sm:h-[410px]" : ""} ${zahtev.zavrseno ? "opacity-70" : ""}`}>
+    <li className={`flex w-full min-w-0 min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${featured ? "min-h-[250px] sm:min-h-[270px] overflow-hidden" : compact ? "min-h-[390px] sm:min-h-[410px]" : ""} ${zahtev.zavrseno ? "opacity-70" : ""}`}>
       <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className={titleLinkClass} aria-label={`Otvori zahtev: ${title}`}>{title}</Link>
       <p className="mt-1 shrink-0 text-xs text-muted-foreground">
         {zahtev.lokacija} · {formatVreme(zahtev.created_at)}
