@@ -198,3 +198,25 @@ CREATE TABLE IF NOT EXISTS chatgpt_usage (
 );
 CREATE INDEX IF NOT EXISTS chatgpt_usage_admin_created_idx ON chatgpt_usage(admin_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS chatgpt_usage_conversation_idx ON chatgpt_usage(admin_id,conversation_id,created_at);
+
+
+-- Account identity verification (safe additive migration; existing records remain intact).
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS prezime text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS telefon_normalizovan text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS telefon_verifikovan_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS duplikat_sumnja boolean NOT NULL DEFAULT false;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS verifikacija_zapoceta_at timestamptz;
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_verified_phone_unique
+ ON profiles(telefon_normalizovan)
+ WHERE telefon_verifikovan_at IS NOT NULL AND telefon_normalizovan IS NOT NULL;
+CREATE INDEX IF NOT EXISTS profiles_duplicate_review_idx
+ ON profiles(duplikat_sumnja,created_at DESC) WHERE duplikat_sumnja=true;
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ token_hash text NOT NULL UNIQUE,
+ expires_at timestamptz NOT NULL,
+ used_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON email_verification_tokens(user_id,expires_at DESC);
