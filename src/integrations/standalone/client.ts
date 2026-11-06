@@ -68,7 +68,7 @@ const auth = {
     catch (error: any) { return { data: { user: null, session: null }, error }; }
   },
   async signInWithPassword({ email, password }: any) {
-    try { const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); writeSession(result.session); emit("SIGNED_IN", result.session); return { data: result, error: null }; }
+    try { const result = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) }); if (result.verification_required) return { data: result, error: Object.assign(new Error(result.message || "Potrebna je potvrda telefona."), { verificationToken: result.verification_token }) }; writeSession(result.session); emit("SIGNED_IN", result.session); return { data: result, error: null }; }
     catch (error: any) { return { data: { user: null, session: null }, error }; }
   },
   async getSession() {
