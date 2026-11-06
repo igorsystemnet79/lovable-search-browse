@@ -367,7 +367,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const orderSql=(orders||[]).filter(o=>columns.includes(o.column)).map(o=>`${ident(o.column)} ${o.ascending===false?'DESC':'ASC'}`).join(',');
    const lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500;
    const ownListingFilter=(filters||[]).some(f=>f.column==='user_id'&&f.op==='eq'&&f.value===userId);
-   const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false':'';
+   const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!ownListingFilter?' AND pauziran=false':'';
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false`:''}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim}`;
    const {rows}=await pool.query(sql,params);
    if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data:rows,count:c.rows[0].n};}else result={data:rows};
