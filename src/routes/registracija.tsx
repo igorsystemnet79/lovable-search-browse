@@ -36,7 +36,7 @@ function porukaGreske(error: unknown) {
 
 function Registracija() {
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
-  const [f, setF] = useState({ ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
+  const [f, setF] = useState({ ime: "", prezime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,9 @@ function Registracija() {
     if (busy) return;
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
-    if (f.lozinka.length < 6) return setGreska("Lozinka mora imati najmanje 6 karaktera.");
+    if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
+    if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
+    if (f.grad.trim().length < 2) return setGreska("Mesto stanovanja je obavezno.");
     if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     if (tip === "pravno") {
       if (f.naziv_firme.trim().length < 2) return setGreska("Unesi naziv firme.");
@@ -64,6 +66,7 @@ function Registracija() {
           emailRedirectTo: window.location.origin,
           data: {
             ime: f.ime.trim(),
+            prezime: f.prezime.trim(),
             telefon: f.telefon.trim(),
             grad: f.grad.trim(),
             adresa: f.adresa.trim(),
@@ -73,11 +76,12 @@ function Registracija() {
         },
       });
       if (error) throw error;
-      if (!data.user) {
+      if (data.pending_verification || data.user) {
+        setUspeh(true);
+      } else {
         setGreska("Registracija nije potvrđena. Proveri podešavanja servisa i pokušaj ponovo.");
         return;
       }
-      setUspeh(true);
     } catch (error) {
       setGreska(porukaGreske(error));
     } finally {
@@ -87,8 +91,8 @@ function Registracija() {
 
   if (uspeh)
     return (
-      <AuthShell title="Nalog je kreiran" subtitle="Registracija je uspešno završena.">
-        <p className="text-sm">Sada možeš da se <Link to="/prijava" className="font-semibold text-brand hover:underline">prijaviš</Link> svojim emailom i lozinkom.</p>
+      <AuthShell title="Proveri svoj e-mail" subtitle="Još jedan korak do verifikovanog PonudiMi naloga.">
+        <p className="text-sm">Poslali smo link za potvrdu na <strong>{f.email}</strong>. Otvori poruku i potvrdi adresu. Zatim ćeš dobiti SMS kod za potvrdu telefona. Oznaka „Verifikovan korisnik“ prikazuje se tek nakon obe provere.</p>
         {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">Firma se automatski verifikuje ako je PIB pronađen u APR registru, a u suprotnom je proverava administrator.</p>}
       </AuthShell>
     );
@@ -107,13 +111,14 @@ function Registracija() {
             <input className={inputCls} required inputMode="numeric" maxLength={9} placeholder="PIB (9 cifara)" value={f.pib} onChange={set("pib")} />
           </>
         )}
-        <input className={inputCls} required maxLength={100} autoComplete="name" placeholder={tip === "pravno" ? "Ime i prezime odgovornog lica" : "Ime i prezime"} value={f.ime} onChange={set("ime")} />
+        <input className={inputCls} required maxLength={60} autoComplete="given-name" placeholder="Ime" value={f.ime} onChange={set("ime")} />
+        <input className={inputCls} required maxLength={60} autoComplete="family-name" placeholder="Prezime" value={f.prezime} onChange={set("prezime")} />
         <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
-        <input className={inputCls} maxLength={60} placeholder="Grad" value={f.grad} onChange={set("grad")} />
+        <input className={inputCls} required maxLength={60} autoComplete="address-level2" placeholder="Mesto stanovanja" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} maxLength={150} placeholder={tip === "pravno" ? "Adresa sedišta (ulica i broj)" : "Adresa stanovanja (ulica i broj)"} value={f.adresa} onChange={set("adresa")} />
         <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={f.email} onChange={set("email")} />
         <div className="relative">
-          <input className={`${inputCls} pr-12`} type={prikaziLozinku ? "text" : "password"} required minLength={6} autoComplete="new-password" placeholder="Lozinka (min. 6 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
+          <input className={`${inputCls} pr-12`} type={prikaziLozinku ? "text" : "password"} required minLength={8} autoComplete="new-password" placeholder="Lozinka (min. 8 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
           <button
             type="button"
             onClick={() => setPrikaziLozinku((v) => !v)}
