@@ -100,6 +100,7 @@ class QueryBuilder implements PromiseLike<any> {
   private disjunction: string | null = null;
   private orders: Array<{ column: string; ascending: boolean }> = [];
   private rowLimit?: number;
+  private rowOffset = 0;
   private one = false;
   private countMode?: string;
   constructor(private table: string) {}
@@ -109,6 +110,7 @@ class QueryBuilder implements PromiseLike<any> {
   or(expression: string) { this.disjunction = expression; return this; }
   order(column: string, options?: { ascending?: boolean }) { this.orders.push({ column, ascending: options?.ascending !== false }); return this; }
   limit(value: number) { this.rowLimit = value; return this; }
+  range(from: number, to: number) { this.rowOffset = Math.max(0, Math.trunc(from)); this.rowLimit = Math.max(0, Math.trunc(to) - this.rowOffset + 1); return this; }
   insert(values: any) { this.action = "insert"; this.values = values; return this; }
   upsert(values: any) { this.action = "upsert"; this.values = values; return this; }
   update(values: any) { this.action = "update"; this.values = values; return this; }
@@ -118,7 +120,7 @@ class QueryBuilder implements PromiseLike<any> {
   then<TResult1 = any, TResult2 = never>(onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null): PromiseLike<TResult1 | TResult2> {
     const run = async () => {
       try {
-        const result = await api("/api/db/query", { method: "POST", body: JSON.stringify({ table: this.table, action: this.action, columns: this.columns, values: this.values, filters: this.filters, or: this.disjunction, orders: this.orders, limit: this.rowLimit, single: this.one, count: this.countMode }) });
+        const result = await api("/api/db/query", { method: "POST", body: JSON.stringify({ table: this.table, action: this.action, columns: this.columns, values: this.values, filters: this.filters, or: this.disjunction, orders: this.orders, limit: this.rowLimit, offset: this.rowOffset, single: this.one, count: this.countMode }) });
         return { data: result.data ?? null, error: null, count: result.count ?? null };
       } catch (error: any) { return { data: null, error: { message: error.message || "Greška", code: error.code }, count: null }; }
     };
