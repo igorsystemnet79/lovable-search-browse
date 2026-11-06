@@ -61,7 +61,6 @@ function Index() {
             height={1088}
             className="h-[380px] w-full object-cover sm:h-[460px]"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent" />
           <div className="absolute inset-0 flex items-center px-5">
             <div className="max-w-xl text-brand-foreground">
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-highlight">
