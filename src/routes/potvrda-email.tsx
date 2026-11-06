@@ -20,13 +20,18 @@ function PotvrdaEmail() {
 
   useEffect(() => {
     let active = true;
-    const token = new URLSearchParams(window.location.search).get("token") || "";
-    if (!token) { setError("Nedostaje link za potvrdu. Otvori link iz e-mail poruke."); setBusy(false); return; }
-    ponudimi.verification.confirmEmail(token)
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token") || "";
+    const existingVerificationToken = params.get("verification_token") || "";
+    if (!token && !existingVerificationToken) { setError("Nedostaje link za potvrdu. Otvori link iz e-mail poruke ili se ponovo prijavi."); setBusy(false); return; }
+    const begin = existingVerificationToken
+      ? Promise.resolve({ verification_token: existingVerificationToken, message: "Nastavljamo potvrdu telefona..." })
+      : ponudimi.verification.confirmEmail(token);
+    begin
       .then(async (result: any) => {
         if (!active) return;
         setVerificationToken(result.verification_token);
-        setInfo("E-mail je potvrđen. Šaljemo SMS kod na broj koji si uneo prilikom registracije...");
+        setInfo("E-mail je potvrđen. Šaljemo SMS kod na broj koji je povezan sa nalogom...");
         await ponudimi.verification.startPhone(result.verification_token);
         if (active) setInfo("SMS kod je poslat. Unesi ga ispod da završiš verifikaciju.");
       })
