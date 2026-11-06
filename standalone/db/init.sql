@@ -233,3 +233,6 @@ SET telefon_normalizovan = CASE
   ELSE telefon_normalizovan
 END
 WHERE telefon_normalizovan IS NULL AND telefon IS NOT NULL;
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
+UPDATE profiles p SET email_confirmed_at=u.email_confirmed_at FROM users u WHERE u.id=p.id AND p.email_confirmed_at IS DISTINCT FROM u.email_confirmed_at;
