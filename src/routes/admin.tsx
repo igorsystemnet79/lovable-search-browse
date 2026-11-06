@@ -127,8 +127,8 @@ function Korisnici({ selfId }: { selfId: string }) {
                     {" · "}{p.telefon ?? "bez telefona"}{" · "}{[p.grad, p.adresa].filter(Boolean).join(", ") || "bez adrese"}
                   </p>
                   <p className="mt-1 flex flex-wrap gap-2 text-xs">
-                    <span className={p.email_confirmed_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.email_confirmed_at ? "E-mail potvrđen" : "E-mail nije potvrđen"}</span>
-                    <span className={p.telefon_verifikovan_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.telefon_verifikovan_at ? "Telefon potvrđen" : "Telefon nije potvrđen"}</span>
+                    <span className={p.email_confirmed_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.email_confirmed_at ? `E-mail potvrđen · ${new Date(p.email_confirmed_at).toLocaleString("sr-RS")}` : "E-mail nije potvrđen"}</span>
+                    <span className={p.telefon_verifikovan_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.telefon_verifikovan_at ? `Telefon potvrđen · ${new Date(p.telefon_verifikovan_at).toLocaleString("sr-RS")}` : "Telefon nije potvrđen"}</span>
                     {p.email_confirmed_at && p.telefon_verifikovan_at && <span className="font-bold text-green-700">VERIFIKOVAN KORISNIK</span>}
                     {p.duplikat_sumnja && <span className="font-semibold text-amber-700">PROVERITI MOGUĆI DUPLIKAT</span>}
                     {p.blokiran && <span className="font-semibold text-destructive">BLOKIRAN</span>}
