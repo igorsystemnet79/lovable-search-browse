@@ -496,7 +496,8 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const selectWhereSql=selectWhere.length?` WHERE ${selectWhere.join(' AND ')}`:'';
    const sql=`SELECT * FROM ${ident(table)}${selectWhereSql}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params);
-   if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${selectWhereSql}`,params);result={data:rows,count:c.rows[0].n};}else result={data:rows};
+   const selectedRows=(table==='ponude'||table==='zahtevi')?await attachListingOwnerData(table,rows,Boolean(userId)):rows;
+   if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${selectWhereSql}`,params);result={data:selectedRows,count:c.rows[0].n};}else result={data:selectedRows};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
    for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);}
