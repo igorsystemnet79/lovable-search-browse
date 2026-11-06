@@ -37,6 +37,7 @@ function MojiOglasi() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"svi" | "aktivni" | "pauzirani" | "zavrseni">("svi");
+  const [searchText, setSearchText] = useState("");
 
   async function obrisi(table: "ponude" | "zahtevi", id: string) {
     if (busyId) return;
@@ -99,11 +100,15 @@ function MojiOglasi() {
     pauzirani: sveObjave.filter((x) => !x.zavrseno && !!x.pauziran).length,
     zavrseni: sveObjave.filter((x) => !!x.zavrseno).length,
   };
+  const normalizujPretragu = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("sr-Latn");
+  const pojamPretrage = normalizujPretragu(searchText.trim());
   const prikazi = <T extends Ponuda | Zahtev>(items: T[]) => items.filter((x) => {
-    if (statusFilter === "aktivni") return !x.zavrseno && !x.pauziran;
-    if (statusFilter === "pauzirani") return !x.zavrseno && !!x.pauziran;
-    if (statusFilter === "zavrseni") return !!x.zavrseno;
-    return true;
+    if (statusFilter === "aktivni" && (x.zavrseno || x.pauziran)) return false;
+    if (statusFilter === "pauzirani" && (x.zavrseno || !x.pauziran)) return false;
+    if (statusFilter === "zavrseni" && !x.zavrseno) return false;
+    if (!pojamPretrage) return true;
+    const tekst = normalizujPretragu([x.naslov, x.kategorija, x.opis ?? "", x.lokacija].join(" "));
+    return tekst.includes(pojamPretrage);
   });
 
   const actions = (k: ListingKind, x: Ponuda | Zahtev, iznos: number | null) => (
@@ -127,7 +132,10 @@ function MojiOglasi() {
             {actionError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">{actionError}</p>}
             {q.isError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Tvoji oglasi trenutno nisu mogli da se učitaju. Osveži stranicu ili pokušaj ponovo.</p>}
             <section className="rounded-2xl border border-border bg-card p-4">
-              <h2 className="text-base font-semibold">Filtriraj moje objave</h2>
+              <label htmlFor="moji-oglasi-pretraga" className="text-base font-semibold">Pretraži moje oglase</label>
+              <input id="moji-oglasi-pretraga" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Unesi naslov, kategoriju, opis ili lokaciju…" autoComplete="off" className="mt-3 min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+              <p className="mt-2 text-xs text-muted-foreground">Rezultati se prikazuju odmah dok kucaš.</p>
+              <h2 className="mt-4 text-base font-semibold">Filtriraj moje objave</h2>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtriranje objava po statusu">
                 {([
                   ["svi", "Sve objave"],
@@ -144,13 +152,13 @@ function MojiOglasi() {
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
-              {q.data && q.data.ponude.length > 0 && prikazi(q.data.ponude).length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nema ponuda u izabranom statusu.</p>}
+              {q.data && q.data.ponude.length > 0 && prikazi(q.data.ponude).length === 0 && <p className="mt-3 text-sm text-muted-foreground">{pojamPretrage ? "Nema ponuda koje odgovaraju pretrazi i izabranom statusu." : "Nema ponuda u izabranom statusu."}</p>}
               <ul className="mt-4 space-y-4">{prikazi(q.data?.ponude ?? []).map((p) => <div key={p.id}><PonudaItem ponuda={p} hideFollow />{actions("ponuda", p, p.cena)}</div>)}</ul>
             </section>
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moji zahtevi</h2>
               {q.data?.zahtevi.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš postavljenih zahteva.</p>}
-              {q.data && q.data.zahtevi.length > 0 && prikazi(q.data.zahtevi).length === 0 && <p className="mt-3 text-sm text-muted-foreground">Nema zahteva u izabranom statusu.</p>}
+              {q.data && q.data.zahtevi.length > 0 && prikazi(q.data.zahtevi).length === 0 && <p className="mt-3 text-sm text-muted-foreground">{pojamPretrage ? "Nema zahteva koji odgovaraju pretrazi i izabranom statusu." : "Nema zahteva u izabranom statusu."}</p>}
               <ul className="mt-4 space-y-4">{prikazi(q.data?.zahtevi ?? []).map((z) => <div key={z.id}><ZahtevItem zahtev={z} />{actions("zahtev", z, z.budzet)}</div>)}</ul>
             </section>
           </div>
