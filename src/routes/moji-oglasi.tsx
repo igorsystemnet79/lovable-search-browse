@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { SiteHeader } from "@/components/site-header";
+import { Input } from "@/components/ui/input";
 import { SiteFooter } from "@/components/site-footer";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { ListingFormDialog, type ListingEdit, type ListingKind } from "@/components/listing-form-dialog";
@@ -133,7 +134,7 @@ function MojiOglasi() {
             {q.isError && <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">Tvoji oglasi trenutno nisu mogli da se učitaju. Osveži stranicu ili pokušaj ponovo.</p>}
             <section className="rounded-2xl border border-border bg-card p-4">
               <label htmlFor="moji-oglasi-pretraga" className="text-base font-semibold">Pretraži moje oglase</label>
-              <input id="moji-oglasi-pretraga" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Unesi naslov, kategoriju, opis ili lokaciju…" autoComplete="off" className="mt-3 min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
+              <Input id="moji-oglasi-pretraga" type="search" value={searchText} onChange={(event) => setSearchText(event.target.value)} placeholder="Unesi naslov, kategoriju, opis ili lokaciju…" autoComplete="off" className="mt-3 min-h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm outline-none transition-colors placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring" />
               <p className="mt-2 text-xs text-muted-foreground">Rezultati se prikazuju odmah dok kucaš.</p>
               <h2 className="mt-4 text-base font-semibold">Filtriraj moje objave</h2>
               <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtriranje objava po statusu">
