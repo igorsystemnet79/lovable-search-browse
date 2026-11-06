@@ -137,6 +137,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
+                  {p.duplikat_sumnja && <button className={small} onClick={() => update(p.id, { duplikat_sumnja: false })}>Označi kao provereno</button>}
                   <button className={small} disabled={p.id === selfId} onClick={() => toggleUloga(p.id, "admin")}>{r.includes("admin") ? "Ukini admina" : "Daj admina"}</button>
                   <button className={small} onClick={() => toggleUloga(p.id, "moderator")}>{r.includes("moderator") ? "Ukini moderatora" : "Daj moderatora"}</button>
                   <button className={small} disabled={p.id === selfId} onClick={() => update(p.id, { blokiran: !p.blokiran })}>{p.blokiran ? "Vrati sve privilegije" : "Ukini sve privilegije"}</button>
