@@ -51,6 +51,10 @@ function Prijava() {
         password: lozinka,
       });
       if (error) {
+        if ((error as any).verificationToken) {
+          window.location.href = "/potvrda-email?verification_token=" + encodeURIComponent((error as any).verificationToken);
+          return;
+        }
         if (/invalid login credentials/i.test(error.message)) {
           setGreska("Email ili lozinka nisu ispravni. Ako još nemaš nalog, prvo se registruj.");
         } else if (/email not confirmed/i.test(error.message)) {
