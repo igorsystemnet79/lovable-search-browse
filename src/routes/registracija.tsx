@@ -36,7 +36,7 @@ function porukaGreske(error: unknown) {
 
 function Registracija() {
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
-  const [f, setF] = useState({ ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
+  const [f, setF] = useState({ ime: "", prezime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
