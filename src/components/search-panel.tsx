@@ -1,3 +1,6 @@
+import { useState } from "react";
+import { ClearableSearchInput } from "@/components/clearable-search-input";
+
 type SearchPanelProps = {
   defaultQ?: string;
   defaultLokacija?: string;
@@ -6,6 +9,9 @@ type SearchPanelProps = {
 };
 
 export function SearchPanel({ defaultQ = "", defaultLokacija = "", newTab }: SearchPanelProps) {
+  const [q, setQ] = useState(defaultQ);
+  const [lokacija, setLokacija] = useState(defaultLokacija);
+
   return (
     <form
       action="/pretraga"
@@ -15,28 +21,24 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", newTab }: Sea
       className="grid gap-3 rounded-2xl bg-surface p-4 shadow-panel sm:grid-cols-[2fr_1fr_auto]"
     >
       <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
-        <span aria-hidden="true" className="text-muted-foreground">
-          ⌕
-        </span>
-        <input
-          type="search"
-          name="q"
-          defaultValue={defaultQ}
+        <span aria-hidden="true" className="text-muted-foreground">⌕</span>
+        <ClearableSearchInput
+          value={q}
+          onChange={setQ}
           placeholder="Šta tražiš danas?"
-          aria-label="Pretraži oglase"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          ariaLabel="Pretraži oglase"
+          className="text-sm"
         />
       </label>
 
       <label className="flex items-center gap-2 rounded-xl border border-border bg-background px-4 py-3">
         <span aria-hidden="true">📍</span>
-        <input
-          type="text"
-          name="lokacija"
-          defaultValue={defaultLokacija}
+        <ClearableSearchInput
+          value={lokacija}
+          onChange={setLokacija}
           placeholder="Lokacija"
-          aria-label="Izaberi lokaciju"
-          className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+          ariaLabel="Lokacija"
+          className="text-sm"
         />
       </label>
 
