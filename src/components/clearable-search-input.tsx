@@ -1,5 +1,4 @@
 import type { HTMLAttributes } from "react";
-import { X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type ClearableSearchInputProps = {
@@ -28,16 +27,17 @@ export function ClearableSearchInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         inputMode={inputMode}
-        className={cn("w-full min-w-0 bg-transparent pr-12 outline-none placeholder:text-muted-foreground", className)}
+        className={cn("w-full min-w-0 bg-transparent pr-14 outline-none placeholder:text-muted-foreground", className)}
       />
       <button
         type="button"
         aria-label={`Obriši: ${ariaLabel.toLowerCase()}`}
         title="Obriši tekst"
         onClick={() => onChange("")}
-        className="absolute right-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 shrink-0 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+        className="absolute right-0 top-1/2 z-30 flex h-10 w-10 -translate-y-1/2 appearance-none items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-lg hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
+        style={{ display: "flex", visibility: "visible", opacity: 1, backgroundColor: "#f97316", color: "#ffffff", pointerEvents: "auto" }}
       >
-        <X className="h-5 w-5" strokeWidth={3} />
+        <span aria-hidden="true" className="text-2xl font-bold leading-none">×</span>
       </button>
     </div>
   );
