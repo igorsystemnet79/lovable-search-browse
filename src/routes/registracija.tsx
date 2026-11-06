@@ -113,9 +113,9 @@ function Registracija() {
         )}
         <input className={inputCls} required maxLength={60} autoComplete="given-name" placeholder="Ime" value={f.ime} onChange={set("ime")} />
         <input className={inputCls} required maxLength={60} autoComplete="family-name" placeholder="Prezime" value={f.prezime} onChange={set("prezime")} />
-        <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
+        <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon (npr. 0641234567 ili +381641234567)" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} required maxLength={60} autoComplete="address-level2" placeholder="Mesto stanovanja" value={f.grad} onChange={set("grad")} />
-        <input className={inputCls} required maxLength={150} autoComplete="street-address" placeholder={tip === "pravno" ? "Adresa sedišta (ulica i broj)" : "Adresa stanovanja (ulica i broj)"} value={f.adresa} onChange={set("adresa")} />
+        <input className={inputCls} maxLength={150} autoComplete="street-address" placeholder={tip === "pravno" ? "Adresa sedišta (opciono)" : "Adresa (opciono)"} value={f.adresa} onChange={set("adresa")} />
         <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={f.email} onChange={set("email")} />
         <input className={inputCls} type="password" required minLength={8} autoComplete="new-password" placeholder="Lozinka (min. 8 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
