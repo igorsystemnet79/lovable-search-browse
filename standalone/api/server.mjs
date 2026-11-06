@@ -158,7 +158,8 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   const created=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,NULL,$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,ime:first,prezime:last,telefon:phone,grad:city})]);
   const u=created.rows[0],pib=metadata.tip_lica==='pravno'&&validPib(metadata.pib)?String(metadata.pib).replace(/\s/g,''):null;
   const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
-  const sameName=await c.query("SELECT 1 FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
+  const sameName=await c.query("SELECT id FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
+  if(sameName.rows[0])await c.query('UPDATE profiles SET duplikat_sumnja=true WHERE id=$1',[sameName.rows[0].id]);
   await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
@@ -457,6 +458,14 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
      const merged={...current.rows[0],...(supplied[0]||{})};
      if(String(merged.naslov||'').trim().length<3||String(merged.naslov).length>150||!String(merged.kategorija||'').trim()||String(merged.lokacija||'').trim().length<2||String(merged.lokacija).length>100||String(merged.kontakt_ime||'').trim().length<2||String(merged.kontakt_ime).length>100||! /^[+0-9 ()-]{6,30}$/.test(String(merged.telefon||''))||String(merged.opis||'').length>3000||(merged[amountField]!==null&&merged[amountField]!==undefined&&(!Number.isFinite(Number(merged[amountField]))||Number(merged[amountField])<0)))return res.status(400).json({error:'Izmenjeni podaci oglasa nisu ispravni.'});
    }
+ }
+ if(table==='profiles' && action==='update' && supplied.some(row=>row.telefon!==undefined)) {
+   const idFilter=(filters||[]).find(f=>f.column==='id'&&f.op==='eq');
+   if(!idFilter)return res.status(400).json({error:'Izmena telefona zahteva ID korisnika.'});
+   const currentPhone=await pool.query('SELECT telefon FROM profiles WHERE id=$1',[idFilter.value]);
+   if(!currentPhone.rows[0])return res.status(404).json({error:'Korisnički profil nije pronađen.'});
+   const proposed=supplied.find(row=>row.telefon!==undefined)?.telefon;
+   if(String(proposed??'').trim()!==String(currentPhone.rows[0].telefon??'').trim())return res.status(400).json({error:'Promena broja telefona zahteva novu SMS verifikaciju. Obrati se podršci.'});
  }
  if(table==='profiles' && action==='update' && !adminUser) {
    for(const row of supplied) {
