@@ -100,7 +100,7 @@ function MojiOglasi() {
     pauzirani: sveObjave.filter((x) => !x.zavrseno && !!x.pauziran).length,
     zavrseni: sveObjave.filter((x) => !!x.zavrseno).length,
   };
-  const normalizujPretragu = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").toLocaleLowerCase("sr-Latn");
+  const normalizujPretragu = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("sr-Latn");
   const pojamPretrage = normalizujPretragu(searchText.trim());
   const prikazi = <T extends Ponuda | Zahtev>(items: T[]) => items.filter((x) => {
     if (statusFilter === "aktivni" && (x.zavrseno || x.pauziran)) return false;
