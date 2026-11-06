@@ -220,8 +220,18 @@ app.post('/api/auth/login',asyncRoute(async(req,res)=>{
  if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});
  const p=await pool.query('SELECT blokiran,telefon_verifikovan_at FROM profiles WHERE id=$1',[u.id]);
  if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});
- if(!u.email_confirmed_at)return res.status(403).json({error:'E-mail adresa nije potvrđena. Otvori link koji smo poslali na e-mail.'});
- if(!p.rows[0]?.telefon_verifikovan_at)return res.status(403).json({error:'Broj telefona nije potvrđen. Otvori link iz e-maila i završi SMS verifikaciju.'});
+ if(!u.email_confirmed_at){
+  if(process.env.SMTP_HOST&&process.env.SMTP_USER&&process.env.SMTP_PASS)await sendEmailVerification(u.id,u.email);
+  return res.status(403).json({error:'E-mail adresa nije potvrđena. Poslali smo novi link za potvrdu na tvoju adresu.'});
+ }
+ if(!p.rows[0]?.telefon_verifikovan_at){
+  const rawPhone=await pool.query('SELECT telefon,telefon_normalizovan FROM profiles WHERE id=$1',[u.id]);
+  const phone=rawPhone.rows[0]?.telefon_normalizovan||normalizePhone(rawPhone.rows[0]?.telefon);
+  if(!phone)return res.status(400).json({error:'Broj telefona nije u ispravnom formatu. Kontaktiraj podršku radi ispravke.'});
+  await pool.query('UPDATE profiles SET telefon_normalizovan=$1 WHERE id=$2',[phone,u.id]);
+  await twilioVerify(phone,null);
+  return res.json({verification_required:true,verification_token:signVerification(u.id),message:'Poslali smo SMS kod. Unesi ga da završiš verifikaciju.'});
+ }
  const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});
 }));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
