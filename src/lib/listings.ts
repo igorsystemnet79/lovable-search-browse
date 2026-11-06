@@ -17,6 +17,7 @@ export type Ponuda = {
   ime_prezime?: string | null;
   adresa?: string | null;
   kontakt_zasticen?: boolean;
+  verifikovan_korisnik?: boolean;
   created_at: string;
 };
 
@@ -34,6 +35,7 @@ export type Zahtev = {
   ime_prezime?: string | null;
   adresa?: string | null;
   kontakt_zasticen?: boolean;
+  verifikovan_korisnik?: boolean;
   valuta: string;
   created_at: string;
 };
