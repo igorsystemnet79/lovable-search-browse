@@ -4,9 +4,9 @@ import { ponudimi } from "@/integrations/standalone/client";
 import logo from "@/assets/ponudimi-logo.png";
 
 const outline =
-  "rounded-full border border-brand-foreground/25 px-4 py-2 font-medium transition-colors hover:bg-brand-foreground/10";
+  "flex min-h-10 items-center justify-center rounded-full border border-brand-foreground/25 px-2 py-2 text-center font-medium leading-tight transition-colors hover:bg-brand-foreground/10 sm:px-4";
 const solid =
-  "rounded-full bg-highlight px-4 py-2 font-semibold text-highlight-foreground transition-opacity hover:opacity-90";
+  "flex min-h-10 items-center justify-center rounded-full bg-highlight px-2 py-2 text-center font-semibold leading-tight text-highlight-foreground transition-opacity hover:opacity-90 sm:px-4";
 
 export function SiteHeader() {
   const { user, isAdmin } = useIsAdmin();
@@ -14,12 +14,12 @@ export function SiteHeader() {
 
   return (
     <header className="sticky top-0 z-30 bg-brand text-brand-foreground">
-      <div className="site-header-inner container-page flex flex-wrap items-center justify-between gap-3 py-4">
+      <div className="site-header-inner container-page flex flex-col items-start gap-3 py-3">
         <Link to="/" aria-label="PonudiMi — početna" className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md bg-surface">
           <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
         </Link>
 
-        <nav aria-label="Korisničke opcije" className="site-header-nav flex min-w-0 flex-wrap items-center gap-2 text-sm">
+        <nav aria-label="Korisničke opcije" className="site-header-nav grid w-full min-w-0 grid-cols-3 items-center gap-2 text-xs sm:text-sm">
           <Link to="/podrska" className={outline}>
             Podrška
           </Link>
@@ -28,7 +28,7 @@ export function SiteHeader() {
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
-              <span className="hidden px-2 text-brand-foreground/80 sm:inline">
+              <span className="hidden min-h-10 items-center justify-center px-1 text-center text-brand-foreground/80 sm:flex">
                 {(user.user_metadata?.["ime"] as string) || user.email}
               </span>
               <button
