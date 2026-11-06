@@ -102,6 +102,7 @@ class QueryBuilder implements PromiseLike<any> {
   private rowLimit?: number;
   private rowOffset = 0;
   private one = false;
+  private includePaused = false;
   private countMode?: string;
   constructor(private table: string) {}
   select(columns = "*", options?: any) { this.columns = columns; this.countMode = options?.count; return this; }
@@ -117,10 +118,11 @@ class QueryBuilder implements PromiseLike<any> {
   delete() { this.action = "delete"; return this; }
   single() { this.one = true; return this; }
   maybeSingle() { this.one = true; return this; }
+  includePausedListings() { this.includePaused = true; return this; }
   then<TResult1 = any, TResult2 = never>(onfulfilled?: ((value: any) => TResult1 | PromiseLike<TResult1>) | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | null): PromiseLike<TResult1 | TResult2> {
     const run = async () => {
       try {
-        const result = await api("/api/db/query", { method: "POST", body: JSON.stringify({ table: this.table, action: this.action, columns: this.columns, values: this.values, filters: this.filters, or: this.disjunction, orders: this.orders, limit: this.rowLimit, offset: this.rowOffset, single: this.one, count: this.countMode }) });
+        const result = await api("/api/db/query", { method: "POST", body: JSON.stringify({ table: this.table, action: this.action, columns: this.columns, values: this.values, filters: this.filters, or: this.disjunction, orders: this.orders, limit: this.rowLimit, offset: this.rowOffset, single: this.one, count: this.countMode, includePaused: this.includePaused }) });
         return { data: result.data ?? null, error: null, count: result.count ?? null };
       } catch (error: any) { return { data: null, error: { message: error.message || "Greška", code: error.code }, count: null }; }
     };
