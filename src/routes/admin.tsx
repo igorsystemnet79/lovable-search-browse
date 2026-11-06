@@ -361,7 +361,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const polje = tabela === "ponude" ? "cena" : "budzet";
   const imageColumn = tabela === "ponude" ? "ponuda_id" : "zahtev_id";
   const load = useCallback(async () => {
-    const { data } = await ponudimi.from(tabela).select("*").order("created_at", { ascending: false });
+    const { data } = await ponudimi.from(tabela).select("*").includePausedListings().order("created_at", { ascending: false });
     setRows((data ?? []) as Oglas[]);
   }, [tabela]);
   useEffect(() => { load(); }, [load]);
