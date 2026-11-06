@@ -153,13 +153,13 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
-  const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 LIMIT 1',[phone]);
+  const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 AND telefon_verifikovan_at IS NOT NULL LIMIT 1',[phone]);
   if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovaj broj telefona je već povezan sa nalogom. Prijavi se na postojeći nalog ili kontaktiraj podršku.'});}
   const created=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,NULL,$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,ime:first,prezime:last,telefon:phone,grad:city})]);
   const u=created.rows[0],pib=metadata.tip_lica==='pravno'&&validPib(metadata.pib)?String(metadata.pib).replace(/\s/g,''):null;
   const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
   const sameName=await c.query("SELECT 1 FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
-  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first+' '+last,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
+  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
   await sendEmailVerification(u.id,e);
@@ -258,7 +258,7 @@ async function attachListingOwnerData(table, rows, authenticated) {
  const byId=new Map(profiles.rows.map(profile=>[profile.id,profile]));
  return rows.map(row=>{
   const profile=byId.get(row.user_id);
-  const ownerName=profile?.ime || row.kontakt_ime || null;
+  const ownerName=profile ? [profile.ime,profile.prezime].filter(Boolean).join(' ') : (row.kontakt_ime || null);
   const verified=!!(profile?.email_confirmed_at && profile?.telefon_verifikovan_at);
   const ownerAddress=profile?.adresa || null;
   if (!authenticated) return {...row,user_id:null,ime_prezime:'••••••••',adresa:'••••••••',kontakt_ime:'••••••••',telefon:'••••••••',kontakt_zasticen:true,verifikovan_korisnik:verified};
