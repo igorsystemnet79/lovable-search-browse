@@ -20,7 +20,7 @@ export function ClearableSearchInput({
   inputMode,
 }: ClearableSearchInputProps) {
   return (
-    <div className="relative w-full min-w-0">
+    <div className="relative flex w-full min-w-0 flex-1 items-center">
       <input
         type="text"
         value={value}
@@ -28,16 +28,16 @@ export function ClearableSearchInput({
         placeholder={placeholder}
         aria-label={ariaLabel}
         inputMode={inputMode}
-        className={cn("w-full min-w-0 bg-transparent pr-10 outline-none placeholder:text-muted-foreground", className, "pr-10")}
+        className={cn("w-full min-w-0 bg-transparent pr-12 outline-none placeholder:text-muted-foreground", className)}
       />
       <button
         type="button"
         aria-label={`Obriši: ${ariaLabel.toLowerCase()}`}
-        title="Obriši pretragu"
+        title="Obriši tekst"
         onClick={() => onChange("")}
-        className="absolute right-1 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground opacity-100 transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="absolute right-0 top-1/2 z-20 flex h-9 w-9 -translate-y-1/2 shrink-0 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500"
       >
-        <X className="h-4 w-4" strokeWidth={2.5} />
+        <X className="h-5 w-5" strokeWidth={3} />
       </button>
     </div>
   );
