@@ -220,3 +220,16 @@ CREATE TABLE IF NOT EXISTS email_verification_tokens (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS email_verification_tokens_user_idx ON email_verification_tokens(user_id,expires_at DESC);
+
+-- Normalize legacy phone numbers for the new verification flow without marking them verified.
+UPDATE profiles
+SET telefon_normalizovan = CASE
+  WHEN regexp_replace(coalesce(telefon,''),'[^0-9]','','g') ~ '^06[0-9]{7,8}$'
+    THEN '+381' || substring(regexp_replace(telefon,'[^0-9]','','g') from 2)
+  WHEN regexp_replace(coalesce(telefon,''),'[^0-9]','','g') ~ '^3816[0-9]{7,8}$'
+    THEN '+' || regexp_replace(telefon,'[^0-9]','','g')
+  WHEN regexp_replace(coalesce(telefon,''),'[^0-9]','','g') ~ '^003816[0-9]{7,8}$'
+    THEN '+' || substring(regexp_replace(telefon,'[^0-9]','','g') from 3)
+  ELSE telefon_normalizovan
+END
+WHERE telefon_normalizovan IS NULL AND telefon IS NOT NULL;
