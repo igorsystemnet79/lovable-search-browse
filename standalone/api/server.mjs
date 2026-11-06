@@ -259,7 +259,7 @@ const ownsImage = async (row,userId) => {
 const listingStorageKeys = async (table, ids, db=pool) => { if(!ids.length)return [];const col=table==='ponude'?'ponuda_id':'zahtev_id';const {rows}=await db.query(`SELECT storage_path FROM slike_oglasa WHERE ${col}=ANY($1::uuid[]) AND storage_path IS NOT NULL`,[ids]);return rows.map(row=>{const parts=String(row.storage_path).split('/').filter(Boolean);if(parts[0]==='uploads')parts.shift();return parts.join('/');}).filter(Boolean); };
 const removeStoredImages = async keys => { for(const key of keys){try{await removeImage(key);}catch(error){console.error('Neuspešno čišćenje fotografije nakon brisanja oglasa:',error.message);}} };
 app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
- const {table,action='select',values,filters=[],orders=[],limit,single,count,or,includePaused=false}=req.body||{};
+ const {table,action='select',values,filters=[],orders=[],limit,single,count,or,includePaused=false,offset=0}=req.body||{};
  // This adapter does not implement PostgreSQL ON CONFLICT semantics. Treating
  // upsert as INSERT bypasses table-specific ownership checks, so reject it.
  if(action==='upsert') return res.status(400).json({error:'Operacija upsert nije podržana. Koristi dozvoljeno dodavanje ili izmenu.'});
@@ -365,6 +365,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(action==='select'){
    const orderSql=(orders||[]).filter(o=>columns.includes(o.column)).map(o=>`${ident(o.column)} ${o.ascending===false?'DESC':'ASC'}`).join(',');
    const lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500;
+   const off=Number.isInteger(offset)?Math.max(0,Math.min(offset,1000000)):0;
    const ownListingFilter=(filters||[]).some(f=>f.column==='user_id'&&f.op==='eq'&&f.value===userId);
    // Paused listings stay hidden in public feeds. Only an authenticated admin
    // may explicitly request them for the dedicated administration screen.
@@ -373,7 +374,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const selectWhere=[whereSql.replace(/^ WHERE /,'')].filter(Boolean);
    if(publicPauseFilter)selectWhere.push(publicPauseFilter);
    const selectWhereSql=selectWhere.length?` WHERE ${selectWhere.join(' AND ')}`:'';
-   const sql=`SELECT * FROM ${ident(table)}${selectWhereSql}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim}`;
+   const sql=`SELECT * FROM ${ident(table)}${selectWhereSql}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params);
    if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${selectWhereSql}`,params);result={data:rows,count:c.rows[0].n};}else result={data:rows};
  } else if(action==='insert'||action==='upsert'){
