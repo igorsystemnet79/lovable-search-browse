@@ -74,7 +74,7 @@ function PotvrdaEmail() {
           <button type="button" className="w-full rounded-full border border-input px-4 py-3 text-sm font-medium hover:bg-secondary disabled:opacity-50" disabled={sending} onClick={resend}>{sending ? "Šaljem..." : "Pošalji novi SMS kod"}</button>
         </form>
       )}
-      {done && <Link to="/prijava" className={btnCls + " mt-4"}>Nastavi na PonudiMi</Link>}
+      {done && <Link to="/" className={btnCls + " mt-4"}>Nastavi na PonudiMi</Link>}
       {!verificationToken && !busy && !done && <Link to="/registracija" className="mt-4 block text-sm font-semibold text-brand hover:underline">Vrati se na registraciju</Link>}
     </AuthShell>
   );
