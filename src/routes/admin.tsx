@@ -105,7 +105,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   }
 
   const q = filter.toLowerCase();
-  const lista = profili.filter((p) => !q || [p.ime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLowerCase().includes(q)));
+  const lista = profili.filter((p) => !q || [p.ime, p.prezime, p.email, p.naziv_firme, p.pib, p.telefon].some((v) => v?.toLowerCase().includes(q)));
 
   return (
     <div>
@@ -121,12 +121,19 @@ function Korisnici({ selfId }: { selfId: string }) {
             <div key={p.id} className="rounded-2xl bg-surface p-4 shadow-card">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="text-sm">
-                  <p className="font-semibold">{p.ime || "—"} <span className="font-normal text-muted-foreground">· {p.email}</span></p>
+                  <p className="font-semibold">{[p.ime, p.prezime].filter(Boolean).join(" ") || "—"} <span className="font-normal text-muted-foreground">· {p.email}</span></p>
                   <p className="text-muted-foreground">
                     {p.tip_lica === "pravno" ? `Pravno lice: ${p.naziv_firme ?? "—"}, PIB ${p.pib ?? "—"} ${p.firma_verifikovana ? "✔ verifikovano" : "✖ nije verifikovano"}` : "Fizičko lice"}
                     {" · "}{p.telefon ?? "bez telefona"}{" · "}{[p.grad, p.adresa].filter(Boolean).join(", ") || "bez adrese"}
                   </p>
-                  <p className="mt-1 text-xs">Uloge: {r.join(", ") || "nema"} {p.blokiran && <span className="font-semibold text-destructive">· BLOKIRAN</span>}</p>
+                  <p className="mt-1 flex flex-wrap gap-2 text-xs">
+                    <span className={p.email_confirmed_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.email_confirmed_at ? "E-mail potvrđen" : "E-mail nije potvrđen"}</span>
+                    <span className={p.telefon_verifikovan_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.telefon_verifikovan_at ? "Telefon potvrđen" : "Telefon nije potvrđen"}</span>
+                    {p.email_confirmed_at && p.telefon_verifikovan_at && <span className="font-bold text-green-700">VERIFIKOVAN KORISNIK</span>}
+                    {p.duplikat_sumnja && <span className="font-semibold text-amber-700">PROVERITI MOGUĆI DUPLIKAT</span>}
+                    {p.blokiran && <span className="font-semibold text-destructive">BLOKIRAN</span>}
+                    <span>Uloge: {r.join(", ") || "nema"}</span>
+                  </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
@@ -139,7 +146,7 @@ function Korisnici({ selfId }: { selfId: string }) {
               </div>
               {edit?.id === p.id && (
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {(["ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
+                  {(["ime", "prezime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
                     <input key={k} className={inputCls} placeholder={k} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null })} />
                   ))}
                   <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value })}>
@@ -147,7 +154,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <option value="pravno">Pravno lice</option>
                   </select>
                   <div className="flex gap-2">
-                    <button className={small} onClick={() => { const { id, ime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit; update(id, { ime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj</button>
+                    <button className={small} onClick={() => { const { id, ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit; update(id, { ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj</button>
                     <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                   </div>
                 </div>
