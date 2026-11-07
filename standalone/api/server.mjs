@@ -142,7 +142,6 @@ app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_U
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const {email,password,metadata={}}=req.body||{},e=String(email||'').trim().toLowerCase();
- if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return res.status(503).json({error:'Slanje potvrde e-maila nije podešeno. Administrator mora podesiti SMTP u Render Environment.'});
  const first=String(metadata.ime||'').trim(),last=String(metadata.prezime||'').trim(),city=String(metadata.grad||'').trim(),phone=normalizePhone(metadata.telefon);
  if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<8)return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera.'});
  if(first.length<2||first.length>60||last.length<2||last.length>60)return res.status(400).json({error:'Ime i prezime su obavezni.'});
@@ -153,8 +152,6 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
-  const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 AND telefon_verifikovan_at IS NOT NULL LIMIT 1',[phone]);
-  if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovaj broj telefona je već povezan sa nalogom. Prijavi se na postojeći nalog ili kontaktiraj podršku.'});}
   const created=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,NULL,$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,ime:first,prezime:last,telefon:phone,grad:city})]);
   const u=created.rows[0],pib=metadata.tip_lica==='pravno'&&validPib(metadata.pib)?String(metadata.pib).replace(/\s/g,''):null;
   const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
@@ -163,11 +160,11 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
-  await sendEmailVerification(u.id,e);
-  res.status(201).json({ok:true,pending_verification:true,message:'Nalog je kreiran. Potvrdi e-mail adresu preko linka koji smo poslali.',email:e});
+  const session={access_token:sign(u),token_type:'bearer',expires_in:604800,user:publicUser(u)};
+  res.status(201).json({ok:true,pending_verification:false,message:'Nalog je uspešno kreiran.',email:e,user:publicUser(u),session});
  }catch(err){
   try{await c.query('ROLLBACK');}catch{}
-  if(err.code==='23505')return res.status(409).json({error:'E-mail ili broj telefona je već povezan sa nalogom.'});
+  if(err.code==='23505')return res.status(409).json({error:'E-mail adresa je već povezana sa nalogom.'});
   throw err;
  }finally{c.release();}
 }));
@@ -220,21 +217,10 @@ app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
 app.post('/api/auth/login',asyncRoute(async(req,res)=>{
  const e=String(req.body?.email||'').trim().toLowerCase(),{rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]),u=rows[0];
  if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});
- const p=await pool.query('SELECT blokiran,telefon_verifikovan_at FROM profiles WHERE id=$1',[u.id]);
+ const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);
  if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});
- if(!u.email_confirmed_at){
-  if(process.env.SMTP_HOST&&process.env.SMTP_USER&&process.env.SMTP_PASS)await sendEmailVerification(u.id,u.email);
-  return res.status(403).json({error:'E-mail adresa nije potvrđena. Poslali smo novi link za potvrdu na tvoju adresu.'});
- }
- if(!p.rows[0]?.telefon_verifikovan_at){
-  const rawPhone=await pool.query('SELECT telefon,telefon_normalizovan FROM profiles WHERE id=$1',[u.id]);
-  const phone=rawPhone.rows[0]?.telefon_normalizovan||normalizePhone(rawPhone.rows[0]?.telefon);
-  if(!phone)return res.status(400).json({error:'Broj telefona nije u ispravnom formatu. Kontaktiraj podršku radi ispravke.'});
-  await pool.query('UPDATE profiles SET telefon_normalizovan=$1 WHERE id=$2',[phone,u.id]);
-  await twilioVerify(phone,null);
-  return res.json({verification_required:true,verification_token:signVerification(u.id),message:'Poslali smo SMS kod. Unesi ga da završiš verifikaciju.'});
- }
- const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});
+ const user=publicUser(u),token=sign(u);
+ res.json({user,session:{access_token:token,token_type:'bearer',expires_in:604800,user}});
 }));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
