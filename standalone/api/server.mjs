@@ -127,13 +127,37 @@ async function sendEmailVerification(userId,email){
 }
 async function twilioVerify(phone,code){
  const {TWILIO_ACCOUNT_SID:sid,TWILIO_AUTH_TOKEN:token,TWILIO_VERIFY_SERVICE_SID:service}=process.env;
- if(!sid||!token||!service) throw Object.assign(new Error('SMS verifikacija nije podešena. Administrator mora uneti Twilio Verify podatke.'),{status:503});
+ if(!sid||!token||!service) throw Object.assign(new Error('Twilio Verify nije podešen.'),{status:503});
  const endpoint='https://verify.twilio.com/v2/Services/'+encodeURIComponent(service)+(code?'/VerificationCheck':'/Verifications');
  const form=new URLSearchParams(code?{To:phone,Code:code}:{To:phone,Channel:'sms'});
  const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Basic '+Buffer.from(sid+':'+token).toString('base64'),'Content-Type':'application/x-www-form-urlencoded'},body:form});
  const data=await response.json().catch(()=>({}));
  if(!response.ok) throw Object.assign(new Error(data.message||'Twilio nije uspeo da obradi SMS verifikaciju.'),{status:response.status===429?429:502});
  return data;
+}
+async function smsAgentVerify(phone,code){
+ const token=process.env.SMSAGENT_API_TOKEN;
+ const service=process.env.SMSAGENT_AUTH_SERVICE_ID;
+ if(!token||!service) throw Object.assign(new Error('SMSAgent nije podešen. Administrator mora uneti SMSAGENT_API_TOKEN i SMSAGENT_AUTH_SERVICE_ID u Render Environment.'),{status:503});
+ const action=code?'verify':'send';
+ const endpoint='https://api.smsagent.rs/v1/sms/auth/'+encodeURIComponent(service)+'/'+action;
+ const body=code?{phone,code}:{phone,tag:'ponudimi-account-verification'};
+ const response=await fetch(endpoint,{method:'POST',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json'},body:JSON.stringify(body)});
+ const raw=await response.text();
+ let data={};
+ try{data=raw?JSON.parse(raw):{};}catch{}
+ if(!response.ok){
+  const message=typeof data.message==='string'?data.message:(typeof data.error==='string'?data.error:'SMSAgent nije uspeo da obradi verifikaciju.');
+  throw Object.assign(new Error(response.status===400&&code?'SMS kod nije ispravan ili je istekao.':message),{status:response.status===429?429:(response.status===400&&code?400:502)});
+ }
+ // SMSAgent returns HTTP 201 for a successful authorization-code verification.
+ return code?{status:'approved',provider_response:data}:{status:'pending',provider_response:data};
+}
+async function phoneVerification(phone,code){
+ const provider=String(process.env.SMS_PROVIDER||'twilio').trim().toLowerCase();
+ if(provider==='smsagent') return smsAgentVerify(phone,code);
+ if(provider==='twilio') return twilioVerify(phone,code);
+ throw Object.assign(new Error('SMS_PROVIDER mora biti smsagent ili twilio.'),{status:503});
 }
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
@@ -186,13 +210,13 @@ app.post('/api/auth/email/confirm',asyncRoute(async(req,res)=>{
   res.json({ok:true,verification_token:signVerification(userId),message:'E-mail je potvrđen. Sada potvrdi broj telefona.'});
  }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }));
-app.post('/api/auth/phone/start',asyncRoute(async(req,res)=>{
+app.post('/api/auth/phone/start',rateLimit({windowMs:10*60*1000,limit:3,standardHeaders:true,legacyHeaders:false,message:{error:'Previše pokušaja slanja SMS koda. Sačekaj 10 minuta pa pokušaj ponovo.'}}),asyncRoute(async(req,res)=>{
  let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET);}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
  if(decoded.purpose!=='account-verification')return res.status(401).json({error:'Nedozvoljena sesija za verifikaciju.'});
  const p=await pool.query('SELECT telefon,telefon_normalizovan,telefon_verifikovan_at FROM profiles WHERE id=$1',[decoded.sub]);
  if(!p.rows[0])return res.status(404).json({error:'Korisnički profil nije pronađen.'});
  if(p.rows[0].telefon_verifikovan_at)return res.json({ok:true,verified:true,message:'Broj telefona je već potvrđen.'});
- const result=await twilioVerify(p.rows[0].telefon_normalizovan||normalizePhone(p.rows[0].telefon),null);
+ const result=await phoneVerification(p.rows[0].telefon_normalizovan||normalizePhone(p.rows[0].telefon),null);
  await pool.query('UPDATE profiles SET verifikacija_zapoceta_at=now() WHERE id=$1',[decoded.sub]);
  res.json({ok:true,status:result.status||'pending',message:'SMS kod je poslat.'});
 }));
@@ -206,7 +230,7 @@ app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
   const p=await c.query('SELECT telefon_normalizovan,telefon_verifikovan_at FROM profiles WHERE id=$1 FOR UPDATE',[decoded.sub]);
   if(!p.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički profil nije pronađen.'});}
   if(p.rows[0].telefon_verifikovan_at){await c.query('COMMIT');return res.json({ok:true,verified:true});}
-  const check=await twilioVerify(p.rows[0].telefon_normalizovan,code);
+  const check=await phoneVerification(p.rows[0].telefon_normalizovan,code);
   if(check.status!=='approved'){await c.query('ROLLBACK');return res.status(400).json({error:'SMS kod nije ispravan ili je istekao.'});}
   const duplicate=await c.query('SELECT id FROM profiles WHERE telefon_normalizovan=$1 AND id<>$2 AND telefon_verifikovan_at IS NOT NULL',[p.rows[0].telefon_normalizovan,decoded.sub]);
   if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovaj broj telefona je već verifikovan na drugom nalogu.'});}
