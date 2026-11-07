@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
@@ -35,6 +35,7 @@ function porukaGreske(error: unknown) {
 }
 
 function Registracija() {
+  const navigate = useNavigate();
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
   const [f, setF] = useState({ ime: "", prezime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
@@ -91,9 +92,10 @@ function Registracija() {
 
   if (uspeh)
     return (
-      <AuthShell title="Proveri svoj e-mail" subtitle="Još jedan korak do verifikovanog PonudiMi naloga.">
-        <p className="text-sm">Poslali smo link za potvrdu na <strong>{f.email}</strong>. Otvori poruku i potvrdi adresu. Zatim ćeš dobiti SMS kod za potvrdu telefona. Oznaka „Verifikovan korisnik“ prikazuje se tek nakon obe provere.</p>
-        {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">Firma se automatski verifikuje ako je PIB pronađen u APR registru, a u suprotnom je proverava administrator.</p>}
+      <AuthShell title="Nalog je uspešno kreiran" subtitle="Dobro došao na PonudiMi!">
+        <p className="text-sm">Registracija je završena. Možeš odmah da nastaviš na platformu — potvrda e-mail adrese i telefona trenutno nije potrebna.</p>
+        {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">Podaci o firmi mogu biti dodatno provereni kroz APR.</p>}
+        <button type="button" onClick={() => navigate({ to: "/" })} className={btnCls + " mt-4"}>Nastavi na PonudiMi</button>
       </AuthShell>
     );
 
