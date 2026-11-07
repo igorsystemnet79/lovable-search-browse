@@ -135,7 +135,8 @@ const auth = {
     try {
       await ensureApiReady();
       const result = await api("/api/auth/register", { method: "POST", body: JSON.stringify({ email, password, metadata: options?.data || {} }) });
-      return { data: { user: result.user || null, session: null, pending_verification: !!result.pending_verification, email: result.email }, error: null };
+      if (result.session) { writeSession(result.session); emit("SIGNED_IN", result.session); }
+      return { data: { user: result.user || null, session: result.session || null, pending_verification: false, email: result.email }, error: null };
     } catch (error: any) { return { data: { user: null, session: null }, error }; }
   },
   async signInWithPassword({ email, password }: any) {
