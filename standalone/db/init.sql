@@ -9,6 +9,12 @@ CREATE TABLE IF NOT EXISTS users (
  password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS platform_maintenance (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), enabled boolean NOT NULL DEFAULT false,
+ message text NOT NULL DEFAULT 'Platforma PonudiMi je trenutno u fazi izrade ili unapređenja. Molimo vas za strpljenje. Uskoro se vraćamo!',
+ updated_by uuid REFERENCES users(id) ON DELETE SET NULL, updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO platform_maintenance(singleton,enabled) VALUES(true,false) ON CONFLICT(singleton) DO NOTHING;
 CREATE TABLE IF NOT EXISTS platform_rules (
  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), sadrzaj text NOT NULL, version integer NOT NULL DEFAULT 1,
  published_by uuid REFERENCES users(id) ON DELETE SET NULL, published_at timestamptz NOT NULL DEFAULT now()
