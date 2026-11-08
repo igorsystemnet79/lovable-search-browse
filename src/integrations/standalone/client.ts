@@ -236,3 +236,12 @@ export async function ucitajIstorijuPravilaPlatforme() {
 export async function vratiVerzijuPravilaPlatforme(id: string) {
   return api("/api/admin/platform-rules/restore", { method: "POST", body: JSON.stringify({ id }) });
 }
+
+
+export async function ucitajRezimOdrzavanja() {
+  return api("/api/maintenance-status");
+}
+
+export async function podesiRezimOdrzavanja(enabled: boolean, message?: string) {
+  return api("/api/admin/maintenance-mode", { method: "PUT", body: JSON.stringify({ enabled, message }) });
+}
