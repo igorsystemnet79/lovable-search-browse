@@ -23,6 +23,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }));
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
+app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -176,6 +177,38 @@ app.post('/api/admin/proposals/:id/decision',auth,admin,asyncRoute(async(req,res
  }catch(error){await c.query('ROLLBACK');if(['Oglas više ne postoji.','Oglas je u međuvremenu izmenjen. Predlog je potrebno ponovo proveriti.','Predlog sadrži nedozvoljena polja.'].includes(error.message))return res.status(409).json({error:error.message});throw error;}finally{c.release();}
 }));
 app.post('/api/podrska',asyncRoute(async(req,res)=>{const {ime,email,poruka}=req.body||{};if(!ime||!/^\S+@\S+\.\S+$/.test(email||'')||!poruka||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
+app.post('/api/reports',optionalAuth,asyncRoute(async(req,res)=>{
+ const {tabela,oglas_id,razlog}=req.body||{};
+ const allowedReasons=['sumnja_na_prevaru','netacni_podaci','neispravan_kontakt','neprimeren_sadrzaj','dupliran_oglas','ostalo'];
+ if(!['ponude','zahtevi'].includes(tabela)||! /^[0-9a-f-]{36}$/i.test(String(oglas_id||''))||!allowedReasons.includes(razlog))return res.status(400).json({error:'Proveri podatke prijave.'});
+ const detalji=String(req.body?.detalji||'').trim().slice(0,1000)||null;
+ const listing=await pool.query(`SELECT id,user_id FROM ${tabela} WHERE id=$1`,[oglas_id]);
+ if(!listing.rows[0])return res.status(404).json({error:'Oglas više ne postoji.'});
+ if(req.user?.sub&&listing.rows[0].user_id===req.user.sub)return res.status(400).json({error:'Ne možeš prijaviti sopstveni oglas.'});
+ try{
+  const saved=await pool.query('INSERT INTO prijave_oglasa(tabela,oglas_id,prijavio_id,razlog,detalji) VALUES($1,$2,$3,$4,$5) RETURNING id,created_at',[tabela,oglas_id,req.user?.sub||null,razlog,detalji]);
+  res.status(201).json({ok:true,...saved.rows[0]});
+ }catch(error){if(error.code==='23505')return res.status(409).json({error:'Već postoji tvoja prijava koja čeka pregled.'});throw error;}
+}));
+app.get('/api/admin/reports',auth,admin,asyncRoute(async(_req,res)=>{
+ const result=await pool.query(`SELECT r.*,CASE WHEN r.tabela='ponude' THEN p.naslov ELSE z.naslov END AS oglas_naslov,CASE WHEN r.tabela='ponude' THEN p.lokacija ELSE z.lokacija END AS oglas_lokacija,COALESCE(pu.email,zu.email) AS vlasnik_email,ru.email AS prijavio_email
+ FROM prijave_oglasa r
+ LEFT JOIN ponude p ON r.tabela='ponude' AND p.id=r.oglas_id
+ LEFT JOIN zahtevi z ON r.tabela='zahtevi' AND z.id=r.oglas_id
+ LEFT JOIN users pu ON pu.id=p.user_id
+ LEFT JOIN users zu ON zu.id=z.user_id
+ LEFT JOIN users ru ON ru.id=r.prijavio_id
+ ORDER BY CASE WHEN r.status='na_cekanju' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 500`);
+ res.json(result.rows);
+}));
+app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=>{
+ const status=req.body?.status;
+ if(!['pregledano','odbijeno'].includes(status))return res.status(400).json({error:'Izaberi ispravan status prijave.'});
+ const note=String(req.body?.napomena||'').trim().slice(0,1000)||null;
+ const result=await pool.query("UPDATE prijave_oglasa SET status=$1,admin_napomena=$2,odlucio_id=$3,odluceno_at=now() WHERE id=$4 AND status='na_cekanju' RETURNING *",[status,note,req.user.sub,req.params.id]);
+ if(!result.rows[0])return res.status(409).json({error:'Prijava ne postoji ili je već obrađena.'});
+ res.json(result.rows[0]);
+}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
 
