@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,19 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
+  const [categorySearch, setCategorySearch] = useState("");
+  const filteredCategories = useMemo(() => {
+    const term = categorySearch.trim().toLocaleLowerCase("sr-Latn");
+    if (!term) return kategorije;
+    return kategorije
+      .map((category) => ({
+        ...category,
+        podkategorije: category.podkategorije.filter((subcategory) =>
+          `${category.naziv} ${subcategory}`.toLocaleLowerCase("sr-Latn").includes(term),
+        ),
+      }))
+      .filter((category) => category.naziv.toLocaleLowerCase("sr-Latn").includes(term) || category.podkategorije.length > 0);
+  }, [categorySearch]);
 
   useEffect(() => {
     if (!kind) return;
@@ -136,18 +149,38 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
             <ListingImages value={photos} onChange={setPhotos} disabled={busy} />
-            <label className="space-y-1 text-sm font-medium sm:col-span-2">
-              Kategorija i potkategorija
-              <select className={inputCls} required {...field("kategorija")}>
-                <option value="">Izaberi kategoriju</option>
-                {kategorije.map((k) => (
-                  <optgroup key={k.slug} label={k.naziv}>
-                    <option value={k.naziv}>Ostalo u kategoriji {k.naziv}</option>
-                    {k.podkategorije.map((pod) => <option key={pod} value={`${k.naziv} / ${pod}`}>{pod}</option>)}
-                  </optgroup>
-                ))}
-              </select>
-            </label>
+            <div className="space-y-2 sm:col-span-2">
+              <label className="block space-y-1 text-sm font-medium">
+                Pretraži kategorije i potkategorije
+                <input
+                  className={inputCls}
+                  type="search"
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  placeholder="Npr. stanovi, iPhone, auto-delovi, majstorske usluge…"
+                  autoComplete="off"
+                  aria-label="Pretraga kategorija i potkategorija"
+                />
+              </label>
+              <label className="block space-y-1 text-sm font-medium">
+                Kategorija i potkategorija
+                <select className={inputCls} required {...field("kategorija")}>
+                  <option value="">Izaberi kategoriju ili potkategoriju</option>
+                  {filteredCategories.map((k) => (
+                    <optgroup key={k.slug} label={k.naziv}>
+                      {k.naziv.toLocaleLowerCase("sr-Latn").includes(categorySearch.trim().toLocaleLowerCase("sr-Latn")) && (
+                        <option value={k.naziv}>Ostalo u kategoriji {k.naziv}</option>
+                      )}
+                      {k.podkategorije.map((pod) => <option key={pod} value={`${k.naziv} / ${pod}`}>{pod}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              {categorySearch.trim() && filteredCategories.length === 0 && (
+                <p className="text-xs text-muted-foreground">Nema rezultata. Pokušaj sa drugim pojmom.</p>
+              )}
+              <p className="text-xs text-muted-foreground">Počni da kucaš naziv kategorije ili potkategorije da suziš izbor.</p>
+            </div>
             <label className="space-y-1 text-sm font-medium">Grad / mesto<input className={inputCls} required minLength={2} maxLength={100} {...field("lokacija")} /></label>
             <label className="space-y-1 text-sm font-medium">{offer ? "Prodavac / ponuđač" : "Ime osobe za kontakt"}<input className={inputCls} required minLength={2} maxLength={100} autoComplete="name" {...field("kontakt_ime")} /></label>
             <label className="space-y-1 text-sm font-medium">Telefon<input className={inputCls} type="tel" required minLength={6} maxLength={30} autoComplete="tel" {...field("telefon")} /></label>
