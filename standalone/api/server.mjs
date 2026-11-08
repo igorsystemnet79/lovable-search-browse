@@ -54,7 +54,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imat
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, skip: req => ['/me','/login','/register','/reset-request'].includes(req.path) || req.path.startsWith('/phone/'), standardHeaders: true, legacyHeaders: false }));
 // Stricter per-endpoint limits reduce credential stuffing and SMS/email abuse.
 app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše neuspešnih pokušaja prijave. Sačekaj 15 minuta pa pokušaj ponovo.' } }));
 app.use('/api/auth/register', rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše pokušaja registracije. Pokušaj ponovo kasnije.' } }));
