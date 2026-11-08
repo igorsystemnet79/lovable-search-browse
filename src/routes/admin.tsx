@@ -346,8 +346,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                   </div>
                 </div>
-              )}
-            </div>
+              )}            </div>
           );
         })}
         {lista.length === 0 && <p className="rounded-2xl bg-surface p-4 text-sm text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</p>}
@@ -366,13 +365,31 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, AdminImage[]>>({});
   const [imageBusy, setImageBusy] = useState(false);
+  const [filter, setFilter] = useState("");
   const polje = tabela === "ponude" ? "cena" : "budzet";
   const imageColumn = tabela === "ponude" ? "ponuda_id" : "zahtev_id";
   const load = useCallback(async () => {
-    const { data } = await ponudimi.from(tabela).select("*").includePausedListings().order("created_at", { ascending: false });
+    const { data, error } = await ponudimi.from(tabela).select("*").includePausedListings().order("created_at", { ascending: false });
+    if (error) {
+      setMsg("Učitavanje nije uspelo. Osvežite stranicu i pokušajte ponovo.");
+      return;
+    }
     setRows((data ?? []) as Oglas[]);
   }, [tabela]);
   useEffect(() => { load(); }, [load]);
+
+  const normalizujPretragu = (value: string) =>
+    value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
+  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\\s+/).filter(Boolean);
+  const filtriraniRows = rows.filter((o) => {
+    if (!pojmoviPretrage.length) return true;
+    const pretraziviTekst = normalizujPretragu(
+      [o.naslov, o.opis, o.kategorija, o.lokacija, o.kontakt_ime, o.telefon, o.user_id, o.id, o[polje], o.valuta]
+        .filter((value) => value !== null && value !== undefined)
+        .join(" ")
+    );
+    return pojmoviPretrage.every((pojam) => pretraziviTekst.includes(pojam));
+  });
 
   async function sacuvaj() {
     if (!edit) return;
@@ -425,8 +442,33 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
 
   return (
     <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">Ukupno: {rows.length} {msg && <span className="text-brand">· {msg}</span>}</p>
-      {rows.map((o) => (
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full sm:max-w-md">
+          <Input
+            className={inputCls + " w-full pr-10"}
+            placeholder={tabela === "ponude" ? "Pretraži ponude: naslov, opis, kategorija, lokacija..." : "Pretraži zahteve: naslov, opis, kategorija, lokacija..."}
+            value={filter}
+            onChange={(event) => setFilter(event.target.value)}
+            aria-label={tabela === "ponude" ? "Pretraga ponuda" : "Pretraga zahteva"}
+          />
+          {filter && (
+            <button
+              type="button"
+              onClick={() => setFilter("")}
+              aria-label="Obriši pretragu"
+              title="Obriši pretragu"
+              className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full text-lg text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              ×
+            </button>
+          )}
+        </div>
+        <p className="text-sm text-muted-foreground">
+          Prikazano: {filtriraniRows.length} / {rows.length}
+          {msg && <span className="text-brand"> · {msg}</span>}
+        </p>
+      </div>
+      {filtriraniRows.map((o) => (
         <div key={o.id} className="rounded-2xl bg-surface p-4 shadow-card">
           {edit?.id === o.id ? (
             <div className="grid gap-2 sm:grid-cols-2">
@@ -435,7 +477,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
               <Input className={inputCls} placeholder="Kontakt" value={edit.kontakt_ime ?? ""} onChange={(e) => setEdit({ ...edit, kontakt_ime: e.target.value })} />
               <Input className={inputCls} placeholder="Telefon" value={edit.telefon ?? ""} onChange={(e) => setEdit({ ...edit, telefon: e.target.value })} />
               <Input className={inputCls} type="number" min={0} placeholder={tabela === "ponude" ? "Cena" : "Budžet"} value={edit[polje] ?? ""} onChange={(e) => setEdit({ ...edit, [polje]: e.target.value === "" ? null : Number(e.target.value) })} />
-              <textarea className={`${inputCls} sm:col-span-2`} rows={3} value={edit.opis ?? ""} onChange={(e) => setEdit({ ...edit, opis: e.target.value })} />
+              <textarea className={inputCls + " sm:col-span-2"} rows={3} value={edit.opis ?? ""} onChange={(e) => setEdit({ ...edit, opis: e.target.value })} />
               <div className="flex gap-2"><button className={small} onClick={sacuvaj}>Sačuvaj</button><button className={small} onClick={() => setEdit(null)}>Otkaži</button></div>
             </div>
           ) : (
@@ -457,7 +499,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
                   {(images[o.id] ?? []).map((image) => (
                     <div key={image.id} className="w-28">
                       <img src={image.external_url || ponudimi.storage.from("listing-images").getPublicUrl((image.storage_path || "").replace("/uploads/", "")).data.publicUrl} alt="Fotografija oglasa" className="h-24 w-28 rounded-lg border border-input object-cover" />
-                      <button className={`${danger} mt-2 w-full`} disabled={imageBusy} onClick={() => removeImage(o, image)}>Obriši sliku</button>
+                      <button className={danger + " mt-2 w-full"} disabled={imageBusy} onClick={() => removeImage(o, image)}>Obriši sliku</button>
                     </div>
                   ))}
                   {(images[o.id]?.length ?? 0) === 0 && <p className="text-sm text-muted-foreground">Oglas trenutno nema fotografija.</p>}
@@ -472,6 +514,11 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
           </div>
         </div>
       ))}
+      {filtriraniRows.length === 0 && (
+        <p className="rounded-2xl bg-surface p-5 text-sm text-muted-foreground">
+          {rows.length === 0 ? "Nema objavljenih stavki." : "Nema rezultata za uneti pojam. Pokušajte sa drugim izrazom."}
+        </p>
+      )}
     </div>
   );
 }
