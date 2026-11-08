@@ -190,7 +190,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
                       <Button key={category.slug} type="button" variant={selectedCategory === category.naziv ? "default" : "outline"} className="h-auto min-h-11 justify-start whitespace-normal text-left" onClick={() => {
                         setSelectedCategory(category.naziv);
                         setSelectedSubcategory("");
-                        setForm((old) => ({ ...old, kategorija: "" }));
+                        setForm((old) => ({ ...old, kategorija: category.naziv }));
                         setCategoryPickerOpen(false);
                         setPickerSearch("");
                       }}>{category.naziv}</Button>
