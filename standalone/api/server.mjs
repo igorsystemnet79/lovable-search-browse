@@ -176,8 +176,61 @@ app.put('/api/admin/maintenance',auth,admin,asyncRoute(async(req,res)=>{
  const result=await pool.query("INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message,updated_at,updated_by) VALUES(1,$1,$2,now(),$3) ON CONFLICT(id) DO UPDATE SET maintenance_enabled=EXCLUDED.maintenance_enabled,maintenance_message=EXCLUDED.maintenance_message,updated_at=now(),updated_by=EXCLUDED.updated_by RETURNING maintenance_enabled,maintenance_message,updated_at",[enabled,message,req.user.sub]);
  res.json({ok:true,...result.rows[0]});
 }));
+/* Backward-compatible endpoints used by the currently published PonudiMi frontend. */
+app.get('/api/maintenance-status',asyncRoute(async(req,res)=>{
+ const result=await pool.query("SELECT maintenance_enabled,message,updated_at FROM platform_settings WHERE id=1");
+ let isAdmin=false;
+ const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);isAdmin=!!role.rowCount;}catch{}}
+ const row=result.rows[0]||{};
+ res.setHeader('Cache-Control','no-store');
+ res.json({enabled:!!row.maintenance_enabled,message:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.',updated_at:row.updated_at||null,isAdmin});
+}));
+app.put('/api/admin/maintenance-mode',auth,admin,asyncRoute(async(req,res)=>{
+ const enabled=req.body?.enabled;
+ if(typeof enabled!=='boolean')return res.status(400).json({error:'Status održavanja nije ispravan.'});
+ const message=String(req.body?.message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.').trim().slice(0,300);
+ const result=await pool.query("INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message,updated_at,updated_by) VALUES(1,$1,$2,now(),$3) ON CONFLICT(id) DO UPDATE SET maintenance_enabled=EXCLUDED.maintenance_enabled,maintenance_message=EXCLUDED.maintenance_message,updated_at=now(),updated_by=EXCLUDED.updated_by RETURNING maintenance_enabled,maintenance_message,updated_at",[enabled,message,req.user.sub]);
+ res.json({ok:true,enabled:result.rows[0].maintenance_enabled,message:result.rows[0].maintenance_message,updated_at:result.rows[0].updated_at});
+}));
+app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{
+ const result=await pool.query("SELECT id,sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");
+ res.setHeader('Cache-Control','no-store');res.json({data:result.rows[0]||null});
+}));
+app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{
+ const result=await pool.query('SELECT id,sadrzaj,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');
+ res.json({data:result.rows});
+}));
+app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{
+ const sadrzaj=String(req.body?.sadrzaj||'').trim();
+ if(sadrzaj.length<30||sadrzaj.length>50000)return res.status(400).json({error:'Tekst pravila mora imati između 30 i 50.000 karaktera.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const current=await client.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');
+  const version=current.rows[0].version+1;
+  const inserted=await client.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[sadrzaj,version,req.user.sub]);
+  await client.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[sadrzaj,version,req.user.sub]);
+  await client.query('COMMIT');res.json({data:inserted.rows[0]});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.post('/api/admin/platform-rules/restore',auth,admin,asyncRoute(async(req,res)=>{
+ const id=String(req.body?.id||'');
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const found=await client.query('SELECT sadrzaj FROM platform_rules_versions WHERE id=$1',[id]);
+  if(!found.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Verzija nije pronađena.'});}
+  const current=await client.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');
+  const version=current.rows[0].version+1;
+  const inserted=await client.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[found.rows[0].sadrzaj,version,req.user.sub]);
+  await client.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[found.rows[0].sadrzaj,version,req.user.sub]);
+  await client.query('COMMIT');res.json({data:inserted.rows[0]});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+
 app.use(asyncRoute(async(req,res,next)=>{
- if(req.path==='/api/platform/status'||req.path==='/api/health'||req.path==='/'||req.path==='/sitemap.xml'||req.path==='/robots.txt'||req.path.startsWith('/api/admin/')||req.path.startsWith('/api/auth/')||req.path.startsWith('/api/storage/public')||req.path.startsWith('/uploads/'))return next();
+ if(req.path==='/api/platform/status'||req.path==='/api/maintenance-status'||req.path==='/api/platform-rules'||req.path==='/api/health'||req.path==='/'||req.path==='/sitemap.xml'||req.path==='/robots.txt'||req.path.startsWith('/api/admin/')||req.path.startsWith('/api/auth/')||req.path.startsWith('/api/storage/public')||req.path.startsWith('/uploads/'))return next();
  const setting=await pool.query('SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1');
  const row=setting.rows[0];if(!row?.maintenance_enabled)return next();
  const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
