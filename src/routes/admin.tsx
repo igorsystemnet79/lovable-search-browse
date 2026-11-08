@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
 import { Input } from "@/components/ui/input";
 import type { Tables } from "@/integrations/standalone/types";
+import { obradiPrijavu, ucitajPrijaveOglasa, type PrijavaOglasa } from "@/lib/reports";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -53,6 +54,7 @@ function AdminPage() {
             {tab === "Korisnici" && <Korisnici selfId={user.id} />}
             {tab === "Ponude" && <Oglasi tabela="ponude" />}
             {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
+            {tab === "Prijave" && <Prijave />}
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
             {tab === "APR firme" && <Apr />}
@@ -74,6 +76,90 @@ function AdminPage() {
   );
 }
 
+
+function Prijave() {
+  const [rows, setRows] = useState<PrijavaOglasa[]>([]);
+  const [filter, setFilter] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [msg, setMsg] = useState("");
+
+  const load = useCallback(async () => {
+    try {
+      setRows(await ucitajPrijaveOglasa());
+      setMsg("");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Prijave nije moguće učitati.");
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  async function decide(item: PrijavaOglasa, status: "pregledano" | "odbijeno") {
+    const napomena = prompt(status === "pregledano" ? "Napomena administratora (opciono):" : "Razlog odbijanja (opciono):");
+    if (napomena === null) return;
+    setBusy(item.id);
+    setMsg("");
+    try {
+      await obradiPrijavu(item.id, status, napomena);
+      setMsg(status === "pregledano" ? "Prijava je označena kao pregledana." : "Prijava je odbijena.");
+      await load();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Obrada prijave nije uspela.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  const reasonLabels: Record<string, string> = {
+    sumnja_na_prevaru: "Sumnja na prevaru",
+    netacni_podaci: "Netačni podaci",
+    neispravan_kontakt: "Neispravan kontakt",
+    neprimeren_sadrzaj: "Neprimeren sadržaj",
+    dupliran_oglas: "Dupliran oglas",
+    ostalo: "Ostalo",
+  };
+  const normalized = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").toLocaleLowerCase("sr");
+  const terms = normalized(filter).trim().split(/\\s+/).filter(Boolean);
+  const visible = rows.filter((item) => {
+    const searchable = normalized([
+      item.oglas_naslov, item.oglas_lokacija, item.vlasnik_email, item.prijavio_email,
+      item.razlog, item.detalji, item.status, item.oglas_id,
+    ].filter(Boolean).join(" "));
+    return terms.every((term) => searchable.includes(term));
+  });
+  const pending = rows.filter((item) => item.status === "na_cekanju").length;
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <div><h2 className="font-semibold">Prijave oglasa</h2><p className="text-sm text-muted-foreground">Na čekanju: {pending} · Ukupno: {rows.length}</p></div>
+        <Input className={inputCls + " min-w-0 w-full sm:max-w-sm"} value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Pretraži naslov, lokaciju, korisnika..." />
+        <button type="button" className={small} onClick={load}>Osveži</button>
+      </div>
+      {msg && <p role="status" className="text-sm text-brand">{msg}</p>}
+      {visible.map((item) => (
+        <article key={item.id} className="rounded-2xl bg-surface p-4 shadow-card">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="font-semibold">{item.oglas_naslov || "Oglas više nije dostupan"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.tabela === "ponude" ? "Ponuda" : "Zahtev"} · {item.oglas_lokacija || "Lokacija nije dostupna"} · {new Date(item.created_at).toLocaleString("sr-RS")}</p>
+            </div>
+            <span className={item.status === "na_cekanju" ? "rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-secondary px-3 py-1 text-xs font-semibold"}>{item.status === "na_cekanju" ? "Čeka pregled" : item.status === "pregledano" ? "Pregledano" : "Odbijeno"}</span>
+          </div>
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+            <p><span className="text-muted-foreground">Razlog: </span><b>{reasonLabels[item.razlog] || item.razlog}</b></p>
+            <p><span className="text-muted-foreground">Vlasnik oglasa: </span>{item.vlasnik_email || "Nedostupan podatak"}</p>
+            <p><span className="text-muted-foreground">Prijavio: </span>{item.prijavio_email || (item.prijavio_id ? "Registrovani korisnik" : "Anonimna prijava")}</p>
+            <p className="break-all text-xs text-muted-foreground">ID oglasa: {item.oglas_id}</p>
+          </div>
+          {item.detalji && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-input p-3 text-sm">{item.detalji}</p>}
+          {item.admin_napomena && <p className="mt-2 text-sm text-muted-foreground">Napomena administratora: {item.admin_napomena}</p>}
+          {item.status === "na_cekanju" && <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={small} disabled={busy === item.id} onClick={() => decide(item, "pregledano")}>Označi kao pregledano</button><button type="button" className={danger} disabled={busy === item.id} onClick={() => decide(item, "odbijeno")}>Odbij prijavu</button></div>}
+        </article>
+      ))}
+      {!visible.length && <p className="rounded-2xl bg-surface p-5 text-sm text-muted-foreground">{rows.length ? "Nema prijava koje odgovaraju pretrazi." : "Još nema prijava oglasa."}</p>}
+    </section>
+  );
+}
 
 function AdminChatGPT() {
   type Message = { role: "user" | "assistant"; content: string };
