@@ -188,7 +188,7 @@ const verifyTotp = (secret,code) => {
 const adminTwoFactorLimit=rateLimit({windowMs:15*60*1000,limit:8,standardHeaders:true,legacyHeaders:false,message:{error:'Previše pokušaja potvrde. Pokušaj ponovo za 15 minuta.'}});
 app.get('/api/admin/2fa/status',auth,adminIdentity,asyncRoute(async(req,res)=>{
  const r=await pool.query('SELECT enabled,pending_expires_at FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
- res.set('Cache-Control','no-store').json({enabled:!!r.rows[0]?.enabled,pending:!!r.rows[0]?.pending_expires_at&&new Date(r.rows[0].pending_expires_at)>new Date()});
+ res.set('Cache-Control','no-store').json({enabled:!!r.rows[0]?.enabled,pending:!!r.rows[0]?.pending_expires_at&&new Date(r.rows[0].pending_expires_at)>new Date(),elevated:req.user.admin2fa===true&&!!req.user.admin2faAt&&Date.now()-Number(req.user.admin2faAt)<=15*60*1000});
 }));
 app.post('/api/admin/2fa/setup',auth,adminIdentity,adminTwoFactorLimit,asyncRoute(async(req,res)=>{
  const password=String(req.body?.password||'');
