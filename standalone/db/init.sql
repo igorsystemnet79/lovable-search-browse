@@ -325,3 +325,17 @@ CREATE TABLE IF NOT EXISTS platform_settings (
  updated_by uuid REFERENCES users(id) ON DELETE SET NULL
 );
 INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message) VALUES(1,false,'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.') ON CONFLICT(id) DO NOTHING;
+
+
+-- Encrypted TOTP credentials and one-time recovery hashes for administrator access.
+CREATE TABLE IF NOT EXISTS admin_2fa (
+ user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ secret_ciphertext text,
+ pending_secret_ciphertext text,
+ pending_expires_at timestamptz,
+ recovery_code_hashes text[] NOT NULL DEFAULT '{}',
+ enabled boolean NOT NULL DEFAULT false,
+ enabled_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
