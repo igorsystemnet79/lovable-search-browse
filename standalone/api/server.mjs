@@ -174,17 +174,17 @@ const totpAt = (secret,step=Math.floor(Date.now()/30000)) => {
  const binary=((digest[offset]&127)<<24)|(digest[offset+1]<<16)|(digest[offset+2]<<8)|digest[offset+3];
  return String(binary%1000000).padStart(6,'0');
 };
-const verifyTotp = (secret,code) => {
+const matchingTotpStep = (secret,code) => {
  const candidate=String(code||'').replace(/\s/g,'');
- if(!/^\d{6}$/.test(candidate))return false;
+ if(!/^\d{6}$/.test(candidate))return null;
  const now=Math.floor(Date.now()/30000);
  for(let delta=-1;delta<=1;delta++){
-  const expected=Buffer.from(totpAt(secret,now+delta));
-  const actual=Buffer.from(candidate);
-  if(expected.length===actual.length&&timingSafeEqual(expected,actual))return true;
+  const step=now+delta,expected=Buffer.from(totpAt(secret,step)),actual=Buffer.from(candidate);
+  if(expected.length===actual.length&&timingSafeEqual(expected,actual))return step;
  }
- return false;
+ return null;
 };
+const verifyTotp = (secret,code) => matchingTotpStep(secret,code)!==null;
 const adminTwoFactorLimit=rateLimit({windowMs:15*60*1000,limit:8,standardHeaders:true,legacyHeaders:false,message:{error:'Previše pokušaja potvrde. Pokušaj ponovo za 15 minuta.'}});
 app.get('/api/admin/2fa/status',auth,adminIdentity,asyncRoute(async(req,res)=>{
  const r=await pool.query('SELECT enabled,pending_expires_at FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
@@ -214,10 +214,11 @@ app.post('/api/admin/2fa/verify-setup',auth,adminIdentity,adminTwoFactorLimit,as
  const found=await pool.query('SELECT pending_secret_ciphertext,pending_expires_at,enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
  if(!found.rows[0]?.pending_secret_ciphertext||found.rows[0].enabled||!found.rows[0].pending_expires_at||new Date(found.rows[0].pending_expires_at)<=new Date())return res.status(400).json({error:'QR kod je istekao. Pokreni podešavanje ponovo.'});
  const secret=decryptAdminSecret(found.rows[0].pending_secret_ciphertext);
- if(!verifyTotp(secret,code))return res.status(400).json({error:'Kod nije ispravan. Proveri vreme na telefonu i pokušaj ponovo.'});
+ const setupStep=matchingTotpStep(secret,code);
+ if(setupStep===null)return res.status(400).json({error:'Kod nije ispravan. Proveri vreme na telefonu i pokušaj ponovo.'});
  const recovery=Array.from({length:10},()=>randomBytes(8).toString('hex').toUpperCase().match(/.{1,4}/g).join('-'));
  const hashes=recovery.map(value=>createHash('sha256').update(value).digest('hex'));
- await pool.query(`UPDATE admin_2fa SET secret_ciphertext=$2,pending_secret_ciphertext=NULL,pending_expires_at=NULL,recovery_code_hashes=$3,enabled=true,enabled_at=now(),updated_at=now() WHERE user_id=$1`,[req.user.sub,encryptAdminSecret(secret),hashes]);
+ await pool.query(`UPDATE admin_2fa SET secret_ciphertext=$2,pending_secret_ciphertext=NULL,pending_expires_at=NULL,recovery_code_hashes=$3,last_totp_step=$4,enabled=true,enabled_at=now(),updated_at=now() WHERE user_id=$1`,[req.user.sub,encryptAdminSecret(secret),hashes,setupStep]);
  res.set('Cache-Control','no-store').json({ok:true,recovery_codes:recovery,message:'Authenticator je aktiviran. Sačuvaj rezervne kodove — prikazuju se samo jednom.'});
 }));
 app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res)=>{
@@ -232,7 +233,13 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
  if(!(await bcrypt.compare(password,state.rows[0].admin_password_hash)))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
  let verified=false,usedRecovery=false;
  const secret=decryptAdminSecret(state.rows[0].secret_ciphertext);
- if(/^\d{6}$/.test(code))verified=verifyTotp(secret,code);
+ if(/^\d{6}$/.test(code)){
+  const matchedStep=matchingTotpStep(secret,code);
+  if(matchedStep!==null){
+   const consumed=await pool.query('UPDATE admin_2fa SET last_totp_step=$2,updated_at=now() WHERE user_id=$1 AND COALESCE(last_totp_step,-1)<$2 RETURNING user_id',[user.id,matchedStep]);
+   verified=consumed.rowCount>0;
+  }
+ }
  if(!verified&&code){
   const hash=createHash('sha256').update(code.toUpperCase()).digest('hex');
   const client=await pool.connect();
