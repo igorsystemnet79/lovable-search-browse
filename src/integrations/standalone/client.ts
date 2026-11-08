@@ -111,7 +111,7 @@ const storage = {
 
 const adminSecurity = {
   status() { return api("/api/admin/2fa/status"); },
-  setup(password: string) { return api("/api/admin/2fa/setup", { method: "POST", body: JSON.stringify({ password }) }); },
+  setup(currentPassword: string, adminPassword: string, confirmAdminPassword: string) { return api("/api/admin/2fa/setup", { method: "POST", body: JSON.stringify({ password: currentPassword, admin_password: adminPassword, confirm_admin_password: confirmAdminPassword }) }); },
   verifySetup(code: string) { return api("/api/admin/2fa/verify-setup", { method: "POST", body: JSON.stringify({ code }) }); },
   challenge(email: string, password: string, code: string) { return api("/api/admin/2fa/challenge", { method: "POST", body: JSON.stringify({ email, password, code }) }); },
 };
