@@ -17,6 +17,7 @@ export type ProfileRow = {
   blokiran: boolean;
   email: string | null;
   created_at: string;
+  last_active_at: string | null;
 };
 
 export type SupportMessageRow = {
