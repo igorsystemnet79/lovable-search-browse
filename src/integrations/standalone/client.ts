@@ -219,3 +219,20 @@ export const ponudimi: any = {
   from: (table: string) => new QueryBuilder(table),
   async rpc(fn: string, args: AnyRecord = {}) { try { const result = await api("/api/db/rpc", { method: "POST", body: JSON.stringify({ fn, args }) }); return { data: result.data, error: null }; } catch (error: any) { return { data: null, error }; } },
 };
+
+
+export async function ucitajPravilaPlatforme() {
+  return api("/api/platform-rules");
+}
+
+export async function sacuvajPravilaPlatforme(sadrzaj: string) {
+  return api("/api/admin/platform-rules", { method: "PUT", body: JSON.stringify({ sadrzaj }) });
+}
+
+export async function ucitajIstorijuPravilaPlatforme() {
+  return api("/api/admin/platform-rules/history");
+}
+
+export async function vratiVerzijuPravilaPlatforme(id: string) {
+  return api("/api/admin/platform-rules/restore", { method: "POST", body: JSON.stringify({ id }) });
+}
