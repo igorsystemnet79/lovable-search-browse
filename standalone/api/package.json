@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node server.mjs"
+    "start": "node server.mjs",
+    "audit:prod": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
     "bcryptjs": "^3.0.2",
@@ -12,10 +13,14 @@
     "express-rate-limit": "^8.1.0",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "multer": "^2.0.2",
+    "multer": "2.5.0",
     "sharp": "^0.34.3",
     "pg": "^8.16.3",
     "nodemailer": "^7.0.5",
     "@aws-sdk/client-s3": "^3.883.0"
+  },
+  "overrides": {
+    "body-parser": "2.4.0",
+    "multer": "2.5.0"
   }
 }
