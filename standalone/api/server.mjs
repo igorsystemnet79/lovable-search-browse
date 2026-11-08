@@ -315,7 +315,7 @@ app.get('/api/platform/status',asyncRoute(async(req,res)=>{
  res.setHeader('Cache-Control','no-store');
  res.json({maintenance:!!row.maintenance_enabled,message:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.',isAdmin});
 }));
-app.put('/api/admin/maintenance',auth,admin,asyncRoute(async(req,res)=>{
+app.put('/api/admin/maintenance',auth,adminIdentity,asyncRoute(async(req,res)=>{
  const enabled=req.body?.enabled;
  if(typeof enabled!=='boolean')return res.status(400).json({error:'Status održavanja nije ispravan.'});
  const message=String(req.body?.message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.').trim().slice(0,300);
@@ -332,7 +332,7 @@ app.get('/api/maintenance-status',asyncRoute(async(req,res)=>{
  res.setHeader('Cache-Control','no-store');
  res.json({enabled:!!row.maintenance_enabled,message:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.',updated_at:row.updated_at||null,isAdmin});
 }));
-app.put('/api/admin/maintenance-mode',auth,admin,asyncRoute(async(req,res)=>{
+app.put('/api/admin/maintenance-mode',auth,adminIdentity,asyncRoute(async(req,res)=>{
  const enabled=req.body?.enabled;
  if(typeof enabled!=='boolean')return res.status(400).json({error:'Status održavanja nije ispravan.'});
  const message=String(req.body?.message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.').trim().slice(0,300);
