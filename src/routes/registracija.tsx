@@ -41,6 +41,7 @@ function Registracija() {
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [prikaziLozinku, setPrikaziLozinku] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function onSubmit(e: React.FormEvent) {
@@ -119,7 +120,27 @@ function Registracija() {
         <input className={inputCls} required maxLength={60} autoComplete="address-level2" placeholder="Mesto stanovanja" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} maxLength={150} autoComplete="street-address" placeholder={tip === "pravno" ? "Adresa sedišta (opciono)" : "Adresa (opciono)"} value={f.adresa} onChange={set("adresa")} />
         <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={f.email} onChange={set("email")} />
-        <input className={inputCls} type="password" required minLength={8} autoComplete="new-password" placeholder="Lozinka (min. 8 karaktera)" value={f.lozinka} onChange={set("lozinka")} />
+        <div className="relative">
+          <input
+            className={inputCls + " pr-14"}
+            type={prikaziLozinku ? "text" : "password"}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            placeholder="Lozinka (min. 8 karaktera)"
+            value={f.lozinka}
+            onChange={set("lozinka")}
+          />
+          <button
+            type="button"
+            onClick={() => setPrikaziLozinku((trenutno) => !trenutno)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 min-h-10 rounded-full px-3 text-sm font-semibold text-brand hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={prikaziLozinku ? "Sakrij lozinku" : "Prikaži lozinku"}
+            aria-pressed={prikaziLozinku}
+          >
+            {prikaziLozinku ? "Sakrij" : "Prikaži"}
+          </button>
+        </div>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
       </form>
