@@ -117,8 +117,8 @@ function Prijave() {
     dupliran_oglas: "Dupliran oglas",
     ostalo: "Ostalo",
   };
-  const normalized = (value: string) => value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").toLocaleLowerCase("sr");
-  const terms = normalized(filter).trim().split(/\\s+/).filter(Boolean);
+  const normalized = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").toLocaleLowerCase("sr");
+  const terms = normalized(filter).trim().split(/\s+/).filter(Boolean);
   const visible = rows.filter((item) => {
     const searchable = normalized([
       item.oglas_naslov, item.oglas_lokacija, item.vlasnik_email, item.prijavio_email,
