@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme"] as const;
+const tabs = ["Statistika", "Korisnici", "Ponude", "Zahtevi", "Prijave oglasa", "Poruke", "APR firme"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -46,10 +46,10 @@ function AdminPage() {
             <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t}</button>
           ))}
         </div>
-        {tab === "Korisnici" && <Korisnici selfId={user.id} />}
+        {tab === "Statistika" && <Statistika />}\n        {tab === "Korisnici" && <Korisnici selfId={user.id} />}
         {tab === "Ponude" && <Oglasi tabela="ponude" />}
         {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
-        {tab === "Poruke" && <Poruke />}
+        {tab === "Prijave oglasa" && <Izvestaji />}\n        {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
       </>
     );
@@ -64,6 +64,64 @@ function AdminPage() {
       <SiteFooter />
     </div>
   );
+}
+
+
+function Statistika() {
+  const [data, setData] = useState<any>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const load = useCallback(async () => {
+    setLoading(true); setError("");
+    try { setData(await adminStatistika()); }
+    catch (e) { setError(e instanceof Error ? e.message : "Statistika trenutno nije dostupna."); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  const cards = data ? [
+    { title: "Registrovani korisnici", total: data.korisnici.total, sub: `Fizička: ${data.korisnici.fizicka} · Pravna: ${data.korisnici.pravna}`, recent: `+${data.korisnici.novih_7d} za 7 dana · +${data.korisnici.novih_30d} za 30 dana` },
+    { title: "Ponude", total: data.ponude.total, sub: `Aktivne: ${data.ponude.aktivne}`, recent: `+${data.ponude.novih_7d} za 7 dana · +${data.ponude.novih_30d} za 30 dana` },
+    { title: "Zahtevi", total: data.zahtevi.total, sub: `Aktivni: ${data.zahtevi.aktivni}`, recent: `+${data.zahtevi.novi_7d} za 7 dana · +${data.zahtevi.novi_30d} za 30 dana` },
+  ] : [];
+  return <section>
+    <div className="mb-4 flex items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Pregled aktivnosti i rasta platforme.</p><button className={small} onClick={load} disabled={loading}>Osveži</button></div>
+    {loading && <p className="text-sm text-muted-foreground">Učitavanje statistike...</p>}
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    {data && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">{cards.map(card => <article key={card.title} className="rounded-2xl border border-border bg-surface p-5 shadow-card"><p className="text-sm text-muted-foreground">{card.title}</p><p className="mt-2 text-3xl font-bold tabular-nums">{card.total}</p><p className="mt-2 text-sm">{card.sub}</p><p className="mt-1 text-xs text-muted-foreground">{card.recent}</p></article>)}</div>}
+    {data?.azurirano_at && <p className="mt-4 text-xs text-muted-foreground">Ažurirano: {new Date(data.azurirano_at).toLocaleString("sr-RS")}</p>}
+  </section>;
+}
+
+function Izvestaji() {
+  const [rows, setRows] = useState<any[]>([]);
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState("");
+  const [notes, setNotes] = useState<Record<string,string>>({});
+  const load = useCallback(async () => {
+    try { setRows(await adminPrijaveOglasa()); setMessage(""); }
+    catch (e) { setMessage(e instanceof Error ? e.message : "Prijave trenutno nisu dostupne."); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function decide(id: string, status: "pregledano" | "odbijeno") {
+    setBusy(id); setMessage("");
+    try { await odluciPrijavuOglasa(id, status, notes[id] || ""); setMessage("Odluka je sačuvana."); await load(); }
+    catch (e) { setMessage(e instanceof Error ? e.message : "Odluka nije sačuvana."); }
+    finally { setBusy(""); }
+  }
+  const reasons: Record<string,string> = { sumnja_na_prevaru:"Sumnja na prevaru", netacni_podaci:"Netačni podaci", neispravan_kontakt:"Neispravan kontakt", neprimeren_sadrzaj:"Neprimeren sadržaj", dupliran_oglas:"Dupliran oglas", ostalo:"Ostalo" };
+  return <section className="space-y-3">
+    <div className="flex flex-wrap items-center justify-between gap-3"><p className="text-sm text-muted-foreground">Ukupno prijava: {rows.length} · Na čekanju: {rows.filter(r=>r.status==="na_cekanju").length}</p><button className={small} onClick={load}>Osveži</button></div>
+    {message && <p role="status" className="text-sm text-brand">{message}</p>}
+    {rows.length===0 && <p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Trenutno nema prijava oglasa.</p>}
+    {rows.map(r => <article key={r.id} className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+      <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold">{r.oglas_naslov || "Oglas je obrisan"}</p><p className="mt-1 text-xs text-muted-foreground">{r.tabela==="ponude"?"Ponuda":"Zahtev"} · {r.oglas_lokacija || "—"} · {new Date(r.created_at).toLocaleString("sr-RS")}</p></div><span className={r.status==="na_cekanju"?"rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900":"rounded-full bg-secondary px-3 py-1 text-xs font-semibold"}>{r.status==="na_cekanju"?"Na čekanju":r.status==="pregledano"?"Pregledano":"Odbijeno"}</span></div>
+      <p className="mt-3 text-sm"><strong>Razlog:</strong> {reasons[r.razlog] || r.razlog}</p>
+      {r.detalji && <p className="mt-1 whitespace-pre-wrap text-sm">{r.detalji}</p>}
+      <p className="mt-2 text-xs text-muted-foreground">Prijavio: {r.prijavio_email || "Gost"} · Vlasnik: {r.vlasnik_email || "—"}</p>
+      {r.status==="na_cekanju" && <div className="mt-3 space-y-2"><textarea className={inputCls+" w-full"} rows={2} maxLength={1000} placeholder="Napomena administratora (opciono)" value={notes[r.id] || ""} onChange={e=>setNotes(prev=>({...prev,[r.id]:e.target.value}))}/><div className="flex flex-wrap gap-2"><button className={small} disabled={!!busy} onClick={()=>decide(r.id,"pregledano")}>{busy===r.id?"Čuvanje...":"Označi kao pregledano"}</button><button className={danger} disabled={!!busy} onClick={()=>decide(r.id,"odbijeno")}>Odbaci prijavu</button><Link to="/oglas/$kind/$id" params={{kind:r.tabela==="ponude"?"ponuda":"zahtev",id:r.oglas_id}} className={small}>Otvori oglas</Link></div></div>}
+      {r.admin_napomena && <p className="mt-2 text-xs text-muted-foreground">Napomena: {r.admin_napomena}</p>}
+    </article>)}
+  </section>;
 }
 
 function Korisnici({ selfId }: { selfId: string }) {
