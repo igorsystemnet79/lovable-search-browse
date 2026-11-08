@@ -55,6 +55,7 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }));
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
+app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -214,15 +215,8 @@ app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
   res.json({ok:true,verified:true,session,message:'Broj telefona je potvrđen. Tvoj nalog je sada verifikovan.'});
  }catch(e){await c.query('ROLLBACK');if(e.code==='23505')return res.status(409).json({error:'Ovaj broj telefona je već verifikovan na drugom nalogu.'});throw e;}finally{c.release();}
 }));
-app.post('/api/auth/login',asyncRoute(async(req,res)=>{
- const e=String(req.body?.email||'').trim().toLowerCase(),{rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]),u=rows[0];
- if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});
- const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);
- if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});
- const user=publicUser(u),token=sign(u);
- res.json({user,session:{access_token:token,token_type:'bearer',expires_in:604800,user}});
-}));
-app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
+app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
+app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});await pool.query("UPDATE profiles SET last_active_at=now() WHERE id=$1 AND (last_active_at IS NULL OR last_active_at<now()-interval '5 minutes')",[req.user.sub]);res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
  // Check mail configuration before looking up the account, so the response
@@ -330,6 +324,46 @@ app.post('/api/admin/proposals/:id/decision',auth,admin,asyncRoute(async(req,res
 }));
 const supportMessageLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 app.post('/api/podrska',supportMessageLimiter,asyncRoute(async(req,res)=>{const ime=typeof req.body?.ime==='string'?req.body.ime.trim():'';const email=typeof req.body?.email==='string'?req.body.email.trim().toLowerCase():'';const poruka=typeof req.body?.poruka==='string'?req.body.poruka.trim():'';if(ime.length<2||ime.length>100||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||poruka.length<5||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci. Ime, email i poruka moraju biti ispravno uneti.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
+app.post('/api/reports',optionalAuth,asyncRoute(async(req,res)=>{
+ const {tabela,oglas_id,razlog}=req.body||{};
+ const allowedReasons=['sumnja_na_prevaru','netacni_podaci','neispravan_kontakt','neprimeren_sadrzaj','dupliran_oglas','ostalo'];
+ if(!['ponude','zahtevi'].includes(tabela)||! /^[0-9a-f-]{36}$/i.test(String(oglas_id||''))||!allowedReasons.includes(razlog))return res.status(400).json({error:'Proveri podatke prijave.'});
+ const detalji=String(req.body?.detalji||'').trim().slice(0,1000)||null;
+ const listing=await pool.query(`SELECT id,user_id FROM ${tabela} WHERE id=$1`,[oglas_id]);
+ if(!listing.rows[0])return res.status(404).json({error:'Oglas više ne postoji.'});
+ if(req.user?.sub&&listing.rows[0].user_id===req.user.sub)return res.status(400).json({error:'Ne možeš prijaviti sopstveni oglas.'});
+ try{
+  const saved=await pool.query('INSERT INTO prijave_oglasa(tabela,oglas_id,prijavio_id,razlog,detalji) VALUES($1,$2,$3,$4,$5) RETURNING id,created_at',[tabela,oglas_id,req.user?.sub||null,razlog,detalji]);
+  res.status(201).json({ok:true,...saved.rows[0]});
+ }catch(error){if(error.code==='23505')return res.status(409).json({error:'Već postoji tvoja prijava koja čeka pregled.'});throw error;}
+}));
+app.get('/api/admin/reports',auth,admin,asyncRoute(async(_req,res)=>{
+ const result=await pool.query(`SELECT r.*,CASE WHEN r.tabela='ponude' THEN p.naslov ELSE z.naslov END AS oglas_naslov,CASE WHEN r.tabela='ponude' THEN p.lokacija ELSE z.lokacija END AS oglas_lokacija,COALESCE(pu.email,zu.email) AS vlasnik_email,ru.email AS prijavio_email
+ FROM prijave_oglasa r
+ LEFT JOIN ponude p ON r.tabela='ponude' AND p.id=r.oglas_id
+ LEFT JOIN zahtevi z ON r.tabela='zahtevi' AND z.id=r.oglas_id
+ LEFT JOIN users pu ON pu.id=p.user_id
+ LEFT JOIN users zu ON zu.id=z.user_id
+ LEFT JOIN users ru ON ru.id=r.prijavio_id
+ ORDER BY CASE WHEN r.status='na_cekanju' THEN 0 ELSE 1 END,r.created_at DESC LIMIT 500`);
+ res.json(result.rows);
+}));
+app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=>{
+ const status=req.body?.status;
+ if(!['pregledano','odbijeno'].includes(status))return res.status(400).json({error:'Izaberi ispravan status prijave.'});
+ const note=String(req.body?.napomena||'').trim().slice(0,1000)||null;
+ const result=await pool.query("UPDATE prijave_oglasa SET status=$1,admin_napomena=$2,odlucio_id=$3,odluceno_at=now() WHERE id=$4 AND status='na_cekanju' RETURNING *",[status,note,req.user.sub,req.params.id]);
+ if(!result.rows[0])return res.status(409).json({error:'Prijava ne postoji ili je već obrađena.'});
+ res.json(result.rows[0]);
+}));
+app.get('/api/admin/stats',auth,admin,asyncRoute(async(_req,res)=>{
+ const queries=await Promise.all([
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE tip_lica=\'fizicko\')::int AS fizicka,count(*) FILTER (WHERE tip_lica=\'pravno\')::int AS pravna,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novih_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novih_30d FROM profiles'),
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivne,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novih_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novih_30d FROM ponude'),
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivni,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novi_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novi_30d FROM zahtevi')
+ ]);
+ res.json({korisnici:queries[0].rows[0],ponude:queries[1].rows[0],zahtevi:queries[2].rows[0],azurirano_at:new Date().toISOString()});
+}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email,u.email_confirmed_at FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
 
