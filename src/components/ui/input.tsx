@@ -39,7 +39,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           onClick={clearValue}
           className="absolute right-1 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <X className="h-5 w-5" strokeWidth={3} />
+          <X className="h-4 w-4" strokeWidth={3} />
         </button>
       </div>
     );
