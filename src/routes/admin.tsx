@@ -434,7 +434,7 @@ function Korisnici({ selfId }: { selfId: string }) {
     if (prikaz === "firme" ? p.tip_lica !== "pravno" : p.tip_lica === "pravno") return false;
     if (!pojmoviPretrage.length) return true;
     const pretraziviTekst = normalizujPretragu(
-      [p.ime, p.email, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
+      [p.ime, p.prezime, p.email, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
         .filter(Boolean)
         .join(" ")
     );
@@ -443,13 +443,15 @@ function Korisnici({ selfId }: { selfId: string }) {
   });
   const lista = [...filtrirani].sort((a, b) => {
     if (prikaz === "firme") return collator.compare((a.naziv_firme || "").trim(), (b.naziv_firme || "").trim());
+    // Novi nalozi čuvaju ime i prezime u odvojenim kolonama; stariji mogu imati puno ime u polju ime.
     const deloviA = (a.ime || "").trim().split(/\s+/).filter(Boolean);
     const deloviB = (b.ime || "").trim().split(/\s+/).filter(Boolean);
-    // Sve reči posle imena tretiramo kao prezime, uključujući složena prezimena.
-    const prezimeA = deloviA.length > 1 ? deloviA.slice(1).join(" ") : (deloviA[0] || a.email || "");
-    const prezimeB = deloviB.length > 1 ? deloviB.slice(1).join(" ") : (deloviB[0] || b.email || "");
+    const imeA = deloviA[0] || "";
+    const imeB = deloviB[0] || "";
+    const prezimeA = (a.prezime || (deloviA.length > 1 ? deloviA.slice(1).join(" ") : "")).trim() || imeA || a.email || "";
+    const prezimeB = (b.prezime || (deloviB.length > 1 ? deloviB.slice(1).join(" ") : "")).trim() || imeB || b.email || "";
     const poPrezimenu = collator.compare(prezimeA, prezimeB);
-    const poImenu = collator.compare(deloviA[0] || "", deloviB[0] || "");
+    const poImenu = collator.compare(imeA, imeB);
     return poPrezimenu || poImenu || collator.compare(a.email || "", b.email || "");
   });
 
