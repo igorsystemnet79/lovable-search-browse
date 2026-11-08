@@ -6,12 +6,13 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
+import QRCode from 'qrcode';
 import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, randomBytes, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHash, createHmac, createCipheriv, createDecipheriv, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -122,7 +123,130 @@ const optionalAuth = asyncRoute(async (req,res,next) => {
  next();
 });
 const isPlatformAdmin = async user => { if (String(user?.email || '').trim().toLowerCase() === 'igorsystemnet@gmail.com') return true; const r = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'", [user.sub]); return r.rowCount > 0; };
-const admin = asyncRoute(async (req,res,next) => { if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
+
+const adminIdentity = asyncRoute(async (req,res,next) => {
+ if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
+ next();
+});
+const admin = asyncRoute(async (req,res,next) => {
+ if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
+ const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
+ if (!state.rows[0]?.enabled) return res.status(403).json({error:'Pre pristupa administraciji potrebno je aktivirati Google Authenticator.',code:'ADMIN_2FA_SETUP_REQUIRED'});
+ if (req.user.admin2fa!==true || !req.user.admin2faAt || Date.now()-Number(req.user.admin2faAt)>15*60*1000)
+  return res.status(401).json({error:'Potrebna je dodatna potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});
+ next();
+});
+const encryptionKey = () => {
+ const raw=String(process.env.ADMIN_2FA_ENCRYPTION_KEY||'').trim();
+ if(!/^[a-f0-9]{64}$/i.test(raw)) throw Object.assign(new Error('Serverski ključ za zaštitu Authenticator podataka nije podešen u Renderu.'),{status:503});
+ return Buffer.from(raw,'hex');
+};
+const encryptAdminSecret = value => {
+ const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',encryptionKey(),iv);
+ const encrypted=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);
+ return [iv.toString('base64'),cipher.getAuthTag().toString('base64'),encrypted.toString('base64')].join('.');
+};
+const decryptAdminSecret = value => {
+ const [iv,tag,data]=String(value||'').split('.');
+ if(!iv||!tag||!data) throw new Error('Zaštićeni Authenticator podatak nije ispravan.');
+ const decipher=createDecipheriv('aes-256-gcm',encryptionKey(),Buffer.from(iv,'base64'));
+ decipher.setAuthTag(Buffer.from(tag,'base64'));
+ return Buffer.concat([decipher.update(Buffer.from(data,'base64')),decipher.final()]).toString('utf8');
+};
+const base32Encode = buffer => {
+ const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,value=0,out='';
+ for(const byte of buffer){value=(value<<8)|byte;bits+=8;while(bits>=5){out+=alphabet[(value>>>(bits-5))&31];bits-=5;}}
+ if(bits)out+=alphabet[(value<<(5-bits))&31];
+ return out;
+};
+const base32Decode = value => {
+ const alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';let bits=0,current=0;const out=[];
+ for(const char of String(value).replace(/=+$/,'').toUpperCase()){
+  const n=alphabet.indexOf(char);if(n<0)throw new Error('Neispravan Authenticator ključ.');
+  current=(current<<5)|n;bits+=5;if(bits>=8){out.push((current>>>(bits-8))&255);bits-=8;}
+ }
+ return Buffer.from(out);
+};
+const totpAt = (secret,step=Math.floor(Date.now()/30000)) => {
+ const counter=Buffer.alloc(8);counter.writeBigUInt64BE(BigInt(step));
+ const digest=createHmac('sha1',base32Decode(secret)).update(counter).digest();
+ const offset=digest[digest.length-1]&15;
+ const binary=((digest[offset]&127)<<24)|(digest[offset+1]<<16)|(digest[offset+2]<<8)|digest[offset+3];
+ return String(binary%1000000).padStart(6,'0');
+};
+const verifyTotp = (secret,code) => {
+ const candidate=String(code||'').replace(/\s/g,'');
+ if(!/^\d{6}$/.test(candidate))return false;
+ const now=Math.floor(Date.now()/30000);
+ for(let delta=-1;delta<=1;delta++){
+  const expected=Buffer.from(totpAt(secret,now+delta));
+  const actual=Buffer.from(candidate);
+  if(expected.length===actual.length&&timingSafeEqual(expected,actual))return true;
+ }
+ return false;
+};
+const adminTwoFactorLimit=rateLimit({windowMs:15*60*1000,limit:8,standardHeaders:true,legacyHeaders:false,message:{error:'Previše pokušaja potvrde. Pokušaj ponovo za 15 minuta.'}});
+app.get('/api/admin/2fa/status',auth,adminIdentity,asyncRoute(async(req,res)=>{
+ const r=await pool.query('SELECT enabled,pending_expires_at FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
+ res.set('Cache-Control','no-store').json({enabled:!!r.rows[0]?.enabled,pending:!!r.rows[0]?.pending_expires_at&&new Date(r.rows[0].pending_expires_at)>new Date()});
+}));
+app.post('/api/admin/2fa/setup',auth,adminIdentity,adminTwoFactorLimit,asyncRoute(async(req,res)=>{
+ const password=String(req.body?.password||'');
+ if(!password)return res.status(400).json({error:'Ponovo unesi administratorsku lozinku.'});
+ const account=await pool.query('SELECT password_hash FROM users WHERE id=$1',[req.user.sub]);
+ if(!account.rows[0]||!(await bcrypt.compare(password,account.rows[0].password_hash)))return res.status(401).json({error:'Administratorska lozinka nije ispravna.'});
+ const current=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
+ if(current.rows[0]?.enabled)return res.status(409).json({error:'Google Authenticator je već aktiviran.'});
+ const secret=base32Encode(randomBytes(20));
+ const label=encodeURIComponent('PonudiMi (igorsystemnet@gmail.com)');
+ const issuer=encodeURIComponent('PonudiMi');
+ const uri='otpauth://totp/'+label+'?secret='+secret+'&issuer='+issuer+'&algorithm=SHA1&digits=6&period=30';
+ const qr=await QRCode.toDataURL(uri,{errorCorrectionLevel:'M',margin:2,width:280});
+ await pool.query(`INSERT INTO admin_2fa(user_id,pending_secret_ciphertext,pending_expires_at,enabled)
+ VALUES($1,$2,now()+interval '10 minutes',false)
+ ON CONFLICT(user_id) DO UPDATE SET pending_secret_ciphertext=EXCLUDED.pending_secret_ciphertext,pending_expires_at=EXCLUDED.pending_expires_at`,[req.user.sub,encryptAdminSecret(secret)]);
+ res.set('Cache-Control','no-store').json({qr,manual_key:secret,expires_in:600});
+}));
+app.post('/api/admin/2fa/verify-setup',auth,adminIdentity,adminTwoFactorLimit,asyncRoute(async(req,res)=>{
+ const code=String(req.body?.code||'');
+ const found=await pool.query('SELECT pending_secret_ciphertext,pending_expires_at,enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
+ if(!found.rows[0]?.pending_secret_ciphertext||found.rows[0].enabled||!found.rows[0].pending_expires_at||new Date(found.rows[0].pending_expires_at)<=new Date())return res.status(400).json({error:'QR kod je istekao. Pokreni podešavanje ponovo.'});
+ const secret=decryptAdminSecret(found.rows[0].pending_secret_ciphertext);
+ if(!verifyTotp(secret,code))return res.status(400).json({error:'Kod nije ispravan. Proveri vreme na telefonu i pokušaj ponovo.'});
+ const recovery=Array.from({length:10},()=>randomBytes(5).toString('hex').toUpperCase().match(/.{1,5}/g).join('-'));
+ const hashes=recovery.map(value=>createHash('sha256').update(value).digest('hex'));
+ await pool.query(`UPDATE admin_2fa SET secret_ciphertext=$2,pending_secret_ciphertext=NULL,pending_expires_at=NULL,recovery_code_hashes=$3,enabled=true,enabled_at=now(),updated_at=now() WHERE user_id=$1`,[req.user.sub,encryptAdminSecret(secret),hashes]);
+ res.set('Cache-Control','no-store').json({ok:true,recovery_codes:recovery,message:'Authenticator je aktiviran. Sačuvaj rezervne kodove — prikazuju se samo jednom.'});
+}));
+app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res)=>{
+ const email=String(req.body?.email||'').trim().toLowerCase();
+ const password=String(req.body?.password||'');
+ const code=String(req.body?.code||'').trim();
+ const userResult=await pool.query('SELECT * FROM users WHERE email=$1',[email]);
+ const user=userResult.rows[0];
+ if(!user||!password||!(await bcrypt.compare(password,user.password_hash))||!(await isPlatformAdmin({sub:user.id,email:user.email})))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
+ const state=await pool.query('SELECT secret_ciphertext,recovery_code_hashes,enabled FROM admin_2fa WHERE user_id=$1',[user.id]);
+ if(!state.rows[0]?.enabled||!state.rows[0]?.secret_ciphertext)return res.status(409).json({error:'Google Authenticator još nije aktiviran.',code:'ADMIN_2FA_SETUP_REQUIRED'});
+ let verified=false,usedRecovery=false;
+ const secret=decryptAdminSecret(state.rows[0].secret_ciphertext);
+ if(/^\d{6}$/.test(code))verified=verifyTotp(secret,code);
+ if(!verified&&code){
+  const hash=createHash('sha256').update(code.toUpperCase()).digest('hex');
+  const client=await pool.connect();
+  try{
+   await client.query('BEGIN');
+   const locked=await client.query('SELECT recovery_code_hashes FROM admin_2fa WHERE user_id=$1 FOR UPDATE',[user.id]);
+   const hashes=locked.rows[0]?.recovery_code_hashes||[];
+   const index=hashes.indexOf(hash);
+   if(index>=0){hashes.splice(index,1);await client.query('UPDATE admin_2fa SET recovery_code_hashes=$2,updated_at=now() WHERE user_id=$1',[user.id,hashes]);verified=true;usedRecovery=true;}
+   await client.query('COMMIT');
+  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+ }
+ if(!verified)return res.status(401).json({error:'Kod nije ispravan ili je već iskorišćen.'});
+ const token=jwt.sign({sub:user.id,email:user.email,role:'authenticated',sv:Number(user.session_version||0),admin2fa:true,admin2faAt:Date.now()},JWT_SECRET,{expiresIn:'15m',algorithm:'HS256'});
+ res.set('Cache-Control','no-store').json({ok:true,used_recovery_code:usedRecovery,session:{access_token:token,token_type:'bearer',expires_in:900,user:publicUser(user)}});
+}));
+
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at, email_verified:!!u.email_confirmed_at });
