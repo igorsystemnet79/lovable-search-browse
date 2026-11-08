@@ -517,7 +517,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   );
 }
 
-type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; kategorija: string; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null; valuta?: string };
+type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; kategorija: string; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null; valuta?: string; zavrseno?: boolean; pauziran?: boolean };
 type AdminImage = { id: string; storage_path: string | null; external_url: string | null; pozicija: number };
 
 function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
@@ -528,6 +528,8 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const [images, setImages] = useState<Record<string, AdminImage[]>>({});
   const [imageBusy, setImageBusy] = useState(false);
   const [filter, setFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"sve" | "aktivni" | "pauzirani" | "zavrseni">("sve");
+  const [sortOrder, setSortOrder] = useState<"najnovije" | "najstarije" | "naslov">("najnovije");
   const polje = tabela === "ponude" ? "cena" : "budzet";
   const imageColumn = tabela === "ponude" ? "ponuda_id" : "zahtev_id";
   const load = useCallback(async () => {
@@ -544,6 +546,9 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
     value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
   const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\s+/).filter(Boolean);
   const filtriraniRows = rows.filter((o) => {
+    if (statusFilter === "aktivni" && (o.pauziran || o.zavrseno)) return false;
+    if (statusFilter === "pauzirani" && !o.pauziran) return false;
+    if (statusFilter === "zavrseni" && !o.zavrseno) return false;
     if (!pojmoviPretrage.length) return true;
     const pretraziviTekst = normalizujPretragu(
       [o.naslov, o.opis, o.kategorija, o.lokacija, o.kontakt_ime, o.telefon, o.user_id, o.id, o[polje], o.valuta]
@@ -551,6 +556,10 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
         .join(" ")
     );
     return pojmoviPretrage.every((pojam) => pretraziviTekst.includes(pojam));
+  }).sort((a, b) => {
+    if (sortOrder === "naslov") return a.naslov.localeCompare(b.naslov, "sr", { sensitivity: "base" });
+    const delta = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    return sortOrder === "najstarije" ? delta : -delta;
   });
 
   async function sacuvaj() {
@@ -625,6 +634,16 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
             </button>
           )}
         </div>
+        <div className="flex flex-wrap gap-2">
+          {([{ value: "sve", label: "Sve" }, { value: "aktivni", label: "Aktivni" }, { value: "pauzirani", label: "Pauzirani" }, { value: "zavrseni", label: "Završeni" }] as const).map((option) => (
+            <button key={option.value} type="button" className={statusFilter === option.value ? `${small} bg-brand text-brand-foreground` : small} onClick={() => setStatusFilter(option.value)}>{option.label}</button>
+          ))}
+        </div>
+        <select aria-label="Sortiranje oglasa" className={inputCls + " min-h-10 w-full sm:w-auto"} value={sortOrder} onChange={(event) => setSortOrder(event.target.value as typeof sortOrder)}>
+          <option value="najnovije">Najnovije prvo</option>
+          <option value="najstarije">Najstarije prvo</option>
+          <option value="naslov">Po naslovu A–Š</option>
+        </select>
         <p className="text-sm text-muted-foreground">
           Prikazano: {filtriraniRows.length} / {rows.length}
           {msg && <span className="text-brand"> · {msg}</span>}
