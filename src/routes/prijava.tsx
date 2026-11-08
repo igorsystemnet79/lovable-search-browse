@@ -64,7 +64,8 @@ function Prijava() {
         }
         return;
       }
-      await navigate({ to: "/" });
+      // Reload the app so the maintenance gate reads the newly saved admin token immediately.
+      window.location.assign("/");
     } catch (error) {
       setGreska(porukaGreske(error, "Došlo je do greške prilikom prijave. Pokušaj ponovo."));
     } finally {
