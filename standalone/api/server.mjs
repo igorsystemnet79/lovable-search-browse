@@ -211,7 +211,7 @@ app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=
 }));
 app.get('/api/admin/stats',auth,admin,asyncRoute(async(_req,res)=>{
  const queries=await Promise.all([
-  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE tip_lica=\'fizicko\')::int AS fizicka,count(*) FILTER (WHERE tip_lica=\'pravno\')::int AS pravna FROM profiles'),
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE tip_lica=\'fizicko\')::int AS fizicka,count(*) FILTER (WHERE tip_lica=\'pravno\')::int AS pravna,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novih_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novih_30d FROM profiles'),
   pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivne,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novih_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novih_30d FROM ponude'),
   pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivni,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novi_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novi_30d FROM zahtevi')
  ]);
