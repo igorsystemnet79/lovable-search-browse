@@ -346,8 +346,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                   </div>
                 </div>
-              )}            </div>
-          );
+              )}            </div>          );
         })}
         {lista.length === 0 && <p className="rounded-2xl bg-surface p-4 text-sm text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</p>}
       </div>
@@ -379,8 +378,8 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   useEffect(() => { load(); }, [load]);
 
   const normalizujPretragu = (value: string) =>
-    value.normalize("NFD").replace(/[\\u0300-\\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
-  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\\s+/).filter(Boolean);
+    value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
+  const pojmoviPretrage = normalizujPretragu(filter).trim().split(/\s+/).filter(Boolean);
   const filtriraniRows = rows.filter((o) => {
     if (!pojmoviPretrage.length) return true;
     const pretraziviTekst = normalizujPretragu(
