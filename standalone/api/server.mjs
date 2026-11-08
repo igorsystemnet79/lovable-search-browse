@@ -160,6 +160,30 @@ async function twilioVerify(phone,code){
  return data;
 }
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
+app.get('/api/platform/status',asyncRoute(async(req,res)=>{
+ const setting=await pool.query("SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1");
+ let isAdmin=false;
+ const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);isAdmin=!!role.rowCount;}catch{}}
+ const row=setting.rows[0]||{};
+ res.setHeader('Cache-Control','no-store');
+ res.json({maintenance:!!row.maintenance_enabled,message:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.',isAdmin});
+}));
+app.put('/api/admin/maintenance',auth,admin,asyncRoute(async(req,res)=>{
+ const enabled=req.body?.enabled;
+ if(typeof enabled!=='boolean')return res.status(400).json({error:'Status održavanja nije ispravan.'});
+ const message=String(req.body?.message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.').trim().slice(0,300);
+ const result=await pool.query("INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message,updated_at,updated_by) VALUES(1,$1,$2,now(),$3) ON CONFLICT(id) DO UPDATE SET maintenance_enabled=EXCLUDED.maintenance_enabled,maintenance_message=EXCLUDED.maintenance_message,updated_at=now(),updated_by=EXCLUDED.updated_by RETURNING maintenance_enabled,maintenance_message,updated_at",[enabled,message,req.user.sub]);
+ res.json({ok:true,...result.rows[0]});
+}));
+app.use(asyncRoute(async(req,res,next)=>{
+ if(req.path==='/api/platform/status'||req.path==='/api/health'||req.path==='/'||req.path==='/sitemap.xml'||req.path==='/robots.txt'||req.path.startsWith('/api/admin/')||req.path.startsWith('/api/auth/')||req.path.startsWith('/api/storage/public')||req.path.startsWith('/uploads/'))return next();
+ const setting=await pool.query('SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1');
+ const row=setting.rows[0];if(!row?.maintenance_enabled)return next();
+ const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);if(role.rowCount)return next();}catch{}}
+ return res.status(503).json({maintenance:true,error:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.'});
+}));
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
