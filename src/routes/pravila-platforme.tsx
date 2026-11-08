@@ -132,6 +132,12 @@ const sections = [
   },
 ];
 
+export const defaultPlatformRulesText = sections.map(section => [
+  `PRAVILO ${section.number} — ${section.title}`,
+  ...section.paragraphs,
+  ...(section.bullets || []).map(item => `• ${item}`),
+].join("\n\n")).join("\n\n\n");
+
 function PravilaPlatforme() {
   const [publishedText, setPublishedText] = useState<string | null>(null);
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
