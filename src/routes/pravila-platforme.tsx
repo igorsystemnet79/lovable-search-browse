@@ -1,4 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { API_ORIGIN } from "@/integrations/standalone/client";
 import { ShieldCheck, Ban, Scale, FileText, MessageCircle, AlertTriangle } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -131,6 +133,16 @@ const sections = [
 ];
 
 function PravilaPlatforme() {
+  const [publishedText, setPublishedText] = useState<string | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetch(`${API_ORIGIN}/api/platform-rules`, { cache: "no-store" })
+      .then(response => response.ok ? response.json() : null)
+      .then(result => { if (active && result?.data?.sadrzaj) { setPublishedText(result.data.sadrzaj); setPublishedAt(result.data.published_at || null); } })
+      .catch(() => {});
+    return () => { active = false; };
+  }, []);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
@@ -147,9 +159,12 @@ function PravilaPlatforme() {
               pošteno oglašavanje, bezbednu komunikaciju i zaštitu korisnika, njihovih prava
               i ugleda platforme.
             </p>
-            <p className="mt-5 text-xs text-brand-foreground/70">Radna verzija za pregled · 8. novembar 2026.</p>
+            <p className="mt-5 text-xs text-brand-foreground/70">{publishedAt ? `Poslednje ažuriranje · ${new Date(publishedAt).toLocaleDateString("sr-RS")}` : "Radna verzija za pregled · 8. novembar 2026."}</p>
           </div>
 
+          {publishedText ? (
+            <article className="mt-6 rounded-2xl border border-border bg-surface p-5 text-sm leading-7 text-muted-foreground shadow-card sm:p-7 whitespace-pre-wrap">{publishedText}</article>
+          ) : <>
           <div className="mt-6 rounded-2xl border border-border bg-surface p-5 shadow-card sm:p-6">
             <h2 className="text-base font-semibold">Brzi pregled</h2>
             <div className="mt-4 grid gap-2 sm:grid-cols-2">
@@ -208,6 +223,7 @@ function PravilaPlatforme() {
               Kontaktiraj podršku →
             </Link>
           </div>
+          </>}
           <div className="mt-8 text-center">
             <Link to="/" className="text-sm font-semibold text-brand hover:underline">← Povratak na početnu stranu</Link>
           </div>
