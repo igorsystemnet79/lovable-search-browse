@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { API_ORIGIN } from "@/integrations/standalone/client";
+import { ucitajPravilaPlatforme } from "@/integrations/standalone/client";
 import { ShieldCheck, Ban, Scale, FileText, MessageCircle, AlertTriangle } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -175,14 +175,27 @@ export const defaultPlatformRulesText = sections.map(section => [
 function PravilaPlatforme() {
   const [publishedText, setPublishedText] = useState<string | null>(null);
   const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  const [rulesLoadError, setRulesLoadError] = useState("");
+  const [reloadKey, setReloadKey] = useState(0);
   useEffect(() => {
     let active = true;
-    fetch(`${API_ORIGIN}/api/platform-rules`, { cache: "no-store" })
-      .then(response => response.ok ? response.json() : null)
-      .then(result => { if (active && result?.data?.sadrzaj) { setPublishedText(result.data.sadrzaj); setPublishedAt(result.data.published_at || null); } })
-      .catch(() => {});
+    async function loadPublishedRules() {
+      try {
+        // Koristi isti API klijent kao administracija: proverava da li je Render API budan
+        // i ponavlja proveru pre čitanja javno objavljene verzije.
+        const result = await ucitajPravilaPlatforme();
+        if (!active) return;
+        setPublishedText(result?.data?.sadrzaj || null);
+        setPublishedAt(result?.data?.published_at || null);
+        setRulesLoadError("");
+      } catch (error) {
+        if (!active) return;
+        setRulesLoadError(error instanceof Error ? error.message : "Objavljena pravila trenutno nisu dostupna.");
+      }
+    }
+    void loadPublishedRules();
     return () => { active = false; };
-  }, []);
+  }, [reloadKey]);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
@@ -201,6 +214,14 @@ function PravilaPlatforme() {
             </p>
             <p className="mt-5 text-xs text-brand-foreground/70">{publishedAt ? `Poslednje ažuriranje · ${new Date(publishedAt).toLocaleDateString("sr-RS")}` : "Radna verzija za pregled · 8. novembar 2026."}</p>
           </div>
+
+          {rulesLoadError && (
+            <div role="alert" className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+              <p className="font-semibold">Objavljena verzija pravila trenutno nije dostupna.</p>
+              <p className="mt-1">Prikazan je osnovni tekst dok se veza sa serverom ne uspostavi. Pokušaj ponovo da učitaš najnoviju objavljenu verziju.</p>
+              <button type="button" onClick={() => setReloadKey(value => value + 1)} className="mt-3 min-h-10 rounded-full border border-amber-500 px-4 py-2 font-semibold hover:bg-amber-100">Ponovo učitaj pravila</button>
+            </div>
+          )}
 
           {publishedText ? (
             <article className="mt-6 rounded-2xl border border-border bg-surface p-5 text-sm leading-7 text-muted-foreground shadow-card sm:p-7 whitespace-pre-wrap">{publishedText}</article>
