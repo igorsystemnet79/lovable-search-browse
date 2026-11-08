@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
@@ -73,6 +73,7 @@ function AdminPage() {
       <SiteHeader />
       <main className="container-page py-10">
         <h1 className="mb-6 text-3xl font-bold">Administracija</h1>
+        {isAdmin && <UpravljanjeOdrzavanjem />}
         {body}
       </main>
       <SiteFooter />
@@ -846,5 +847,35 @@ function UpravljanjePravilima() {
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Pregled teksta</h3><div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-xl bg-background p-4 text-sm leading-6 text-muted-foreground">{text || "Pregled će se prikazati kada uneseš tekst pravila."}</div></div>
     <div className="flex flex-wrap gap-2"><button type="button" className="min-h-10 rounded-full border border-input px-4 py-2 text-sm font-medium hover:bg-secondary" onClick={() => void load()} disabled={busy}>Osveži</button><button type="button" className="min-h-10 rounded-full border border-amber-400 bg-amber-100 px-5 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-200 disabled:opacity-50" onClick={() => void publish()} disabled={busy || text.trim().length < 30}>{busy ? "Sačekaj..." : "Sačuvaj i objavi pravila"}</button></div>
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Istorija objavljenih verzija</h3><p className="mt-1 text-xs text-muted-foreground">Čuva se do 50 poslednjih verzija u pregledu. Vraćanje stare verzije objavljuje je kao novu, bez brisanja istorije.</p><div className="mt-3 space-y-2">{history.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"><div><p className="text-sm font-semibold">Verzija {item.version}</p><p className="text-xs text-muted-foreground">{new Date(item.published_at).toLocaleString("sr-RS")}</p></div><button type="button" className={small} onClick={() => void restore(item.id)} disabled={busy || item.version === version}>Vrati ovu verziju</button></div>)}{!history.length && <p className="text-sm text-muted-foreground">Još nema objavljenih verzija kroz ovaj panel.</p>}</div></div>
+  </section>;
+}
+
+function UpravljanjeOdrzavanjem() {
+  const [enabled, setEnabled] = useState(false);
+  const [busy, setBusy] = useState(true);
+  const [error, setError] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try { const result = await ucitajRezimOdrzavanja(); setEnabled(Boolean(result.enabled)); setUpdatedAt(result.updated_at || null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Status održavanja nije moguće učitati."); }
+    finally { setBusy(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function toggle() {
+    const next = !enabled;
+    const promptText = next ? "Uključiti režim održavanja? Svi posetioci i korisnici, osim administratora, videće obaveštenje i neće moći da koriste platformu." : "Isključiti režim održavanja i ponovo omogućiti korišćenje platforme?";
+    if (!window.confirm(promptText)) return;
+    setBusy(true); setError("");
+    try { const result = await podesiRezimOdrzavanja(next); setEnabled(Boolean(result.enabled)); setUpdatedAt(result.updated_at || null); }
+    catch (e) { setError(e instanceof Error ? e.message : "Promena režima održavanja nije uspela."); }
+    finally { setBusy(false); }
+  }
+  return <section className="mb-7 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm sm:p-5">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="min-w-0"><h2 className="font-semibold">Režim održavanja</h2><p className="mt-1 text-sm">Privremeno zaustavlja korišćenje platforme za posetioce i korisnike. Administratori zadržavaju pristup Admin panelu.</p><p className="mt-2 text-xs font-semibold">{enabled ? "REŽIM ODRŽAVANJA JE UKLJUČEN" : "PLATFORMA RADI NORMALNO"}{updatedAt ? ` · ${new Date(updatedAt).toLocaleString("sr-RS")}` : ""}</p></div>
+      <button type="button" onClick={() => void toggle()} disabled={busy} className={"min-h-11 shrink-0 rounded-full px-5 py-2 text-sm font-semibold shadow-sm transition-colors disabled:opacity-50 " + (enabled ? "border border-green-700 bg-green-100 text-green-900 hover:bg-green-200" : "border border-amber-400 bg-amber-200 text-amber-950 hover:bg-amber-300")}>{busy ? "Učitavanje..." : enabled ? "Isključi održavanje" : "Uključi održavanje"}</button>
+    </div>
+    {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
   </section>;
 }
