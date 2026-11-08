@@ -91,3 +91,7 @@ export async function ucitajAdminPredloge() {
 export async function odluciOPredlogu(id: string, decision: "odobreno" | "odbijeno", napomena?: string) {
   return adminRequest(`/api/admin/proposals/${encodeURIComponent(id)}/decision`, "POST", { decision, napomena });
 }
+
+export async function ucitajAdminStatistiku() {
+  return adminRequest("/api/admin/stats", "GET");
+}
