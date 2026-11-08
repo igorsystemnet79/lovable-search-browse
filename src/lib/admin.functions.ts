@@ -20,16 +20,3 @@ export async function obrisiKorisnika({ data }: { data: { userId: string } }) {
 export async function sinhronizujApr() {
   return adminRequest("/api/admin/apr-sync", "POST");
 }
-
-export async function adminStatistika() {
-  return adminRequest("/api/admin/stats", "GET");
-}
-export async function adminPrijaveOglasa() {
-  return adminRequest("/api/admin/reports", "GET");
-}
-export async function odluciPrijavuOglasa(id: string, status: "pregledano" | "odbijeno", napomena = "") {
-  return adminRequest(`/api/admin/reports/${encodeURIComponent(id)}/decision`, "POST", { status, napomena });
-}
-export async function prijaviOglas(tabela: "ponude" | "zahtevi", oglas_id: string, razlog: string, detalji = "") {
-  return adminRequest("/api/reports", "POST", { tabela, oglas_id, razlog, detalji });
-}

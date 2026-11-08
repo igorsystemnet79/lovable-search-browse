@@ -371,7 +371,7 @@ app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows
 const TABLE_COLUMNS = {
  ponude: ['id','naslov','opis','kategorija','lokacija','cena','valuta','emoji','istaknuto','zavrseno','pauziran','user_id','kontakt_ime','telefon','created_at','updated_at'],
  zahtevi: ['id','naslov','opis','kategorija','lokacija','budzet','valuta','zavrseno','pauziran','user_id','kontakt_ime','telefon','created_at','updated_at'],
- profiles: ['id','ime','prezime','email_confirmed_at','telefon','telefon_normalizovan','telefon_verifikovan_at','duplikat_sumnja','verifikacija_zapoceta_at','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email','created_at'],
+ profiles: ['id','ime','prezime','email_confirmed_at','telefon','telefon_normalizovan','telefon_verifikovan_at','duplikat_sumnja','verifikacija_zapoceta_at','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email','created_at','last_active_at'],
  user_roles: ['id','user_id','role'],
  pracenja: ['id','user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet','created_at'],
  slike_oglasa: ['id','ponuda_id','zahtev_id','storage_path','external_url','pozicija','created_at'],
