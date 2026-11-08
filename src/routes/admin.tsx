@@ -40,7 +40,7 @@ function AdminPage() {
   else if (!isAdmin) body = <p>Nemate pristup administratorskom panelu.</p>;
   else
     body = (
-      <>
+      <AdminSecurityGate email={user.email}>
         <div className="mb-6 flex flex-wrap gap-2">
           {tabs.map((t) => (
             <button key={t} onClick={() => setTab(t)} className={`rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : "border border-input hover:bg-secondary"}`}>{t}</button>
@@ -52,7 +52,7 @@ function AdminPage() {
         {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
         {tab === "Platforma" && <PlatformSettings />}
-      </>
+      </AdminSecurityGate>
     );
 
   return (
@@ -64,6 +64,79 @@ function AdminPage() {
       </main>
       <SiteFooter />
     </div>
+  );
+}
+
+
+function AdminSecurityGate({ email, children }: { email: string; children: React.ReactNode }) {
+  const [status, setStatus] = useState<"loading" | "setup" | "challenge" | "recovery" | "ready" | "error">("loading");
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [qr, setQr] = useState("");
+  const [manualKey, setManualKey] = useState("");
+  const [recoveryCodes, setRecoveryCodes] = useState<string[]>([]);
+  const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    let active = true;
+    ponudimi.adminSecurity.status()
+      .then((result: any) => { if (active) setStatus(result.elevated ? "ready" : result.enabled ? "challenge" : "setup"); })
+      .catch((error: any) => { if (active) { setMessage(error.message || "Provera administratorske zaštite nije uspela."); setStatus("error"); } });
+    return () => { active = false; };
+  }, []);
+
+  async function beginSetup() {
+    setMessage("");
+    try {
+      const result = await ponudimi.adminSecurity.setup(password);
+      setQr(result.qr);
+      setManualKey(result.manual_key);
+      setCode("");
+      setStatus("setup");
+      setMessage("Skeniraj QR kod aplikacijom Google Authenticator, pa unesi šestocifreni kod koji aplikacija prikaže.");
+    } catch (error: any) { setMessage(error.message || "Podešavanje nije uspelo."); }
+  }
+  async function verifySetup() {
+    setMessage("");
+    try {
+      const result = await ponudimi.adminSecurity.verifySetup(code);
+      setRecoveryCodes(result.recovery_codes || []);
+      setStatus("recovery");
+    } catch (error: any) { setMessage(error.message || "Kod nije prihvaćen."); }
+  }
+  async function verifyLogin() {
+    setMessage("");
+    try {
+      const result = await ponudimi.adminSecurity.challenge(email, password, code);
+      await ponudimi.auth.setSession(result.session);
+      setStatus("ready");
+    } catch (error: any) { setMessage(error.message || "Dodatna potvrda nije uspela."); }
+  }
+
+  if (status === "loading") return <p className="text-sm text-muted-foreground">Proveravam dodatnu zaštitu administratora…</p>;
+  if (status === "ready") return <>{children}</>;
+  if (status === "error") return <div className="max-w-xl rounded-2xl border border-destructive/30 bg-surface p-5"><p className="font-semibold">Administratorska zaštita trenutno nije dostupna.</p><p className="mt-2 text-sm text-muted-foreground">{message}</p><button className={small + " mt-4"} onClick={() => window.location.reload()}>Pokušaj ponovo</button></div>;
+
+  if (status === "recovery") return (
+    <section className="max-w-xl rounded-2xl border border-input bg-surface p-5">
+      <h2 className="text-xl font-semibold">Sačuvaj rezervne kodove</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Svaki kod može da se iskoristi samo jednom. Sačuvaj ih na bezbednom mestu van ovog telefona. Neće ponovo biti prikazani.</p>
+      <div className="my-4 grid grid-cols-2 gap-2 rounded-xl bg-background p-3 font-mono text-sm">{recoveryCodes.map((value) => <span key={value}>{value}</span>)}</div>
+      <button className={small} onClick={() => { setRecoveryCodes([]); setStatus("ready"); }}>Sačuvao sam kodove — nastavi</button>
+    </section>
+  );
+
+  return (
+    <section className="max-w-xl rounded-2xl border border-input bg-surface p-5">
+      <h2 className="text-xl font-semibold">{status === "setup" ? "Google Authenticator zaštita" : "Potvrda administratorskog pristupa"}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{status === "setup" ? "Administratorski panel je zaštićen dodatnim kodom. Ova aktivacija ne menja tvoju postojeću Facebook prijavu niti druge unose u Authenticator aplikaciji." : "Unesi administratorsku lozinku i šestocifreni kod iz Google Authenticator aplikacije. Možeš uneti i rezervni kod."}</p>
+      {status === "setup" && qr && <div className="my-4 flex flex-col items-center gap-3"><img src={qr} alt="QR kod za PonudiMi Google Authenticator" className="h-56 w-56 rounded-xl bg-white p-2" /><p className="break-all text-center text-xs text-muted-foreground">Ručni ključ: {manualKey}</p></div>}
+      {status === "setup" && !qr && <input className={inputCls + " mt-4 w-full"} type="password" autoComplete="current-password" placeholder="Administratorska lozinka" value={password} onChange={(e) => setPassword(e.target.value)} />}
+      {status === "setup" && qr && <input className={inputCls + " mt-4 w-full"} inputMode="numeric" autoComplete="one-time-code" placeholder="Šestocifreni kod iz Authenticatora" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} />}
+      {status === "challenge" && <><input className={inputCls + " mt-4 w-full"} type="password" autoComplete="current-password" placeholder="Administratorska lozinka" value={password} onChange={(e) => setPassword(e.target.value)} /><input className={inputCls + " mt-3 w-full"} autoComplete="one-time-code" placeholder="Authenticator ili rezervni kod" value={code} onChange={(e) => setCode(e.target.value.replace(/[^a-zA-Z0-9-]/g, "").slice(0, 20))} /></>}
+      {message && <p className="mt-3 text-sm text-destructive">{message}</p>}
+      <button className={small + " mt-4"} disabled={status === "setup" ? (!password && !qr) || (Boolean(qr) && code.length !== 6) : !password || !code} onClick={status === "setup" ? (qr ? verifySetup : beginSetup) : verifyLogin}>{status === "setup" ? (qr ? "Potvrdi kod i aktiviraj" : "Napravi QR kod") : "Potvrdi i otvori administraciju"}</button>
+    </section>
   );
 }
 
