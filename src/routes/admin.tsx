@@ -9,6 +9,7 @@ import { inputCls } from "@/components/auth-shell";
 import { Input } from "@/components/ui/input";
 import type { Tables } from "@/integrations/standalone/types";
 import { obradiPrijavu, ucitajPrijaveOglasa, type PrijavaOglasa } from "@/lib/reports";
+import { ucitajAdminStatistiku } from "@/lib/admin.functions";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -27,7 +28,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -55,6 +56,7 @@ function AdminPage() {
             {tab === "Ponude" && <Oglasi tabela="ponude" />}
             {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
             {tab === "Prijave" && <Prijave />}
+            {tab === "Statistika" && <Statistika />}
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
             {tab === "APR firme" && <Apr />}
@@ -76,6 +78,72 @@ function AdminPage() {
   );
 }
 
+
+function Statistika() {
+  const [data, setData] = useState<any>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(async () => {
+    setBusy(true);
+    setMsg("");
+    try {
+      setData(await ucitajAdminStatistiku());
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Statistiku nije moguće učitati.");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const number = (value: unknown) => Number(value || 0).toLocaleString("sr-RS");
+  const groups = data ? [
+    { title: "Korisnici", items: [
+      ["Ukupno registrovanih", data.korisnici.total],
+      ["Fizička lica", data.korisnici.fizicka],
+      ["Pravna lica", data.korisnici.pravna],
+    ] },
+    { title: "Ponude", items: [
+      ["Ukupno ponuda", data.ponude.total],
+      ["Aktivne ponude", data.ponude.aktivne],
+      ["Nove · 7 dana", data.ponude.novih_7d],
+      ["Nove · 30 dana", data.ponude.novih_30d],
+    ] },
+    { title: "Zahtevi", items: [
+      ["Ukupno zahteva", data.zahtevi.total],
+      ["Aktivni zahtevi", data.zahtevi.aktivni],
+      ["Novi · 7 dana", data.zahtevi.novi_7d],
+      ["Novi · 30 dana", data.zahtevi.novi_30d],
+    ] },
+  ] : [];
+
+  return (
+    <section className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div><h2 className="font-semibold">Pregled platforme</h2><p className="text-sm text-muted-foreground">Broj registrovanih korisnika, ponuda i zahteva.</p></div>
+        <button type="button" className={small} disabled={busy} onClick={load}>{busy ? "Učitavanje..." : "Osveži statistiku"}</button>
+      </div>
+      {msg && <p role="alert" className="text-sm text-destructive">{msg}</p>}
+      {data && <div className="grid gap-4 lg:grid-cols-3">
+        {groups.map((group) => (
+          <div key={group.title} className="rounded-2xl bg-surface p-4 shadow-card">
+            <h3 className="mb-3 font-semibold">{group.title}</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {group.items.map(([label, value]) => (
+                <div key={label} className="rounded-xl border border-input bg-background p-3">
+                  <p className="text-xs text-muted-foreground">{label}</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums">{number(value)}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>}
+      {!data && !busy && !msg && <p className="text-sm text-muted-foreground">Statistika još nije učitana.</p>}
+      {data?.azurirano_at && <p className="text-xs text-muted-foreground">Poslednje osvežavanje: {new Date(data.azurirano_at).toLocaleString("sr-RS")}</p>}
+    </section>
+  );
+}
 
 function Prijave() {
   const [rows, setRows] = useState<PrijavaOglasa[]>([]);
