@@ -49,6 +49,31 @@ ALTER TABLE pracenja DROP CONSTRAINT IF EXISTS pracenja_jedan_oglas;
 ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_ponuda_unique ON pracenja(user_id,ponuda_id) WHERE ponuda_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_zahtev_unique ON pracenja(user_id,zahtev_id) WHERE zahtev_id IS NOT NULL;
+-- Additive moderation state: existing listings remain visible and are never deleted.
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS moderation_status text NOT NULL DEFAULT 'visible' CHECK (moderation_status IN ('visible','hidden'));
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderation_status text NOT NULL DEFAULT 'visible' CHECK (moderation_status IN ('visible','hidden'));
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS moderation_reason text;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderation_reason text;
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS moderated_by uuid REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderated_by uuid REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS moderated_at timestamptz;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderated_at timestamptz;
+CREATE INDEX IF NOT EXISTS ponude_moderation_status_idx ON ponude(moderation_status,created_at DESC);
+CREATE INDEX IF NOT EXISTS zahtevi_moderation_status_idx ON zahtevi(moderation_status,created_at DESC);
+CREATE TABLE IF NOT EXISTS moderation_actions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ listing_table text NOT NULL CHECK (listing_table IN ('ponude','zahtevi','users')),
+ listing_id uuid NOT NULL,
+ actor_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ action text NOT NULL CHECK (action IN ('hide','restore','block_user','unblock_user')),
+ reason_code text NOT NULL,
+ note text,
+ previous_status text,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS moderation_actions_created_idx ON moderation_actions(created_at DESC);
+CREATE INDEX IF NOT EXISTS moderation_actions_listing_idx ON moderation_actions(listing_table,listing_id,created_at DESC);
+
 CREATE TABLE IF NOT EXISTS moderator_proposals (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  tabela text NOT NULL CHECK (tabela IN ('ponude','zahtevi')),
