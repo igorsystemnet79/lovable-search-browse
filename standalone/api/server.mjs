@@ -68,6 +68,7 @@ app.post('/api/admin/platform-rules/restore',auth,admin,asyncRoute(async(req,res
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
 app.post('/api/auth/register', asyncRoute(async(req,res)=>{
+ const maintenance=await pool.query('SELECT enabled,message FROM platform_maintenance WHERE singleton=true');if(maintenance.rows[0]?.enabled)return res.status(503).json({error:maintenance.rows[0].message,code:'MAINTENANCE_MODE',maintenance:true});
  const {email,password,metadata={}}=req.body||{}; const e=String(email||'').trim().toLowerCase();
  if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<6) return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 6 karaktera.'});
  if(!/^[+0-9 ()-]{6,30}$/.test(String(metadata.telefon||'')) || String(metadata.telefon||'').replace(/\D/g,'').length<6) return res.status(400).json({error:'Unesi ispravan broj telefona.'});
