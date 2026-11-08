@@ -101,7 +101,7 @@ const loadSessionUser = async tokenPayload => {
  return { valid:true };
 };
 const auth = asyncRoute(async (req,res,next) => {
- const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (!token) return res.status(401).json({ error:'Prijava je obavezna.' });
  try { req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); }
  catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
@@ -111,7 +111,7 @@ const auth = asyncRoute(async (req,res,next) => {
  next();
 });
 const optionalAuth = asyncRoute(async (req,res,next) => {
- const token = (req.headers.authorization || '').replace(/^Bearer\\s+/i,'');
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (token) {
   try { req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); }
   catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
