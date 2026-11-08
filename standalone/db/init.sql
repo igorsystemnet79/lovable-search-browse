@@ -4,6 +4,11 @@ CREATE TABLE IF NOT EXISTS storage_objects (
  object_key text PRIMARY KEY, content_type text NOT NULL, body bytea NOT NULL,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS users (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL,
+ password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
 CREATE TABLE IF NOT EXISTS platform_rules (
  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), sadrzaj text NOT NULL, version integer NOT NULL DEFAULT 1,
  published_by uuid REFERENCES users(id) ON DELETE SET NULL, published_at timestamptz NOT NULL DEFAULT now()
@@ -11,11 +16,6 @@ CREATE TABLE IF NOT EXISTS platform_rules (
 CREATE TABLE IF NOT EXISTS platform_rules_versions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), sadrzaj text NOT NULL, version integer NOT NULL UNIQUE,
  published_by uuid REFERENCES users(id) ON DELETE SET NULL, published_at timestamptz NOT NULL DEFAULT now()
-);
-CREATE TABLE IF NOT EXISTS users (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL,
- password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
- created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS profiles (
  id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
