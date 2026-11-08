@@ -220,6 +220,7 @@ function Prijave() {
             <p><span className="text-muted-foreground">Vlasnik oglasa: </span>{item.vlasnik_email || "Nedostupan podatak"}</p>
             <p><span className="text-muted-foreground">Prijavio: </span>{item.prijavio_email || (item.prijavio_id ? "Registrovani korisnik" : "Anonimna prijava")}</p>
             <p className="break-all text-xs text-muted-foreground">ID oglasa: {item.oglas_id}</p>
+            {item.oglas_naslov && <Link to="/oglas/$kind/$id" params={{ kind: item.tabela === "ponude" ? "ponuda" : "zahtev", id: item.oglas_id }} className="text-sm font-semibold text-brand hover:underline">Otvori oglas</Link>}
           </div>
           {item.detalji && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-input p-3 text-sm">{item.detalji}</p>}
           {item.admin_napomena && <p className="mt-2 text-sm text-muted-foreground">Napomena administratora: {item.admin_napomena}</p>}
