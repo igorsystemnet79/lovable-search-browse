@@ -206,6 +206,13 @@ const storage = {
   },
 };
 
+const adminSecurity = {
+  status() { return api("/api/admin/2fa/status"); },
+  setup(currentPassword: string, adminPassword: string, confirmAdminPassword: string) { return api("/api/admin/2fa/setup", { method: "POST", body: JSON.stringify({ password: currentPassword, admin_password: adminPassword, confirm_admin_password: confirmAdminPassword }) }); },
+  verifySetup(code: string) { return api("/api/admin/2fa/verify-setup", { method: "POST", body: JSON.stringify({ code }) }); },
+  challenge(email: string, password: string, code: string) { return api("/api/admin/2fa/challenge", { method: "POST", body: JSON.stringify({ email, password, code }) }); },
+};
+
 const verification = {
   async confirmEmail(token: string) { return api("/api/auth/email/confirm", { method: "POST", body: JSON.stringify({ token }) }); },
   async startPhone(verificationToken: string) { return api("/api/auth/phone/start", { method: "POST", body: JSON.stringify({ verification_token: verificationToken }) }); },
@@ -215,6 +222,7 @@ const verification = {
 export const ponudimi: any = {
   auth,
   verification,
+  adminSecurity,
   storage,
   from: (table: string) => new QueryBuilder(table),
   async rpc(fn: string, args: AnyRecord = {}) { try { const result = await api("/api/db/rpc", { method: "POST", body: JSON.stringify({ fn, args }) }); return { data: result.data, error: null }; } catch (error: any) { return { data: null, error }; } },
