@@ -7,8 +7,9 @@ CREATE TABLE IF NOT EXISTS storage_objects (
 CREATE TABLE IF NOT EXISTS users (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), email text UNIQUE NOT NULL,
  password_hash text NOT NULL, email_confirmed_at timestamptz, metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
- created_at timestamptz NOT NULL DEFAULT now()
+ created_at timestamptz NOT NULL DEFAULT now(), session_version integer NOT NULL DEFAULT 0 CHECK (session_version >= 0)
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS session_version integer NOT NULL DEFAULT 0;
 CREATE TABLE IF NOT EXISTS profiles (
  id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  ime text, telefon text, grad text, adresa text, tip_lica text NOT NULL DEFAULT 'fizicko' CHECK (tip_lica IN ('fizicko','pravno')),
