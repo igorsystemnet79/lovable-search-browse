@@ -230,7 +230,8 @@ export const ponudimi: any = {
 
 
 export async function ucitajPravilaPlatforme() {
-  return api("/api/platform-rules");
+  // Sprečava da pregledač ili posredni keš vrati staru verziju javno objavljenih pravila.
+  return api(`/api/platform-rules?refresh=${Date.now()}`);
 }
 
 export async function sacuvajPravilaPlatforme(sadrzaj: string) {
