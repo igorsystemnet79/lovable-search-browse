@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
+import type { ReactNode } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr } from "@/lib/admin.functions";
@@ -68,7 +69,7 @@ function AdminPage() {
 }
 
 
-function AdminSecurityGate({ email, children }: { email: string; children: React.ReactNode }) {
+function AdminSecurityGate({ email, children }: { email: string; children: ReactNode }) {
   const [status, setStatus] = useState<"loading" | "setup" | "challenge" | "recovery" | "ready" | "error">("loading");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
