@@ -164,7 +164,7 @@ const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}
 app.get('/api/platform/status',asyncRoute(async(req,res)=>{
  const setting=await pool.query("SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1");
  let isAdmin=false;
- const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});isAdmin=await isPlatformAdmin(payload);}catch{}}
  const row=setting.rows[0]||{};
  res.setHeader('Cache-Control','no-store');
@@ -181,7 +181,7 @@ app.put('/api/admin/maintenance',auth,admin,asyncRoute(async(req,res)=>{
 app.get('/api/maintenance-status',asyncRoute(async(req,res)=>{
  const result=await pool.query("SELECT maintenance_enabled,maintenance_message,updated_at FROM platform_settings WHERE id=1");
  let isAdmin=false;
- const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});isAdmin=await isPlatformAdmin(payload);}catch{}}
  const row=result.rows[0]||{};
  res.setHeader('Cache-Control','no-store');
@@ -234,7 +234,7 @@ app.use(asyncRoute(async(req,res,next)=>{
  if(req.path==='/api/platform/status'||req.path==='/api/maintenance-status'||req.path==='/api/platform-rules'||req.path==='/api/health'||req.path==='/'||req.path==='/sitemap.xml'||req.path==='/robots.txt'||req.path.startsWith('/api/admin/')||req.path.startsWith('/api/auth/')||req.path.startsWith('/api/storage/public')||req.path.startsWith('/uploads/'))return next();
  const setting=await pool.query('SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1');
  const row=setting.rows[0];if(!row?.maintenance_enabled)return next();
- const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
+ const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
  if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);if(role.rowCount)return next();}catch{}}
  return res.status(503).json({maintenance:true,error:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.'});
 }));
