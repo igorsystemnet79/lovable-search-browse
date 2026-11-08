@@ -716,7 +716,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(action==='upsert') return res.status(400).json({error:'Operacija upsert nije podržana. Koristi dozvoljeno dodavanje ili izmenu.'});
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
  const supplied=Array.isArray(values)?values:[values||{}];
- const userId=req.user?.sub || null; const adminUser=userId ? await isAdmin(userId) : false;
+ const userId=req.user?.sub || null; const roleAdmin=userId ? await isAdmin(userId) : false; const adminUser=roleAdmin && req.user?.admin2fa===true && !!req.user?.admin2faAt && Date.now()-Number(req.user.admin2faAt)<=15*60*1000;
  const write=action!=='select';
  if(write && !userId && !(table==='poruke_podrske' && action==='insert')) return res.status(401).json({error:'Prijava je obavezna.'});
  if(['apr_firme','apr_sinhronizacije'].includes(table) && !adminUser) return res.status(403).json({error:'Samo administrator ima pristup.'});
