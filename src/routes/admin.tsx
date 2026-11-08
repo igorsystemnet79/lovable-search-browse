@@ -102,6 +102,8 @@ function Statistika() {
       ["Ukupno registrovanih", data.korisnici.total],
       ["Fizička lica", data.korisnici.fizicka],
       ["Pravna lica", data.korisnici.pravna],
+      ["Novi korisnici · 7 dana", data.korisnici.novih_7d],
+      ["Novi korisnici · 30 dana", data.korisnici.novih_30d],
     ] },
     { title: "Ponude", items: [
       ["Ukupno ponuda", data.ponude.total],
