@@ -238,6 +238,14 @@ export async function vratiVerzijuPravilaPlatforme(id: string) {
 }
 
 
+export async function posaljiSignalPrisustva() {
+  return api("/api/presence/heartbeat", { method: "POST" });
+}
+
+export async function ucitajKorisnikeNaMrezi() {
+  return api("/api/presence/online");
+}
+
 export async function ucitajRezimOdrzavanja() {
   return api("/api/maintenance-status");
 }
