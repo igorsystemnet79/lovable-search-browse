@@ -257,7 +257,18 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
  res.set('Cache-Control','no-store').json({ok:true,used_recovery_code:usedRecovery,session:{access_token:token,token_type:'bearer',expires_in:900,user:publicUser(user)}});
 }));
 
-const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT role FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});if(r.rows.some(x=>x.role==='admin')){const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);if(!state.rows[0]?.enabled||req.user.admin2fa!==true||!req.user.admin2faAt||Date.now()-Number(req.user.admin2faAt)>15*60*1000)return res.status(401).json({error:'Za administratorsku radnju potrebna je potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});}next();});
+const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{
+ const platformAdmin=await isPlatformAdmin(req.user);
+ if(platformAdmin){
+  const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
+  if(!state.rows[0]?.enabled||req.user.admin2fa!==true||!req.user.admin2faAt||Date.now()-Number(req.user.admin2faAt)>15*60*1000)
+   return res.status(401).json({error:'Za administratorsku radnju potrebna je potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});
+  return next();
+ }
+ const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);
+ if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});
+ next();
+});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at, email_verified:!!u.email_confirmed_at });
 const passwordIsValid = value => typeof value === 'string' && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72;
