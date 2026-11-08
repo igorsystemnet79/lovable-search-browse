@@ -347,6 +347,19 @@ async function attachListingOwnerData(table, rows, authenticated) {
   return {...row,ime_prezime:ownerName,telefon:profile?.telefon || row.telefon,adresa:ownerAddress,kontakt_zasticen:false,verifikovan_korisnik:verified};
  });
 }
+// Online presence: heartbeat is refreshed by authenticated clients; stale sessions expire automatically.
+app.post('/api/presence/heartbeat',auth,asyncRoute(async(req,res)=>{
+ await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[req.user.sub]);
+ res.set('Cache-Control','no-store');res.json({ok:true,checked_at:new Date().toISOString()});
+}));
+app.get('/api/presence/online',auth,asyncRoute(async(req,res)=>{
+ const {rows}=await pool.query(`SELECT p.id,p.ime,p.prezime,p.tip_lica,p.naziv_firme,p.last_active_at
+  FROM profiles p JOIN users u ON u.id=p.id
+  WHERE p.last_active_at>now()-interval '90 seconds' AND NOT p.blokiran
+  ORDER BY COALESCE(NULLIF(p.ime,''),u.email),p.prezime
+  LIMIT 100`);
+ res.set('Cache-Control','private, no-store');res.json({data:rows});
+}));
 app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND p.moderation_status='visible' AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(await attachListingOwnerData('ponude',rows,Boolean(req.user)));}));
 app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND moderation_status='visible' AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(await attachListingOwnerData('zahtevi',rows,Boolean(req.user)));}));
 for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
