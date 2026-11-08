@@ -21,7 +21,7 @@ export function SiteHeader() {
           </Link>
           <Link
             to="/pravila-platforme"
-            className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md border border-brand-foreground/30 px-2 text-center text-xs font-semibold leading-tight transition-colors hover:bg-brand-foreground/10 sm:w-40 sm:text-sm"
+            className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md border border-amber-300 bg-amber-100 px-2 text-center text-xs font-semibold leading-tight text-amber-950 shadow-sm transition-colors hover:bg-amber-200 sm:w-40 sm:text-sm"
           >
             Pravila platforme
           </Link>
