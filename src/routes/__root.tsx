@@ -144,7 +144,7 @@ function RootComponent() {
       } catch { /* Privremeni prekid API-ja ne sme sam da aktivira režim održavanja. */ }
     };
     void check();
-    const interval = window.setInterval(check, 15000);
+    const interval = window.setInterval(check, 5000);
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
