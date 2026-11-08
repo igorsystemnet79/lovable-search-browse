@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr } from "@/lib/admin.functions";
+import { obrisiKorisnika, sinhronizujApr, adminStatistika, adminPrijaveOglasa, odluciPrijavuOglasa } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
