@@ -350,9 +350,19 @@ function PlatformSettings() {
       </div>
       <label className="mt-5 block text-sm font-medium" htmlFor="maintenance-message">Poruka koja se prikazuje posetiocima</label>
       <textarea id="maintenance-message" className={`${inputCls} mt-2 min-h-28 w-full`} maxLength={300} value={message} onChange={e => setMessage(e.target.value)} />
-      <div className="mt-5 flex flex-wrap gap-3">
-        <button type="button" disabled={busy || saving} onClick={() => save(true)} className="rounded-full bg-destructive px-5 py-2.5 text-sm font-semibold text-destructive-foreground disabled:opacity-50">{saving && !enabled ? "Čuvanje..." : "Uključi održavanje"}</button>
-        <button type="button" disabled={busy || saving} onClick={() => save(false)} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{saving && enabled ? "Čuvanje..." : "Vrati platformu u rad"}</button>
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+          <h3 className="font-semibold">Uključivanje održavanja</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Privremeno onemogućava korišćenje platforme posetiocima i korisnicima.</p>
+          <button type="button" disabled={busy || saving || enabled} onClick={() => save(true)} className="mt-4 w-full rounded-full bg-destructive px-5 py-2.5 text-sm font-semibold text-destructive-foreground disabled:opacity-50">{saving && !enabled ? "Čuvanje..." : enabled ? "Održavanje je uključeno" : "Uključi održavanje"}</button>
+        </div>
+        <div className="rounded-xl border border-green-700/30 bg-green-50 p-4">
+          <h3 className="font-semibold">Isključivanje održavanja</h3>
+          <p className="mt-1 text-sm text-muted-foreground">Uklanja obaveštenje o održavanju i ponovo omogućava korišćenje platforme.</p>
+          <button type="button" disabled={busy || saving || !enabled} onClick={() => save(false)} className="mt-4 w-full rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{saving && enabled ? "Čuvanje..." : !enabled ? "Platforma već radi" : "Isključi održavanje"}</button>
+        </div>
+      </div>
+      <div className="mt-4">
         <button type="button" disabled={busy || saving} onClick={load} className={small}>Osveži status</button>
       </div>
       {busy && <p className="mt-3 text-sm text-muted-foreground">Učitavanje statusa...</p>}
