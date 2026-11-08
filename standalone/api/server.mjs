@@ -191,8 +191,10 @@ app.get('/api/admin/2fa/status',auth,adminIdentity,asyncRoute(async(req,res)=>{
  res.set('Cache-Control','no-store').json({enabled:!!r.rows[0]?.enabled,pending:!!r.rows[0]?.pending_expires_at&&new Date(r.rows[0].pending_expires_at)>new Date(),elevated:req.user.admin2fa===true&&!!req.user.admin2faAt&&Date.now()-Number(req.user.admin2faAt)<=15*60*1000});
 }));
 app.post('/api/admin/2fa/setup',auth,adminIdentity,adminTwoFactorLimit,asyncRoute(async(req,res)=>{
- const password=String(req.body?.password||'');
- if(!password)return res.status(400).json({error:'Ponovo unesi administratorsku lozinku.'});
+ const password=String(req.body?.password||''),adminPassword=String(req.body?.admin_password||''),confirmAdminPassword=String(req.body?.confirm_admin_password||'');
+ if(!password)return res.status(400).json({error:'Ponovo unesi lozinku svog naloga.'});
+ if(adminPassword.length<12||Buffer.byteLength(adminPassword,'utf8')>72)return res.status(400).json({error:'Nova zasebna administratorska lozinka mora imati najmanje 12 karaktera i najviše 72 bajta.'});
+ if(adminPassword!==confirmAdminPassword)return res.status(400).json({error:'Potvrda administratorske lozinke se ne podudara.'});
  const account=await pool.query('SELECT password_hash FROM users WHERE id=$1',[req.user.sub]);
  if(!account.rows[0]||!(await bcrypt.compare(password,account.rows[0].password_hash)))return res.status(401).json({error:'Administratorska lozinka nije ispravna.'});
  const current=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
@@ -202,9 +204,9 @@ app.post('/api/admin/2fa/setup',auth,adminIdentity,adminTwoFactorLimit,asyncRout
  const issuer=encodeURIComponent('PonudiMi');
  const uri='otpauth://totp/'+label+'?secret='+secret+'&issuer='+issuer+'&algorithm=SHA1&digits=6&period=30';
  const qr=await QRCode.toDataURL(uri,{errorCorrectionLevel:'M',margin:2,width:280});
- await pool.query(`INSERT INTO admin_2fa(user_id,pending_secret_ciphertext,pending_expires_at,enabled)
- VALUES($1,$2,now()+interval '10 minutes',false)
- ON CONFLICT(user_id) DO UPDATE SET pending_secret_ciphertext=EXCLUDED.pending_secret_ciphertext,pending_expires_at=EXCLUDED.pending_expires_at`,[req.user.sub,encryptAdminSecret(secret)]);
+ await pool.query(`INSERT INTO admin_2fa(user_id,admin_password_hash,pending_secret_ciphertext,pending_expires_at,enabled)
+ VALUES($1,$2,$3,now()+interval '10 minutes',false)
+ ON CONFLICT(user_id) DO UPDATE SET admin_password_hash=EXCLUDED.admin_password_hash,pending_secret_ciphertext=EXCLUDED.pending_secret_ciphertext,pending_expires_at=EXCLUDED.pending_expires_at`,[req.user.sub,await bcrypt.hash(adminPassword,12),encryptAdminSecret(secret)]);
  res.set('Cache-Control','no-store').json({qr,manual_key:secret,expires_in:600});
 }));
 app.post('/api/admin/2fa/verify-setup',auth,adminIdentity,adminTwoFactorLimit,asyncRoute(async(req,res)=>{
@@ -224,9 +226,10 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
  const code=String(req.body?.code||'').trim();
  const userResult=await pool.query('SELECT u.*,p.blokiran FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.email=$1',[email]);
  const user=userResult.rows[0];
- if(!user||user.blokiran||!password||!(await bcrypt.compare(password,user.password_hash))||!(await isPlatformAdmin({sub:user.id,email:user.email})))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
- const state=await pool.query('SELECT secret_ciphertext,recovery_code_hashes,enabled FROM admin_2fa WHERE user_id=$1',[user.id]);
- if(!state.rows[0]?.enabled||!state.rows[0]?.secret_ciphertext)return res.status(409).json({error:'Google Authenticator još nije aktiviran.',code:'ADMIN_2FA_SETUP_REQUIRED'});
+ if(!user||user.blokiran||!password||!(await isPlatformAdmin({sub:user.id,email:user.email})))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
+ const state=await pool.query('SELECT secret_ciphertext,recovery_code_hashes,enabled,admin_password_hash FROM admin_2fa WHERE user_id=$1',[user.id]);
+ if(!state.rows[0]?.enabled||!state.rows[0]?.secret_ciphertext||!state.rows[0]?.admin_password_hash)return res.status(409).json({error:'Administratorska zaštita još nije podešena.',code:'ADMIN_2FA_SETUP_REQUIRED'});
+ if(!(await bcrypt.compare(password,state.rows[0].admin_password_hash)))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
  let verified=false,usedRecovery=false;
  const secret=decryptAdminSecret(state.rows[0].secret_ciphertext);
  if(/^\d{6}$/.test(code))verified=verifyTotp(secret,code);
