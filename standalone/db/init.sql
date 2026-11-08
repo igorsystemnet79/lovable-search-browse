@@ -79,6 +79,24 @@ CREATE TABLE IF NOT EXISTS poruke_podrske (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), ime text NOT NULL, email text NOT NULL,
  poruka text NOT NULL CHECK (char_length(poruka) BETWEEN 1 AND 2000), created_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS prijave_oglasa (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ tabela text NOT NULL CHECK (tabela IN ('ponude','zahtevi')),
+ oglas_id uuid NOT NULL,
+ prijavio_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ razlog text NOT NULL CHECK (razlog IN ('sumnja_na_prevaru','netacni_podaci','neispravan_kontakt','neprimeren_sadrzaj','dupliran_oglas','ostalo')),
+ detalji text CHECK (detalji IS NULL OR char_length(detalji) <= 1000),
+ status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','pregledano','odbijeno')),
+ admin_napomena text,
+ odlucio_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ odluceno_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS prijave_oglasa_status_idx ON prijave_oglasa(status,created_at DESC);
+CREATE INDEX IF NOT EXISTS prijave_oglasa_listing_idx ON prijave_oglasa(tabela,oglas_id,created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS prijave_oglasa_jedna_otvorena_po_korisniku
+ ON prijave_oglasa(prijavio_id,tabela,oglas_id) WHERE prijavio_id IS NOT NULL AND status='na_cekanju';
+
 CREATE TABLE IF NOT EXISTS apr_firme (
  pib text PRIMARY KEY CHECK (pib ~ '^[0-9]{9}$'), maticni_broj text, naziv text NOT NULL,
  sediste text, adresa text, status text, synced_at timestamptz NOT NULL DEFAULT now()
