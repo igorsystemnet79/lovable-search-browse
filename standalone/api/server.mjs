@@ -53,7 +53,13 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imat
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
+// Stricter per-endpoint limits reduce credential stuffing and SMS/email abuse.
+app.use('/api/auth/login', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, skipSuccessfulRequests: true, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše neuspešnih pokušaja prijave. Sačekaj 15 minuta pa pokušaj ponovo.' } }));
+app.use('/api/auth/register', rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše pokušaja registracije. Pokušaj ponovo kasnije.' } }));
+app.use('/api/auth/reset-request', rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše zahteva za promenu lozinke. Pokušaj ponovo kasnije.' } }));
+app.use('/api/auth/phone/start', rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/auth/phone/check', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
@@ -61,7 +67,7 @@ const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
 const storage = multer.diskStorage({ destination: uploadDir, filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`) });
-const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 7 }, fileFilter: (_req, f, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(f.mimetype)) });
+const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 1, fields: 5, parts: 6, fieldNameSize: 100, fieldSize: 1024, headerPairs: 100 }, fileFilter: (_req, f, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(f.mimetype)) });
 async function normalizeImage(buffer) {
  const output = await sharp(buffer, { limitInputPixels: 100000000 }).rotate().resize(800, 600, { fit: 'contain', background: '#ffffff', withoutEnlargement: false }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
  return output;
@@ -85,7 +91,7 @@ const auth = asyncRoute(async (req,res,next) => {
  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (!token) return res.status(401).json({ error:'Prijava je obavezna.' });
  // A database outage is not an invalid token. Keep DB errors out of this catch.
- try { req.user = jwt.verify(token, JWT_SECRET); }
+ try { req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); }
  catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
  if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
  next();
@@ -103,8 +109,9 @@ const admin = asyncRoute(async (req,res,next) => { const { rows } = await pool.q
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at, email_verified:!!u.email_confirmed_at });
-const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JWT_SECRET, { expiresIn:'7d' });
-const signVerification = userId => jwt.sign({ sub:userId, purpose:'account-verification' }, JWT_SECRET, { expiresIn:'30m' });
+const passwordIsValid = value => typeof value === 'string' && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72;
+const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JWT_SECRET, { expiresIn:'7d', algorithm:'HS256' });
+const signVerification = userId => jwt.sign({ sub:userId, purpose:'account-verification' }, JWT_SECRET, { expiresIn:'30m', algorithm:'HS256' });
 const normalizePhone = raw => {
  let p=String(raw||'').replace(/[^0-9+]/g,'');
  if(p.startsWith('00')) p='+'+p.slice(2);
@@ -144,7 +151,7 @@ app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_UR
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const {email,password,metadata={}}=req.body||{},e=String(email||'').trim().toLowerCase();
  const first=String(metadata.ime||'').trim(),last=String(metadata.prezime||'').trim(),city=String(metadata.grad||'').trim(),phone=normalizePhone(metadata.telefon);
- if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<8)return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera.'});
+ if(e.length>254||!/^\S+@\S+\.\S+$/.test(e)||!passwordIsValid(password))return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera (najviše 72 bajta).'});
  if(first.length<2||first.length>60||last.length<2||last.length>60)return res.status(400).json({error:'Ime i prezime su obavezni.'});
  if(!phone)return res.status(400).json({error:'Unesi ispravan mobilni broj u formatu +3816xxxxxxx ili 06xxxxxxx.'});
  if(city.length<2||city.length>60)return res.status(400).json({error:'Mesto stanovanja je obavezno.'});
@@ -185,7 +192,7 @@ app.post('/api/auth/email/confirm',asyncRoute(async(req,res)=>{
  }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }));
 app.post('/api/auth/phone/start',asyncRoute(async(req,res)=>{
- let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET);}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
+ let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET,{algorithms:['HS256']});}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
  if(decoded.purpose!=='account-verification')return res.status(401).json({error:'Nedozvoljena sesija za verifikaciju.'});
  const p=await pool.query('SELECT telefon,telefon_normalizovan,telefon_verifikovan_at FROM profiles WHERE id=$1',[decoded.sub]);
  if(!p.rows[0])return res.status(404).json({error:'Korisnički profil nije pronađen.'});
@@ -215,9 +222,9 @@ app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
   res.json({ok:true,verified:true,session,message:'Broj telefona je potvrđen. Tvoj nalog je sada verifikovan.'});
  }catch(e){await c.query('ROLLBACK');if(e.code==='23505')return res.status(409).json({error:'Ovaj broj telefona je već verifikovan na drugom nalogu.'});throw e;}finally{c.release();}
 }));
-app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
+app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const password=typeof req.body?.password==='string'?req.body.password:'';const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!password||Buffer.byteLength(password,'utf8')>72||!(await bcrypt.compare(password,u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT u.*,p.telefon_verifikovan_at,p.duplikat_sumnja FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});await pool.query("UPDATE profiles SET last_active_at=now() WHERE id=$1 AND (last_active_at IS NULL OR last_active_at<now()-interval '5 minutes')",[req.user.sub]);res.json({user:{...publicUser(rows[0]),phone_verified:!!rows[0].telefon_verifikovan_at,verified:!!rows[0].email_confirmed_at&&!!rows[0].telefon_verifikovan_at,duplicate_review:!!rows[0].duplikat_sumnja}});}));
-app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
+app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=typeof req.body?.password==='string'?req.body.password:'';if(!passwordIsValid(password))return res.status(400).json({error:'Lozinka mora imati najmanje 8 karaktera i najviše 72 bajta.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
  // Check mail configuration before looking up the account, so the response
  // does not reveal whether a submitted email address is registered.
@@ -230,7 +237,7 @@ app.post('/api/auth/reset-request',asyncRoute(async(req,res)=>{
  const configuredBase=process.env.PUBLIC_APP_URL||'http://localhost';const configuredOrigin=new URL(configuredBase).origin;const target=String(req.body?.redirectTo||`${configuredOrigin}/reset-lozinke`);const resetUrl=new URL(target,configuredOrigin);if(resetUrl.origin!==configuredOrigin) return res.status(400).json({error:'Adresa za promenu lozinke nije dozvoljena.'});resetUrl.searchParams.set('token',raw);const link=resetUrl.toString();
  await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — promena lozinke',text:`Za promenu lozinke otvori ovaj link (važi 1 sat): ${link}`,html:`<p>Za promenu lozinke klikni na sledeći link. Važi 1 sat.</p><p><a href="${link}">Postavi novu lozinku</a></p>`});res.json({ok:true});
 }));
-app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=String(req.body?.token||'');const password=String(req.body?.password||'');if(password.length<6)return res.status(400).json({error:'Lozinka mora imati najmanje 6 karaktera.'});const hash=createHash('sha256').update(token).digest('hex');const c=await pool.connect();try{await c.query('BEGIN');const r=await c.query('SELECT user_id FROM password_resets WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[hash]);if(!r.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});}await c.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),r.rows[0].user_id]);await c.query('DELETE FROM password_resets WHERE user_id=$1',[r.rows[0].user_id]);const u=await c.query('SELECT * FROM users WHERE id=$1',[r.rows[0].user_id]);await c.query('COMMIT');const tokenValue=sign(u.rows[0]);const userValue=publicUser(u.rows[0]);res.json({ok:true,session:{access_token:tokenValue,token_type:'bearer',expires_in:604800,user:userValue}});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
+app.post('/api/auth/reset-complete',asyncRoute(async(req,res)=>{const token=String(req.body?.token||'');const password=typeof req.body?.password==='string'?req.body.password:'';if(!passwordIsValid(password))return res.status(400).json({error:'Lozinka mora imati najmanje 8 karaktera i najviše 72 bajta.'});const hash=createHash('sha256').update(token).digest('hex');const c=await pool.connect();try{await c.query('BEGIN');const r=await c.query('SELECT user_id FROM password_resets WHERE token_hash=$1 AND expires_at>now() FOR UPDATE',[hash]);if(!r.rows[0]){await c.query('ROLLBACK');return res.status(400).json({error:'Link je istekao ili je već iskorišćen.'});}await c.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),r.rows[0].user_id]);await c.query('DELETE FROM password_resets WHERE user_id=$1',[r.rows[0].user_id]);const u=await c.query('SELECT * FROM users WHERE id=$1',[r.rows[0].user_id]);await c.query('COMMIT');const tokenValue=sign(u.rows[0]);const userValue=publicUser(u.rows[0]);res.json({ok:true,session:{access_token:tokenValue,token_type:'bearer',expires_in:604800,user:userValue}});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
 async function attachListingOwnerData(table, rows, authenticated) {
  if (!rows.length) return rows;
@@ -667,11 +674,12 @@ app.use((err,req,res,_next)=>{
  const code = err?.code;
  const transientDbCodes = new Set(['08000','08003','08006','08001','57P01','57P02','57P03','53300','53400']);
  const dbUnavailable = transientDbCodes.has(code) || ['ECONNRESET','ECONNREFUSED','ETIMEDOUT','EHOSTUNREACH'].includes(err?.cause?.code || code);
- const status = dbUnavailable ? 503 : (Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 ? err.status : 500);
+ const uploadError = err instanceof multer.MulterError;
+ const status = uploadError ? (err.code === 'LIMIT_FILE_SIZE' ? 413 : 400) : (dbUnavailable ? 503 : (Number.isInteger(err?.status) && err.status >= 400 && err.status < 500 ? err.status : 500));
  console.error('PonudiMi API request failed:', { method:req.method, path:req.path, status, code:code || err?.cause?.code || null, message:err?.message || 'Unknown error' });
  if (res.headersSent) return;
  res.status(status).json({
-  error: dbUnavailable ? 'Baza je trenutno nedostupna. Pokušaj ponovo za nekoliko trenutaka.' : (status===500 && process.env.NODE_ENV==='production' ? 'Greška na serveru.' : err.message),
+  error: uploadError ? (err.code === 'LIMIT_FILE_SIZE' ? 'Fotografija je veća od dozvoljenih 20 MB.' : 'Podaci fotografije nisu ispravni.') : (dbUnavailable ? 'Baza je trenutno nedostupna. Pokušaj ponovo za nekoliko trenutaka.' : (status===500 && process.env.NODE_ENV==='production' ? 'Greška na serveru.' : err.message)),
   code: dbUnavailable ? 'DATABASE_UNAVAILABLE' : (code || undefined),
  });
 });
