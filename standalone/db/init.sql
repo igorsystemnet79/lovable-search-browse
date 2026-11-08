@@ -342,3 +342,5 @@ CREATE TABLE IF NOT EXISTS admin_2fa (
 );
 
 ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS admin_password_hash text;
+
+ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS last_totp_step bigint;
