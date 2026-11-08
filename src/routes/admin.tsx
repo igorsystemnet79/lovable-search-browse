@@ -820,14 +820,15 @@ function UpravljanjePravilima() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const load = useCallback(async () => {
-    setBusy(true); setError(""); setMessage("");
+  const load = useCallback(async (options?: { clearNotice?: boolean }) => {
+    setBusy(true);
+    setError("");
+    if (options?.clearNotice) setMessage("");
     try {
       const current = await ucitajPravilaPlatforme();
       setText(current.data?.sadrzaj || defaultPlatformRulesText);
       setVersion(current.data?.version ?? null);
     } catch (e) {
-      // Osnovni kompletan tekst ostaje dostupan za uređivanje i kada javno objavljena verzija ne može da se učita.
       setText(previous => previous.trim() ? previous : defaultPlatformRulesText);
       setError(e instanceof Error ? e.message : "Objavljena pravila nije moguće učitati. Prikazan je kompletan osnovni tekst.");
     }
@@ -836,15 +837,25 @@ function UpravljanjePravilima() {
       setHistory(past.data || []);
     } catch {
       setHistory([]);
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function publish() {
     if (!window.confirm("Objaviti novu verziju pravila? Ona će odmah postati vidljiva svim posetiocima.")) return;
     setBusy(true); setError(""); setMessage("");
-    try { const result = await sacuvajPravilaPlatforme(text); setVersion(result.data.version); setMessage("Nova verzija pravila je objavljena."); await load(); }
-    catch (e) { setError(e instanceof Error ? e.message : "Objavljivanje nije uspelo."); }
-    finally { setBusy(false); }
+    try {
+      const result = await sacuvajPravilaPlatforme(text);
+      if (!result?.data?.version) throw new Error("Server nije potvrdio objavljivanje pravila.");
+      setVersion(result.data.version);
+      await load();
+      setMessage(`Nova verzija pravila (verzija ${result.data.version}) je uspešno objavljena.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Objavljivanje nije uspelo.");
+    } finally {
+      setBusy(false);
+    }
   }
   async function restore(id: string) {
     if (!window.confirm("Vratiti izabranu verziju? Ona će biti objavljena kao nova verzija.")) return;
