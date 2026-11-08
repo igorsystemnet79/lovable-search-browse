@@ -109,6 +109,13 @@ const storage = {
   },
 };
 
+const adminSecurity = {
+  status() { return api("/api/admin/2fa/status"); },
+  setup(password: string) { return api("/api/admin/2fa/setup", { method: "POST", body: JSON.stringify({ password }) }); },
+  verifySetup(code: string) { return api("/api/admin/2fa/verify-setup", { method: "POST", body: JSON.stringify({ code }) }); },
+  challenge(email: string, password: string, code: string) { return api("/api/admin/2fa/challenge", { method: "POST", body: JSON.stringify({ email, password, code }) }); },
+};
+
 const verification = {
   async confirmEmail(token: string) { return api("/api/auth/email/confirm", { method: "POST", body: JSON.stringify({ token }) }); },
   async startPhone(verificationToken: string) { return api("/api/auth/phone/start", { method: "POST", body: JSON.stringify({ verification_token: verificationToken }) }); },
