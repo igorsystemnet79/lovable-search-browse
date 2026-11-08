@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -23,19 +23,18 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
   const [saved, setSaved] = useState(false);
   const [photos, setPhotos] = useState<ListingPhoto[]>([]);
   const [createdId, setCreatedId] = useState<string | null>(null);
-  const [categorySearch, setCategorySearch] = useState("");
-  const filteredCategories = useMemo(() => {
-    const term = categorySearch.trim().toLocaleLowerCase("sr-Latn");
-    if (!term) return kategorije;
-    return kategorije
-      .map((category) => ({
-        ...category,
-        podkategorije: category.podkategorije.filter((subcategory) =>
-          `${category.naziv} ${subcategory}`.toLocaleLowerCase("sr-Latn").includes(term),
-        ),
-      }))
-      .filter((category) => category.naziv.toLocaleLowerCase("sr-Latn").includes(term) || category.podkategorije.length > 0);
-  }, [categorySearch]);
+  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedSubcategory, setSelectedSubcategory] = useState("");
+  const [categoryPickerOpen, setCategoryPickerOpen] = useState(false);
+  const [subcategoryPickerOpen, setSubcategoryPickerOpen] = useState(false);
+  const [pickerSearch, setPickerSearch] = useState("");
+  const selectedCategoryData = kategorije.find((category) => category.naziv === selectedCategory);
+  const visibleCategories = kategorije.filter((category) =>
+    category.naziv.toLocaleLowerCase("sr-Latn").includes(pickerSearch.trim().toLocaleLowerCase("sr-Latn")),
+  );
+  const visibleSubcategories = (selectedCategoryData?.podkategorije ?? []).filter((subcategory) =>
+    subcategory.toLocaleLowerCase("sr-Latn").includes(pickerSearch.trim().toLocaleLowerCase("sr-Latn")),
+  );
 
   useEffect(() => {
     if (!kind) return;
@@ -43,13 +42,27 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     setError("");
     setPhotos([]);
     setCreatedId(null);
+    setSelectedCategory("");
+    setSelectedSubcategory("");
+    setPickerSearch("");
     setForm({ ...empty, kontakt_ime: typeof user?.user_metadata?.["ime"] === "string" ? user.user_metadata["ime"] : "", telefon: typeof user?.user_metadata?.["telefon"] === "string" ? user.user_metadata["telefon"] : "", lokacija: typeof user?.user_metadata?.["grad"] === "string" ? user.user_metadata["grad"] : "" });
-    if (edit) { setForm(edit.values); return; }
+    if (edit) {
+      setForm(edit.values);
+      const [categoryName, subcategoryName] = edit.values.kategorija.split(" / ", 2);
+      setSelectedCategory(categoryName ?? "");
+      setSelectedSubcategory(subcategoryName ?? "");
+      return;
+    }
     try {
       const raw = sessionStorage.getItem("ponudimi-listing-draft");
       if (raw) {
         const draft = JSON.parse(raw);
-        if (draft.kind === kind) setForm({ ...empty, ...draft.form });
+        if (draft.kind === kind) {
+          setForm({ ...empty, ...draft.form });
+          const [categoryName, subcategoryName] = String(draft.form?.kategorija ?? "").split(" / ", 2);
+          setSelectedCategory(categoryName ?? "");
+          setSelectedSubcategory(subcategoryName ?? "");
+        }
       }
     } catch { /* Storage may be unavailable. */ }
   }, [kind, user?.id, edit?.id]);
@@ -75,7 +88,10 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     if (!user || !kind || busy) return;
     const result = listingFormSchema.safeParse(form);
     if (!result.success) { setError(result.error.issues[0]?.message ?? "Proveri podatke."); return; }
-    if (!vrednostKategorije(result.data.kategorija)) { setError("Izaberi kategoriju i potkategoriju."); return; }
+    if (!selectedCategory || !selectedSubcategory || !vrednostKategorije(result.data.kategorija)) {
+      setError("Obavezno izaberi kategoriju i potkategoriju.");
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -149,37 +165,58 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
             <label className="space-y-1 text-sm font-medium sm:col-span-2">{offer ? "Šta prodaješ ili nudiš?" : "Šta tražiš?"}<input className={inputCls} required minLength={3} maxLength={150} {...field("naslov")} /></label>
             <label className="space-y-1 text-sm font-medium sm:col-span-2">Opis<textarea className={inputCls} rows={3} maxLength={3000} {...field("opis")} /></label>
             <ListingImages value={photos} onChange={setPhotos} disabled={busy} />
-            <div className="space-y-2 sm:col-span-2">
-              <label className="block space-y-1 text-sm font-medium">
-                Pretraži kategorije i potkategorije
-                <input
-                  className={inputCls}
-                  type="search"
-                  value={categorySearch}
-                  onChange={(e) => setCategorySearch(e.target.value)}
-                  placeholder="Npr. stanovi, iPhone, auto-delovi, majstorske usluge…"
-                  autoComplete="off"
-                  aria-label="Pretraga kategorija i potkategorija"
-                />
-              </label>
-              <label className="block space-y-1 text-sm font-medium">
-                Kategorija i potkategorija
-                <select className={inputCls} required {...field("kategorija")}>
-                  <option value="">Izaberi kategoriju ili potkategoriju</option>
-                  {filteredCategories.map((k) => (
-                    <optgroup key={k.slug} label={k.naziv}>
-                      {k.naziv.toLocaleLowerCase("sr-Latn").includes(categorySearch.trim().toLocaleLowerCase("sr-Latn")) && (
-                        <option value={k.naziv}>Ostalo u kategoriji {k.naziv}</option>
-                      )}
-                      {k.podkategorije.map((pod) => <option key={pod} value={`${k.naziv} / ${pod}`}>{pod}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-              </label>
-              {categorySearch.trim() && filteredCategories.length === 0 && (
-                <p className="text-xs text-muted-foreground">Nema rezultata. Pokušaj sa drugim pojmom.</p>
-              )}
-              <p className="text-xs text-muted-foreground">Počni da kucaš naziv kategorije ili potkategorije da suziš izbor.</p>
+            <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+              <div className="space-y-1 text-sm font-medium">
+                <span className="block">Kategorija <span className="text-destructive">*</span></span>
+                <Button type="button" variant="outline" className="h-11 w-full justify-between rounded-md px-3 font-normal" onClick={() => { setPickerSearch(""); setCategoryPickerOpen(true); }}>
+                  <span className={selectedCategory ? "text-foreground" : "text-muted-foreground"}>{selectedCategory || "Izaberi kategoriju"}</span>
+                  <span aria-hidden="true">⌄</span>
+                </Button>
+              </div>
+              <div className="space-y-1 text-sm font-medium">
+                <span className="block">Potkategorija <span className="text-destructive">*</span></span>
+                <Button type="button" variant="outline" disabled={!selectedCategory} className="h-11 w-full justify-between rounded-md px-3 font-normal" onClick={() => { setPickerSearch(""); setSubcategoryPickerOpen(true); }}>
+                  <span className={selectedSubcategory ? "text-foreground" : "text-muted-foreground"}>{selectedSubcategory || "Izaberi potkategoriju"}</span>
+                  <span aria-hidden="true">⌄</span>
+                </Button>
+              </div>
+              <input type="hidden" name="kategorija" value={form.kategorija} />
+              <Dialog open={categoryPickerOpen} onOpenChange={setCategoryPickerOpen}>
+                <DialogContent className="max-h-[80dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg bg-surface">
+                  <DialogHeader><DialogTitle>Izaberi kategoriju</DialogTitle><DialogDescription>Odaberi kategoriju kojoj pripada tvoj oglas ili zahtev.</DialogDescription></DialogHeader>
+                  <input className={inputCls} type="search" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Pretraži kategorije…" autoComplete="off" />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {visibleCategories.map((category) => (
+                      <Button key={category.slug} type="button" variant={selectedCategory === category.naziv ? "default" : "outline"} className="h-auto min-h-11 justify-start whitespace-normal text-left" onClick={() => {
+                        setSelectedCategory(category.naziv);
+                        setSelectedSubcategory("");
+                        setForm((old) => ({ ...old, kategorija: "" }));
+                        setCategoryPickerOpen(false);
+                        setPickerSearch("");
+                      }}>{category.naziv}</Button>
+                    ))}
+                    {visibleCategories.length === 0 && <p className="text-sm text-muted-foreground sm:col-span-2">Nema rezultata pretrage.</p>}
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <Dialog open={subcategoryPickerOpen} onOpenChange={setSubcategoryPickerOpen}>
+                <DialogContent className="max-h-[80dvh] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-lg bg-surface">
+                  <DialogHeader><DialogTitle>Izaberi potkategoriju</DialogTitle><DialogDescription>{selectedCategory} — izaberi odgovarajuću potkategoriju.</DialogDescription></DialogHeader>
+                  <input className={inputCls} type="search" value={pickerSearch} onChange={(e) => setPickerSearch(e.target.value)} placeholder="Pretraži potkategorije…" autoComplete="off" />
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {visibleSubcategories.map((subcategory) => (
+                      <Button key={subcategory} type="button" variant={selectedSubcategory === subcategory ? "default" : "outline"} className="h-auto min-h-11 justify-start whitespace-normal text-left" onClick={() => {
+                        setSelectedSubcategory(subcategory);
+                        setForm((old) => ({ ...old, kategorija: `${selectedCategory} / ${subcategory}` }));
+                        setSubcategoryPickerOpen(false);
+                        setPickerSearch("");
+                      }}>{subcategory}</Button>
+                    ))}
+                    {visibleSubcategories.length === 0 && <p className="text-sm text-muted-foreground sm:col-span-2">Nema rezultata pretrage.</p>}
+                  </div>
+                </DialogContent>
+              </Dialog>
+              <p className="text-xs text-muted-foreground sm:col-span-2">Obavezno je izabrati prvo kategoriju, a zatim jednu od njenih potkategorija.</p>
             </div>
             <label className="space-y-1 text-sm font-medium">Grad / mesto<input className={inputCls} required minLength={2} maxLength={100} {...field("lokacija")} /></label>
             <label className="space-y-1 text-sm font-medium">{offer ? "Prodavac / ponuđač" : "Ime osobe za kontakt"}<input className={inputCls} required minLength={2} maxLength={100} autoComplete="name" {...field("kontakt_ime")} /></label>
