@@ -64,11 +64,7 @@ export function SiteHeader() {
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
-              <span className="inline-flex min-h-10 items-center justify-center gap-2 px-1 text-center text-brand-foreground/80">
-                <span className="relative inline-flex h-2.5 w-2.5 shrink-0" title="Na mreži" aria-label="Na mreži">
-                  <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-50" />
-                  <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                </span>
+              <span className="inline-flex min-h-10 items-center justify-center px-1 text-center text-brand-foreground/80">
                 <span className="hidden sm:inline">{(user.user_metadata?.["ime"] as string) || user.email}</span>
               </span>
               <button
