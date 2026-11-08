@@ -128,12 +128,9 @@ const adminIdentity = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
  next();
 });
+// Privremeno isključena dodatna Google Authenticator potvrda; administratorska prava se i dalje proveravaju.
 const admin = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
- const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
- if (!state.rows[0]?.enabled) return res.status(403).json({error:'Pre pristupa administraciji potrebno je aktivirati Google Authenticator.',code:'ADMIN_2FA_SETUP_REQUIRED'});
- if (req.user.admin2fa!==true || !req.user.admin2faAt || Date.now()-Number(req.user.admin2faAt)>15*60*1000)
-  return res.status(401).json({error:'Potrebna je dodatna potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});
  next();
 });
 const encryptionKey = () => {
@@ -258,13 +255,7 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
 }));
 
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{
- const platformAdmin=await isPlatformAdmin(req.user);
- if(platformAdmin){
-  const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);
-  if(!state.rows[0]?.enabled||req.user.admin2fa!==true||!req.user.admin2faAt||Date.now()-Number(req.user.admin2faAt)>15*60*1000)
-   return res.status(401).json({error:'Za administratorsku radnju potrebna je potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});
-  return next();
- }
+ if(await isPlatformAdmin(req.user)) return next();
  const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);
  if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});
  next();
@@ -737,7 +728,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(action==='upsert') return res.status(400).json({error:'Operacija upsert nije podržana. Koristi dozvoljeno dodavanje ili izmenu.'});
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
  const supplied=Array.isArray(values)?values:[values||{}];
- const userId=req.user?.sub || null; const roleAdmin=userId ? (String(req.user?.email||'').trim().toLowerCase()==='igorsystemnet@gmail.com' || await isAdmin(userId)) : false; const adminUser=roleAdmin && req.user?.admin2fa===true && !!req.user?.admin2faAt && Date.now()-Number(req.user.admin2faAt)<=15*60*1000;
+ const userId=req.user?.sub || null; const roleAdmin=userId ? (String(req.user?.email||'').trim().toLowerCase()==='igorsystemnet@gmail.com' || await isAdmin(userId)) : false; const adminUser=roleAdmin;
  const write=action!=='select';
  if(write && !userId && !(table==='poruke_podrske' && action==='insert')) return res.status(401).json({error:'Prijava je obavezna.'});
  if(['apr_firme','apr_sinhronizacije'].includes(table) && !adminUser) return res.status(403).json({error:'Samo administrator ima pristup.'});
