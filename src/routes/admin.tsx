@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { API_ORIGIN, ponudimi } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
@@ -28,7 +28,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -60,6 +60,7 @@ function AdminPage() {
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
             {tab === "APR firme" && <Apr />}
+            {tab === "Pravila platforme" && <UpravljanjePravilima />}
             {tab === "ChatGPT" && <AdminChatGPT />}
           </>
         ) : <ModeratorWorkspace />}
@@ -805,4 +806,43 @@ function PredloziZaOdobrenje() {
   <div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Trenutni oglas</p>{Object.entries(p.trenutni_podaci||{}).filter(([k])=>["naslov","opis","kategorija","lokacija","cena","budzet","valuta","kontakt_ime","telefon"].includes(k)).map(([k,v])=><p key={k} className="text-sm"><b>{k}:</b> {String(v??"—")}</p>)}</div><div><p className="mb-1 text-xs font-semibold uppercase text-muted-foreground">Predložena izmena</p>{Object.entries(p.predlozeni_podaci||{}).map(([k,v])=><p key={k} className="text-sm"><b>{k}:</b> {String(v??"—")}</p>)}</div></div>
   {p.status==="na_cekanju"&&<div className="mt-3 flex gap-2"><button className={small} disabled={busy===p.id} onClick={()=>decide(p,"odobreno")}>Odobri izmenu</button><button className={danger} disabled={busy===p.id} onClick={()=>decide(p,"odbijeno")}>Odbij</button></div>}{p.admin_napomena&&<p className="mt-2 text-sm text-muted-foreground">Napomena: {p.admin_napomena}</p>}</div>)}
  {!rows.length&&<p className="text-sm text-muted-foreground">Trenutno nema predloga moderatora.</p>}</div>;
+}
+
+function UpravljanjePravilima() {
+  const [text, setText] = useState("");
+  const [history, setHistory] = useState<any[]>([]);
+  const [version, setVersion] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const [current, past] = await Promise.all([ucitajPravilaPlatforme(), ucitajIstorijuPravilaPlatforme()]);
+      setText(current.data?.sadrzaj || ""); setVersion(current.data?.version ?? null); setHistory(past.data || []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Pravila nije moguće učitati."); }
+    finally { setBusy(false); }
+  }, []);
+  useEffect(() => { void load(); }, [load]);
+  async function publish() {
+    if (!window.confirm("Objaviti novu verziju pravila? Ona će odmah postati vidljiva svim posetiocima.")) return;
+    setBusy(true); setError(""); setMessage("");
+    try { const result = await sacuvajPravilaPlatforme(text); setVersion(result.data.version); setMessage("Nova verzija pravila je objavljena."); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Objavljivanje nije uspelo."); }
+    finally { setBusy(false); }
+  }
+  async function restore(id: string) {
+    if (!window.confirm("Vratiti izabranu verziju? Ona će biti objavljena kao nova verzija.")) return;
+    setBusy(true); setError(""); setMessage("");
+    try { const result = await vratiVerzijuPravilaPlatforme(id); setText(result.data.sadrzaj); setVersion(result.data.version); setMessage("Izabrana verzija je vraćena i objavljena."); await load(); }
+    catch (e) { setError(e instanceof Error ? e.message : "Vraćanje verzije nije uspelo."); }
+    finally { setBusy(false); }
+  }
+  return <section className="space-y-4">
+    <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm"><h2 className="font-semibold">Upravljanje pravilima platforme</h2><p className="mt-1 text-sm">Izmene i objavljivanje dostupni su isključivo administratoru. Objavljeni tekst odmah se prikazuje na javnoj stranici „Pravila platforme“.</p><p className="mt-2 text-xs">Trenutna verzija: {version ?? "Još nije objavljena iz administracije"}</p></div>
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}{message && <p role="status" className="text-sm text-green-700">{message}</p>}
+    <label className="block space-y-2"><span className="text-sm font-semibold">Tekst pravila</span><textarea value={text} onChange={e => setText(e.target.value)} rows={20} maxLength={50000} disabled={busy} placeholder="Unesi kompletan tekst pravila platforme..." className="w-full rounded-xl border border-input bg-background p-4 text-sm leading-6 outline-none focus:ring-2 focus:ring-amber-400" /></label>
+    <div className="flex flex-wrap gap-2"><button type="button" className="min-h-10 rounded-full border border-input px-4 py-2 text-sm font-medium hover:bg-secondary" onClick={() => void load()} disabled={busy}>Osveži</button><button type="button" className="min-h-10 rounded-full border border-amber-400 bg-amber-100 px-5 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-200 disabled:opacity-50" onClick={() => void publish()} disabled={busy || text.trim().length < 30}>{busy ? "Sačekaj..." : "Sačuvaj i objavi pravila"}</button></div>
+    <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Istorija objavljenih verzija</h3><p className="mt-1 text-xs text-muted-foreground">Čuva se do 50 poslednjih verzija u pregledu. Vraćanje stare verzije objavljuje je kao novu, bez brisanja istorije.</p><div className="mt-3 space-y-2">{history.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"><div><p className="text-sm font-semibold">Verzija {item.version}</p><p className="text-xs text-muted-foreground">{new Date(item.published_at).toLocaleString("sr-RS")}</p></div><button type="button" className={small} onClick={() => void restore(item.id)} disabled={busy || item.version === version}>Vrati ovu verziju</button></div>)}{!history.length && <p className="text-sm text-muted-foreground">Još nema objavljenih verzija kroz ovaj panel.</p>}</div></div>
+  </section>;
 }
