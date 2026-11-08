@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -51,6 +51,7 @@ function AdminPage() {
         {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
         {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
+        {tab === "Platforma" && <PlatformSettings />}
       </>
     );
 
@@ -291,5 +292,73 @@ function Apr() {
         </table>
       </div>
     </div>
+  );
+}
+
+
+function PlatformSettings() {
+  const [enabled, setEnabled] = useState(false);
+  const [message, setMessage] = useState("Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.");
+  const [busy, setBusy] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [updatedAt, setUpdatedAt] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const token = () => {
+    try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; }
+    catch { return ""; }
+  };
+  const load = useCallback(async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/platform/status", { cache: "no-store", headers: { Authorization: `Bearer ${token()}` } });
+      if (!response.ok) throw new Error("Nije moguće učitati status platforme.");
+      const data = await response.json();
+      setEnabled(!!data.maintenance);
+      setMessage(data.message || "Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju."); }
+    finally { setBusy(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function save(next: boolean) {
+    setSaving(true); setNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/maintenance", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ enabled: next, message }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Promena statusa nije uspela.");
+      setEnabled(!!data.maintenance_enabled);
+      setUpdatedAt(data.updated_at || new Date().toISOString());
+      setNotice(next ? "Režim održavanja je uključen." : "Platforma je ponovo dostupna korisnicima.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Promena statusa nije uspela."); }
+    finally { setSaving(false); }
+  }
+  return (
+    <section className="max-w-2xl rounded-2xl bg-surface p-5 shadow-card sm:p-6">
+      <h2 className="text-xl font-semibold">Režim održavanja platforme</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Privremeno zaustavlja korišćenje platforme za sve posetioce. Administratori i dalje mogu da pristupe panelu i rade na izmenama.</p>
+      <div className="mt-5 flex items-center justify-between gap-4 rounded-xl border border-input p-4">
+        <div>
+          <p className="font-semibold">Trenutni status</p>
+          <p className={enabled ? "mt-1 text-sm font-semibold text-destructive" : "mt-1 text-sm font-semibold text-green-700"}>{enabled ? "Održavanje je uključeno" : "Platforma je dostupna"}</p>
+        </div>
+        <span className={enabled ? "rounded-full bg-destructive/10 px-3 py-1 text-xs font-semibold text-destructive" : "rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800"}>{enabled ? "ZATVORENA" : "AKTIVNA"}</span>
+      </div>
+      <label className="mt-5 block text-sm font-medium" htmlFor="maintenance-message">Poruka koja se prikazuje posetiocima</label>
+      <textarea id="maintenance-message" className={`${inputCls} mt-2 min-h-28 w-full`} maxLength={300} value={message} onChange={e => setMessage(e.target.value)} />
+      <div className="mt-5 flex flex-wrap gap-3">
+        <button type="button" disabled={busy || saving} onClick={() => save(true)} className="rounded-full bg-destructive px-5 py-2.5 text-sm font-semibold text-destructive-foreground disabled:opacity-50">{saving && !enabled ? "Čuvanje..." : "Uključi održavanje"}</button>
+        <button type="button" disabled={busy || saving} onClick={() => save(false)} className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{saving && enabled ? "Čuvanje..." : "Vrati platformu u rad"}</button>
+        <button type="button" disabled={busy || saving} onClick={load} className={small}>Osveži status</button>
+      </div>
+      {busy && <p className="mt-3 text-sm text-muted-foreground">Učitavanje statusa...</p>}
+      {notice && <p role="status" className="mt-3 text-sm font-medium text-green-700">{notice}</p>}
+      {error && <p role="alert" className="mt-3 text-sm font-medium text-destructive">{error}</p>}
+      {updatedAt && <p className="mt-2 text-xs text-muted-foreground">Poslednja izmena: {new Date(updatedAt).toLocaleString("sr-RS")}</p>}
+    </section>
   );
 }
