@@ -300,6 +300,22 @@ BEGIN
 END $$;
 
 
+-- Platform rules and version history used by the public site and admin panel.
+CREATE TABLE IF NOT EXISTS platform_rules (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true),
+ sadrzaj text NOT NULL,
+ version integer NOT NULL DEFAULT 1,
+ published_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ published_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS platform_rules_versions (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ sadrzaj text NOT NULL,
+ version integer NOT NULL UNIQUE,
+ published_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ published_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Global platform maintenance switch, controlled only by administrators.
 CREATE TABLE IF NOT EXISTS platform_settings (
  id smallint PRIMARY KEY CHECK (id=1),
