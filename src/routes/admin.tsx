@@ -811,19 +811,30 @@ function PredloziZaOdobrenje() {
 }
 
 function UpravljanjePravilima() {
-  const [text, setText] = useState("");
+  // Uvek prikaži kompletan tekst pravila odmah, čak i ako API istorije privremeno nije dostupan.
+  const [text, setText] = useState(defaultPlatformRulesText);
   const [history, setHistory] = useState<any[]>([]);
   const [version, setVersion] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const load = useCallback(async () => {
-    setBusy(true); setError("");
+    setBusy(true); setError(""); setMessage("");
     try {
-      const [current, past] = await Promise.all([ucitajPravilaPlatforme(), ucitajIstorijuPravilaPlatforme()]);
-      setText(current.data?.sadrzaj || defaultPlatformRulesText); setVersion(current.data?.version ?? null); setHistory(past.data || []);
-    } catch (e) { setError(e instanceof Error ? e.message : "Pravila nije moguće učitati."); }
-    finally { setBusy(false); }
+      const current = await ucitajPravilaPlatforme();
+      setText(current.data?.sadrzaj || defaultPlatformRulesText);
+      setVersion(current.data?.version ?? null);
+    } catch (e) {
+      // Osnovni kompletan tekst ostaje dostupan za uređivanje i kada javno objavljena verzija ne može da se učita.
+      setText(previous => previous.trim() ? previous : defaultPlatformRulesText);
+      setError(e instanceof Error ? e.message : "Objavljena pravila nije moguće učitati. Prikazan je kompletan osnovni tekst.");
+    }
+    try {
+      const past = await ucitajIstorijuPravilaPlatforme();
+      setHistory(past.data || []);
+    } catch {
+      setHistory([]);
+    } finally { setBusy(false); }
   }, []);
   useEffect(() => { void load(); }, [load]);
   async function publish() {
@@ -843,7 +854,8 @@ function UpravljanjePravilima() {
   return <section className="space-y-4">
     <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-sm"><h2 className="font-semibold">Upravljanje pravilima platforme</h2><p className="mt-1 text-sm">Izmene i objavljivanje dostupni su isključivo administratoru. Objavljeni tekst odmah se prikazuje na javnoj stranici „Pravila platforme“.</p><p className="mt-2 text-xs">Trenutna verzija: {version ?? "Još nije objavljena iz administracije"}</p></div>
     {error && <p role="alert" className="text-sm text-destructive">{error}</p>}{message && <p role="status" className="text-sm text-green-700">{message}</p>}
-    <label className="block space-y-2"><span className="text-sm font-semibold">Tekst pravila</span><textarea value={text} onChange={e => setText(e.target.value)} rows={20} maxLength={50000} disabled={busy} placeholder="Unesi kompletan tekst pravila platforme..." className="w-full rounded-xl border border-input bg-background p-4 text-sm leading-6 outline-none focus:ring-2 focus:ring-amber-400" /></label>
+    <div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-semibold">Kompletan tekst pravila platforme</h3><p className="text-xs text-muted-foreground">Sva pravila su dostupna za uređivanje u jednom polju. Izmene postaju javne tek kada izabereš „Sačuvaj i objavi pravila“.</p></div><button type="button" className={small} onClick={() => { if (window.confirm("Učitati kompletan osnovni tekst pravila? Time će se zameniti trenutni sadržaj polja, bez objavljivanja.")) { setText(defaultPlatformRulesText); setMessage("Učitan je kompletan osnovni tekst. Sačuvaj i objavi kada završiš izmene."); setError(""); } }} disabled={busy}>Učitaj kompletna osnovna pravila</button></div>
+    <label className="block space-y-2"><span className="text-sm font-semibold">Tekst svih pravila — slobodno uređivanje</span><textarea value={text} onChange={e => setText(e.target.value)} rows={30} maxLength={50000} disabled={busy} placeholder="Kompletan tekst pravila platforme..." className="w-full min-h-[650px] rounded-xl border border-input bg-background p-4 text-sm leading-6 outline-none focus:ring-2 focus:ring-amber-400" /></label>
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Pregled teksta</h3><div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-xl bg-background p-4 text-sm leading-6 text-muted-foreground">{text || "Pregled će se prikazati kada uneseš tekst pravila."}</div></div>
     <div className="flex flex-wrap gap-2"><button type="button" className="min-h-10 rounded-full border border-input px-4 py-2 text-sm font-medium hover:bg-secondary" onClick={() => void load()} disabled={busy}>Osveži</button><button type="button" className="min-h-10 rounded-full border border-amber-400 bg-amber-100 px-5 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-200 disabled:opacity-50" onClick={() => void publish()} disabled={busy || text.trim().length < 30}>{busy ? "Sačekaj..." : "Sačuvaj i objavi pravila"}</button></div>
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Istorija objavljenih verzija</h3><p className="mt-1 text-xs text-muted-foreground">Čuva se do 50 poslednjih verzija u pregledu. Vraćanje stare verzije objavljuje je kao novu, bez brisanja istorije.</p><div className="mt-3 space-y-2">{history.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"><div><p className="text-sm font-semibold">Verzija {item.version}</p><p className="text-xs text-muted-foreground">{new Date(item.published_at).toLocaleString("sr-RS")}</p></div><button type="button" className={small} onClick={() => void restore(item.id)} disabled={busy || item.version === version}>Vrati ovu verziju</button></div>)}{!history.length && <p className="text-sm text-muted-foreground">Još nema objavljenih verzija kroz ovaj panel.</p>}</div></div>
