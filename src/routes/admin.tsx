@@ -300,12 +300,13 @@ function AdminChatGPT() {
 function Korisnici({ selfId }: { selfId: string }) {
   const [profili, setProfili] = useState<Profil[]>([]);
   const [uloge, setUloge] = useState<Record<string, Uloga[]>>({});
+  const [aktivnost, setAktivnost] = useState<Record<string, { ponude: number; zahtevi: number }>>({});
   const [filter, setFilter] = useState("");
   const [edit, setEdit] = useState<Profil | null>(null);
   const [msg, setMsg] = useState("");
 
   const load = useCallback(async () => {
-    const ucitajSve = async (tabela: "profiles" | "user_roles") => {
+    const ucitajSve = async (tabela: "profiles" | "user_roles" | "ponude" | "zahtevi") => {
       const svi: any[] = [];
       for (let offset = 0; ; offset += 500) {
         let query = ponudimi.from(tabela).select("*");
@@ -319,11 +320,15 @@ function Korisnici({ selfId }: { selfId: string }) {
       return svi;
     };
     try {
-      const [p, r] = await Promise.all([ucitajSve("profiles"), ucitajSve("user_roles")]);
+      const [p, r, ponude, zahtevi] = await Promise.all([ucitajSve("profiles"), ucitajSve("user_roles"), ucitajSve("ponude"), ucitajSve("zahtevi")]);
       setProfili(p as Profil[]);
       const m: Record<string, Uloga[]> = {};
       for (const x of r) (m[x.user_id] ??= []).push(x.role);
       setUloge(m);
+      const counts: Record<string, { ponude: number; zahtevi: number }> = {};
+      for (const x of ponude) if (x.user_id) (counts[x.user_id] ??= { ponude: 0, zahtevi: 0 }).ponude++;
+      for (const x of zahtevi) if (x.user_id) (counts[x.user_id] ??= { ponude: 0, zahtevi: 0 }).zahtevi++;
+      setAktivnost(counts);
     } catch {
       setMsg("Učitavanje korisnika nije uspelo. Osvežite stranicu i pokušajte ponovo.");
     }
@@ -408,6 +413,8 @@ function Korisnici({ selfId }: { selfId: string }) {
                     {p.blokiran && <span className="font-semibold text-destructive">BLOKIRAN</span>}
                   </p>
                   <p className="mt-1 text-xs">Uloge: {r.join(", ") || "nema"}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Ponude: {aktivnost[p.id]?.ponude ?? 0} · Zahtevi: {aktivnost[p.id]?.zahtevi ?? 0} · Poslednja aktivnost: {p.last_active_at ? new Date(p.last_active_at).toLocaleString("sr-RS") : "Nema podataka"}</p>
+                  <p className="text-xs text-muted-foreground">Registrovan: {p.created_at ? new Date(p.created_at).toLocaleDateString("sr-RS") : "—"}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
