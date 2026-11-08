@@ -48,7 +48,6 @@ function AdminPage() {
       <>
         {isAdmin ? (
           <>
-          <>
             <div className="mb-6 flex flex-wrap gap-2">
               {tabs.map((t) => (
                 <button key={t} onClick={() => setTab(t)} className={`min-h-10 rounded-full px-4 py-2 text-sm font-medium ${tab === t ? "bg-brand text-brand-foreground" : t === "Pravila platforme" ? "border border-amber-300 bg-amber-100 text-amber-950 hover:bg-amber-200" : "border border-input hover:bg-secondary"}`}>{t === "Odobrenja" && pendingCount > 0 ? `Odobrenja (${pendingCount})` : t}</button>
