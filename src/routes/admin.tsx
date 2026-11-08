@@ -128,7 +128,7 @@ function AdminSecurityGate({ email, children }: { email: string; children: React
       <h2 className="text-xl font-semibold">Sačuvaj rezervne kodove</h2>
       <p className="mt-2 text-sm text-muted-foreground">Svaki kod može da se iskoristi samo jednom. Sačuvaj ih na bezbednom mestu van ovog telefona. Neće ponovo biti prikazani.</p>
       <div className="my-4 grid grid-cols-2 gap-2 rounded-xl bg-background p-3 font-mono text-sm">{recoveryCodes.map((value) => <span key={value}>{value}</span>)}</div>
-      <button className={small} onClick={() => { setRecoveryCodes([]); setPassword(""); setCurrentPassword(""); setConfirmPassword(""); setCode(""); setMessage("Authenticator je aktiviran. Sada potvrdi administratorski pristup zasebnom lozinkom i kodom."); setStatus("challenge"); }}>Sačuvao sam kodove — nastavi</button>
+      <button className={small} onClick={() => { setRecoveryCodes([]); setPassword(""); setCurrentPassword(""); setConfirmPassword(""); setCode(""); setMessage("Authenticator je aktiviran. Sačekaj da se kod u aplikaciji promeni, pa potvrdi pristup zasebnom administratorskom lozinkom i novim kodom."); setStatus("challenge"); }}>Sačuvao sam kodove — nastavi</button>
     </section>
   );
 
