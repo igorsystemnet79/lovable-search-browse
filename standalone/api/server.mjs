@@ -355,25 +355,9 @@ app.get('/api/my/moderator-proposals',auth,asyncRoute(async(req,res)=>{
  ORDER BY mp.created_at DESC LIMIT 200`,[req.user.sub]);
  res.json(result.rows);
 }));
-app.post('/api/my/moderator-proposals/:id/decision',auth,asyncRoute(async(req,res)=>{
- const decision=req.body?.decision;
- if(!['odobreno','odbijeno'].includes(decision))return res.status(400).json({error:'Izaberite odobrenje ili odbijanje.'});
- const c=await pool.connect();
- try{
-  await c.query('BEGIN');
-  const found=await c.query('SELECT * FROM moderator_proposals WHERE id=$1 FOR UPDATE',[req.params.id]);
-  const proposal=found.rows[0];
-  if(!proposal){await c.query('ROLLBACK');return res.status(404).json({error:'Predlog nije pronađen.'});}
-  if(proposal.status!=='na_cekanju'){await c.query('ROLLBACK');return res.status(409).json({error:'O ovom predlogu je već odlučeno.'});}
-  const listing=await c.query('SELECT id,user_id FROM '+proposal.tabela+' WHERE id=$1 FOR UPDATE',[proposal.oglas_id]);
-  if(!listing.rows[0]||listing.rows[0].user_id!==req.user.sub){await c.query('ROLLBACK');return res.status(403).json({error:'Samo vlasnik oglasa može odlučiti o ovom predlogu.'});}
-  if(decision==='odobreno'){
-   const allowed=proposalFields(proposal.tabela),patch=proposal.predlozeni_podaci||{},keys=Object.keys(patch);
-   if(!keys.length||keys.some(k=>!allowed.includes(k)))throw new Error('Predlog sadrži nedozvoljena polja.');
-   const current=await c.query('SELECT * FROM '+proposal.tabela+' WHERE id=$1 FOR UPDATE',[proposal.oglas_id]);
-   for(const key of keys)if(JSON.stringify(current.rows[0][key]??null)!==JSON.stringify(proposal.trenutni_podaci?.[key]??null))throw new Error('Oglas je u međuvremenu izmenjen. Predlog je potrebno ponovo proveriti.');
-   const vals=keys.map(k=>patch[k]);vals.push(proposal.oglas_id);
-   const sets=keys.map((k,i)=>'"'+k+'"=
+app.post('/api/my/moderator-proposals/:id/decision',auth,asyncRoute(async(_req,res)=>{
+ res.status(403).json({error:'Vlasnik oglasa ne može da odbije niti poništi bezbednosne izmene administratora ili moderatora.'});
+}));
 app.post('/api/podrska',supportMessageLimiter,asyncRoute(async(req,res)=>{const ime=typeof req.body?.ime==='string'?req.body.ime.trim():'';const email=typeof req.body?.email==='string'?req.body.email.trim().toLowerCase():'';const poruka=typeof req.body?.poruka==='string'?req.body.poruka.trim():'';if(ime.length<2||ime.length>100||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||poruka.length<5||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci. Ime, email i poruka moraju biti ispravno uneti.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
 app.post('/api/reports',optionalAuth,asyncRoute(async(req,res)=>{
  const {tabela,oglas_id,razlog}=req.body||{};
