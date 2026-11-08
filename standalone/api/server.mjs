@@ -209,6 +209,14 @@ app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=
  if(!result.rows[0])return res.status(409).json({error:'Prijava ne postoji ili je već obrađena.'});
  res.json(result.rows[0]);
 }));
+app.get('/api/admin/stats',auth,admin,asyncRoute(async(_req,res)=>{
+ const queries=await Promise.all([
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE tip_lica=\'fizicko\')::int AS fizicka,count(*) FILTER (WHERE tip_lica=\'pravno\')::int AS pravna FROM profiles'),
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivne,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novih_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novih_30d FROM ponude'),
+  pool.query('SELECT count(*)::int AS total,count(*) FILTER (WHERE NOT pauziran AND NOT zavrseno)::int AS aktivni,count(*) FILTER (WHERE created_at>=now()-interval \'7 days\')::int AS novi_7d,count(*) FILTER (WHERE created_at>=now()-interval \'30 days\')::int AS novi_30d FROM zahtevi')
+ ]);
+ res.json({korisnici:queries[0].rows[0],ponude:queries[1].rows[0],zahtevi:queries[2].rows[0],azurirano_at:new Date().toISOString()});
+}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
 
