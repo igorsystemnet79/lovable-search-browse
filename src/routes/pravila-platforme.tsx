@@ -98,9 +98,9 @@ const sections = [
     title: "Uloga i ovlašćenja PonudiMi platforme",
     icon: ShieldCheck,
     paragraphs: [
-      "Korisnici samostalno kreiraju i dostavljaju oglase i zahteve. PonudiMi obezbeđuje tehničko okruženje za njihovo objavljivanje i povezivanje korisnika; samo prisustvo oglasa na platformi ne predstavlja garanciju kvaliteta, zakonitosti, vlasništva, autentičnosti ili ispunjenja obaveza druge strane.",
-      "U meri dozvoljenoj zakonom, PonudiMi može da pregleda prijavljeni sadržaj, zatraži dodatna objašnjenja, privremeno ograniči vidljivost, ukloni sadržaj, ograniči pojedine funkcije ili suspenduje nalog kada postoji osnovana sumnja na kršenje ovih pravila ili propisa.",
-      "Mere se određuju prema prirodi, ozbiljnosti i ponavljanju povrede, uz poštovanje važećih zakonskih obaveza. Ova pravila ne isključuju odgovornost ili obaveze platforme koje se ne mogu isključiti ugovorom.",
+      "Korisnici samostalno kreiraju oglase i zahteve i zaključuju eventualne ugovore neposredno jedni sa drugima. PonudiMi pruža tehničku uslugu objavljivanja, pretraživanja i povezivanja korisnika. Osim ako je u konkretnom slučaju izričito navedeno drugačije, PonudiMi nije prodavac, kupac, pružalac oglašene usluge, zastupnik niti ugovorna strana u poslu između korisnika.",
+      "PonudiMi postupa po prijavama i zahtevima u skladu sa važećim propisima. Platforma može da zatraži dodatne informacije, ograniči vidljivost, ukloni sadržaj ili ograniči/suspenduje nalog kada za to postoji zakonski ili ugovorni osnov.",
+      "Ništa u ovim pravilima ne isključuje niti ograničava odgovornost, zakonske obaveze ili prava korisnika koja se prema prinudnim propisima ne mogu isključiti ili ograničiti.",
     ],
   },
   {
@@ -108,8 +108,8 @@ const sections = [
     title: "Prijava povrede pravila",
     icon: MessageCircle,
     paragraphs: [
-      "Ako primetite sumnjiv oglas, zabranjen sadržaj, prevaru ili povredu prava, prijavite ga kroz odeljak Podrška izborom opcije „Pošalji upit“. Navedite link ili podatke oglasa, opis problema i informacije koje mogu pomoći proveri.",
-      "PonudiMi može zatražiti dodatne informacije i preduzeti odgovarajuće mere u skladu sa zakonom i ovim pravilima. Ne šaljite nepotrebne osetljive podatke niti dokumenta koja nisu potrebna za proveru prijave.",
+      "Ako primetite sumnjiv oglas, zabranjen ili nezakonit sadržaj, prevaru ili povredu prava, prijavite ga kroz odeljak Podrška izborom opcije „Pošalji upit“. Navedite tačan link ili identifikaciju sadržaja, razlog prijave i podatke koji omogućavaju proveru. Nemojte slati nepotrebne osetljive podatke.",
+      "PonudiMi razmatra prijave bez nepotrebnog odlaganja i preduzima mere u skladu sa zakonom. Kada se primenjuje član 20. Zakona o elektronskoj trgovini, po zahtevu trećeg lica za uklanjanje nedopuštenog sadržaja postupa se u zakonskom roku, po pravilu najkasnije dva radna dana od prijema zahteva, osim u zakonom predviđenom slučaju osporavanja nedopuštenosti i obraćanja nadležnom organu.",
     ],
   },
   {
@@ -126,8 +126,42 @@ const sections = [
     title: "Izmene pravila i kontakt",
     icon: FileText,
     paragraphs: [
-      "PonudiMi može ažurirati ova pravila radi usklađivanja sa propisima, razvoja funkcionalnosti i zaštite korisnika. Važeća verzija biće objavljena na ovoj stranici, uz datum poslednjeg ažuriranja. Ako je izmena bitna za korisnike, platforma će nastojati da ih o njoj obavesti na odgovarajući način.",
-      "Za pitanja, prijave i dodatna objašnjenja koristite odeljak Podrška na platformi.",
+      "PonudiMi može menjati ova pravila radi usklađivanja sa propisima, razvoja funkcionalnosti i zaštite korisnika. Objavljuje se važeća verzija sa datumom stupanja na snagu ili poslednjeg ažuriranja. O bitnim izmenama korisnici će biti obavešteni na primeren način. Izmene ne utiču retroaktivno na već nastala prava i obaveze, osim kada zakon nalaže drugačije ili je to dopušteno uz valjan pravni osnov.",
+      "Pravila su dostupna u elektronskom obliku tako da korisnik može da ih sačuva i ponovo pregleda. Za pitanja, prijave i dodatna objašnjenja koristite odeljak Podrška na platformi.",
+    ],
+  },
+  {
+    number: "11",
+    title: "Trgovci, fizička lica i prava potrošača",
+    icon: Scale,
+    paragraphs: [
+      "Korisnik koji objavljuje ponudu dužan je da tačno označi da li nastupa kao trgovac ili preduzetnik u okviru svoje delatnosti ili kao fizičko lice koje prodaje van poslovne delatnosti. Nije dozvoljeno lažno predstavljanje statusa radi izbegavanja zakonskih obaveza.",
+      "Korisnik koji nastupa kao trgovac odgovoran je za ispunjenje svih obaveza koje mu propisi nameću, uključujući jasno navođenje poslovnog imena i kontakt podataka, bitnih svojstava proizvoda ili usluge, ukupne cene sa porezima i dodatnim troškovima kada je primenljivo, načina plaćanja, isporuke, reklamacija i informacija o pravu na odustanak od ugovora kada to pravo postoji.",
+      "Prava potrošača iz Zakona o zaštiti potrošača primenjuju se kada su ispunjeni zakonski uslovi, naročito kada potrošač zaključuje ugovor sa trgovcem. Prodaja između dva fizička lica koja ne nastupaju kao trgovci ne postaje potrošačka kupovina samo zato što je oglas objavljen na PonudiMi.",
+      "Kada se primenjuje ugovor na daljinu između trgovca i potrošača, trgovac je dužan da pruži zakonom propisana prethodna obaveštenja i omogući ostvarivanje prava, uključujući pravo na odustanak u zakonskom roku i zakonske izuzetke. Reklamacije, saobraznost, povraćaj novca i isporuku rešava trgovac kao ugovorna strana, bez uticaja na obaveze platforme koje propisi posebno propisuju.",
+      "PonudiMi može zahtevati dopunu ili ispravku podataka o statusu trgovca i ukloniti ili ograničiti ponudu koja ne sadrži obavezne ili tačne informacije."
+    ],
+  },
+  {
+    number: "12",
+    title: "Podaci o ličnosti i elektronske poruke",
+    icon: ShieldCheck,
+    paragraphs: [
+      "Lični podaci korisnika obrađuju se u skladu sa Zakonom o zaštiti podataka o ličnosti i posebnim Obaveštenjem o obradi podataka o ličnosti/Politikom privatnosti. Ova pravila ne zamenjuju to obaveštenje.",
+      "Korisnik treba da dostavlja samo podatke koji su potrebni za korišćenje platforme i ne sme u javne oglase, fotografije ili poruke unositi tuđe lične podatke, kopije ličnih dokumenata, podatke o platnim karticama, lozinke ili druge poverljive podatke bez odgovarajućeg pravnog osnova.",
+      "Korisnik može da ostvaruje prava koja mu pripadaju po propisima o zaštiti podataka o ličnosti, na način opisan u Politici privatnosti. Podaci se ne koriste za svrhe koje nisu navedene u odgovarajućem obaveštenju ili zasnovane na drugom zakonitom osnovu.",
+      "Komercijalne poruke elektronskim putem šalju se samo kada postoji prethodni pristanak ili drugi izričit zakonski osnov. Korisniku mora biti omogućeno da opozove pristanak i prestane da prima takve poruke."
+    ],
+  },
+  {
+    number: "13",
+    title: "Plaćene promocije, bezbednost i identitet pružaoca usluge",
+    icon: FileText,
+    paragraphs: [
+      "Plaćeno isticanje, sponzorisana objava ili drugi komercijalni sadržaj mora biti jasno prepoznatljiv kao takav i ne sme dovoditi korisnika u zabludu o prirodi, poreklu ili rangiranju ponude. Uslovi, cena i trajanje plaćene usluge prikazuju se pre njenog naručivanja.",
+      "Korisnici ne smeju nuditi proizvode ili usluge koji su zabranjeni, nebezbedni ili povučeni iz prometa, niti prikrivati upozorenja, nedostatke ili zakonska ograničenja. Ponuđači odgovorni su za zakonitost proizvoda i usluga koje nude.",
+      "Podaci o identitetu, sedištu/adresi, registraciji i kontaktu pružaoca usluge PonudiMi, kao i podaci o načinu obraćanja i eventualnim nadležnim organima, objavljuju se na posebnoj stranici sa pravnim informacijama i održavaju ažurnim u skladu sa Zakonom o elektronskoj trgovini. Ovaj pravilnik ne zamenjuje obavezu objavljivanja tih podataka.",
+      "Ova pravila ne predstavljaju pravni savet niti zamenjuju pojedinačne ugovore, Politiku privatnosti, pravila plaćenih paketa ili obavezna obaveštenja koja se moraju prikazati u konkretnom postupku naručivanja."
     ],
   },
 ];
