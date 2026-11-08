@@ -358,6 +358,7 @@ app.get('/api/my/moderator-proposals',auth,asyncRoute(async(req,res)=>{
 app.post('/api/my/moderator-proposals/:id/decision',auth,asyncRoute(async(_req,res)=>{
  res.status(403).json({error:'Vlasnik oglasa ne može da odbije niti poništi bezbednosne izmene administratora ili moderatora.'});
 }));
+const supportMessageLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
 app.post('/api/podrska',supportMessageLimiter,asyncRoute(async(req,res)=>{const ime=typeof req.body?.ime==='string'?req.body.ime.trim():'';const email=typeof req.body?.email==='string'?req.body.email.trim().toLowerCase():'';const poruka=typeof req.body?.poruka==='string'?req.body.poruka.trim():'';if(ime.length<2||ime.length>100||!/^\S+@\S+\.\S+$/.test(email)||email.length>254||poruka.length<5||poruka.length>2000)return res.status(400).json({error:'Proveri podatke u poruci. Ime, email i poruka moraju biti ispravno uneti.'});const {rows}=await pool.query('INSERT INTO poruke_podrske(ime,email,poruka) VALUES($1,$2,$3) RETURNING id,created_at',[ime,email,poruka]);res.status(201).json(rows[0]);}));
 
 // Moderation controls: moderators may immediately quarantine content; only admins may restore it.
