@@ -15,9 +15,17 @@ export function SiteHeader() {
   return (
     <header className="sticky top-0 z-30 bg-brand text-brand-foreground">
       <div className="site-header-inner container-page flex flex-col items-start gap-3 py-3">
-        <Link to="/" aria-label="PonudiMi — početna" className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md bg-surface">
-          <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
-        </Link>
+        <div className="flex w-full items-center justify-between gap-3">
+          <Link to="/" aria-label="PonudiMi — početna" className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md bg-surface">
+            <img src={logo} alt="PonudiMi" width={707} height={353} className="h-12 w-32 object-contain" />
+          </Link>
+          <Link
+            to="/pravila-platforme"
+            className="flex h-10 w-32 shrink-0 items-center justify-center rounded-md border border-brand-foreground/30 px-2 text-center text-xs font-semibold leading-tight transition-colors hover:bg-brand-foreground/10 sm:w-40 sm:text-sm"
+          >
+            Pravila platforme
+          </Link>
+        </div>
 
         <nav aria-label="Korisničke opcije" className="site-header-nav grid w-full min-w-0 grid-cols-3 items-center gap-2 text-xs sm:text-sm">
           <Link to="/podrska" className={outline}>
