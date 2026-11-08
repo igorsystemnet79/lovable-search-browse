@@ -218,12 +218,12 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
               </Dialog>
               <p className="text-xs text-muted-foreground sm:col-span-2">Obavezno je izabrati prvo kategoriju, a zatim jednu od njenih potkategorija.</p>
             </div>
-            <label className="space-y-1 text-sm font-medium">Grad / mesto<input className={inputCls} required minLength={2} maxLength={100} {...field("lokacija")} /></label>
-            <label className="space-y-1 text-sm font-medium">{offer ? "Prodavac / ponuđač" : "Ime osobe za kontakt"}<input className={inputCls} required minLength={2} maxLength={100} autoComplete="name" {...field("kontakt_ime")} /></label>
-            <label className="space-y-1 text-sm font-medium">Telefon<input className={inputCls} type="tel" required minLength={6} maxLength={30} autoComplete="tel" {...field("telefon")} /></label>
+            <label className="space-y-1 text-sm font-medium">Adresa (grad/mesto) <span className="text-destructive">*</span><input className={inputCls} required minLength={2} maxLength={100} autoComplete="address-level2" {...field("lokacija")} /></label>
+            <label className="space-y-1 text-sm font-medium">Ime i prezime <span className="text-destructive">*</span><input className={inputCls} required minLength={5} maxLength={100} autoComplete="name" {...field("kontakt_ime")} /></label>
+            <label className="space-y-1 text-sm font-medium">Telefon <span className="text-destructive">*</span><input className={inputCls} type="tel" required minLength={6} maxLength={30} autoComplete="tel" {...field("telefon")} /></label>
             <label className="space-y-1 text-sm font-medium">{offer ? "Cena (opciono)" : "Budžet (opciono)"}<input className={inputCls} type="number" min={0} step="0.01" placeholder="Po dogovoru" {...field("iznos")} /></label>
             <label className="space-y-1 text-sm font-medium">Valuta<select className={inputCls} {...field("valuta")}><option value="EUR">EUR — evro</option><option value="RSD">RSD — dinar</option></select></label>
-            <p className="text-xs text-muted-foreground sm:col-span-2">Ime i telefon biće javno prikazani uz objavu.</p>
+            <p className="text-xs text-muted-foreground sm:col-span-2">Ime i prezime, grad/mesto i telefon biće prikazani uz objavu.</p>
             {!loading && !user && <p className="text-sm sm:col-span-2">Za objavu se <Link to="/prijava" onClick={keepDraft} className="font-semibold text-brand underline">prijavi</Link> ili <Link to="/registracija" onClick={keepDraft} className="font-semibold text-brand underline">registruj besplatno</Link>.</p>}
             {error && <p role="alert" className="text-sm text-destructive sm:col-span-2">{error}</p>}
             <Button type="submit" disabled={busy || loading || !user} className="h-auto rounded-full bg-highlight py-3 text-highlight-foreground hover:bg-highlight/90 sm:col-span-2">{busy ? "Čuvanje…" : edit ? "Sačuvaj izmene" : offer ? "Objavi oglas" : "Postavi zahtev"}</Button>
