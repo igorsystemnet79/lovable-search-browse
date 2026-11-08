@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS profiles (
  firma_verifikovana boolean NOT NULL DEFAULT false, blokiran boolean NOT NULL DEFAULT false, email text,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_active_at timestamptz NOT NULL DEFAULT now();
 CREATE TABLE IF NOT EXISTS user_roles (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  role text NOT NULL CHECK (role IN ('admin','moderator','user')), UNIQUE(user_id,role)
