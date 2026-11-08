@@ -213,7 +213,7 @@ app.post('/api/admin/2fa/verify-setup',auth,adminIdentity,adminTwoFactorLimit,as
  if(!found.rows[0]?.pending_secret_ciphertext||found.rows[0].enabled||!found.rows[0].pending_expires_at||new Date(found.rows[0].pending_expires_at)<=new Date())return res.status(400).json({error:'QR kod je istekao. Pokreni podešavanje ponovo.'});
  const secret=decryptAdminSecret(found.rows[0].pending_secret_ciphertext);
  if(!verifyTotp(secret,code))return res.status(400).json({error:'Kod nije ispravan. Proveri vreme na telefonu i pokušaj ponovo.'});
- const recovery=Array.from({length:10},()=>randomBytes(5).toString('hex').toUpperCase().match(/.{1,5}/g).join('-'));
+ const recovery=Array.from({length:10},()=>randomBytes(8).toString('hex').toUpperCase().match(/.{1,4}/g).join('-'));
  const hashes=recovery.map(value=>createHash('sha256').update(value).digest('hex'));
  await pool.query(`UPDATE admin_2fa SET secret_ciphertext=$2,pending_secret_ciphertext=NULL,pending_expires_at=NULL,recovery_code_hashes=$3,enabled=true,enabled_at=now(),updated_at=now() WHERE user_id=$1`,[req.user.sub,encryptAdminSecret(secret),hashes]);
  res.set('Cache-Control','no-store').json({ok:true,recovery_codes:recovery,message:'Authenticator je aktiviran. Sačuvaj rezervne kodove — prikazuju se samo jednom.'});
@@ -222,9 +222,9 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
  const email=String(req.body?.email||'').trim().toLowerCase();
  const password=String(req.body?.password||'');
  const code=String(req.body?.code||'').trim();
- const userResult=await pool.query('SELECT * FROM users WHERE email=$1',[email]);
+ const userResult=await pool.query('SELECT u.*,p.blokiran FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.email=$1',[email]);
  const user=userResult.rows[0];
- if(!user||!password||!(await bcrypt.compare(password,user.password_hash))||!(await isPlatformAdmin({sub:user.id,email:user.email})))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
+ if(!user||user.blokiran||!password||!(await bcrypt.compare(password,user.password_hash))||!(await isPlatformAdmin({sub:user.id,email:user.email})))return res.status(401).json({error:'Administratorski podaci nisu ispravni.'});
  const state=await pool.query('SELECT secret_ciphertext,recovery_code_hashes,enabled FROM admin_2fa WHERE user_id=$1',[user.id]);
  if(!state.rows[0]?.enabled||!state.rows[0]?.secret_ciphertext)return res.status(409).json({error:'Google Authenticator još nije aktiviran.',code:'ADMIN_2FA_SETUP_REQUIRED'});
  let verified=false,usedRecovery=false;
@@ -247,7 +247,7 @@ app.post('/api/admin/2fa/challenge',adminTwoFactorLimit,asyncRoute(async(req,res
  res.set('Cache-Control','no-store').json({ok:true,used_recovery_code:usedRecovery,session:{access_token:token,token_type:'bearer',expires_in:900,user:publicUser(user)}});
 }));
 
-const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
+const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT role FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Nemate moderatorska prava.'});if(r.rows.some(x=>x.role==='admin')){const state=await pool.query('SELECT enabled FROM admin_2fa WHERE user_id=$1',[req.user.sub]);if(!state.rows[0]?.enabled||req.user.admin2fa!==true||!req.user.admin2faAt||Date.now()-Number(req.user.admin2faAt)>15*60*1000)return res.status(401).json({error:'Za administratorsku radnju potrebna je potvrda Google Authenticator kodom.',code:'ADMIN_2FA_REQUIRED'});}next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at, email_verified:!!u.email_confirmed_at });
 const passwordIsValid = value => typeof value === 'string' && value.length >= 8 && Buffer.byteLength(value, 'utf8') <= 72;
