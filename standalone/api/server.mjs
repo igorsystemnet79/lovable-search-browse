@@ -178,7 +178,7 @@ app.put('/api/admin/maintenance',auth,admin,asyncRoute(async(req,res)=>{
 }));
 /* Backward-compatible endpoints used by the currently published PonudiMi frontend. */
 app.get('/api/maintenance-status',asyncRoute(async(req,res)=>{
- const result=await pool.query("SELECT maintenance_enabled,message,updated_at FROM platform_settings WHERE id=1");
+ const result=await pool.query("SELECT maintenance_enabled,maintenance_message,updated_at FROM platform_settings WHERE id=1");
  let isAdmin=false;
  const token=(req.headers.authorization||'').replace(/^Bearer\\s+/i,'');
  if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);isAdmin=!!role.rowCount;}catch{}}
@@ -194,7 +194,7 @@ app.put('/api/admin/maintenance-mode',auth,admin,asyncRoute(async(req,res)=>{
  res.json({ok:true,enabled:result.rows[0].maintenance_enabled,message:result.rows[0].maintenance_message,updated_at:result.rows[0].updated_at});
 }));
 app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{
- const result=await pool.query("SELECT id,sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");
+ const result=await pool.query("SELECT sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");
  res.setHeader('Cache-Control','no-store');res.json({data:result.rows[0]||null});
 }));
 app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{
