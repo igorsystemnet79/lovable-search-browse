@@ -207,6 +207,13 @@ const storage = {
 };
 
 // Google Authenticator administracija je privremeno isključena.
+// Zadržavamo kompatibilan objekat da stariji pozivi ne obore učitavanje aplikacije.
+const adminSecurity = {
+  async status() { return { enabled: false, temporarily_disabled: true }; },
+  async setup() { throw new Error("Google Authenticator je privremeno isključen."); },
+  async verifySetup() { throw new Error("Google Authenticator je privremeno isključen."); },
+  async challenge() { throw new Error("Google Authenticator je privremeno isključen."); },
+};
 
 const verification = {
   async confirmEmail(token: string) { return api("/api/auth/email/confirm", { method: "POST", body: JSON.stringify({ token }) }); },
