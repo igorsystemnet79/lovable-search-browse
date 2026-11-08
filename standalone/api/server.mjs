@@ -99,7 +99,7 @@ const auth = asyncRoute(async (req,res,next) => {
 const optionalAuth = asyncRoute(async (req,res,next) => {
  const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
  if (token) {
-  try { req.user = jwt.verify(token, JWT_SECRET); }
+  try { req.user = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }); }
   catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
   if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
  }
@@ -202,7 +202,7 @@ app.post('/api/auth/phone/start',asyncRoute(async(req,res)=>{
  res.json({ok:true,status:result.status||'pending',message:'SMS kod je poslat.'});
 }));
 app.post('/api/auth/phone/check',asyncRoute(async(req,res)=>{
- let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET);}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
+ let decoded;try{decoded=jwt.verify(String(req.body?.verification_token||''),JWT_SECRET,{algorithms:['HS256']});}catch{return res.status(401).json({error:'Sesija za verifikaciju je istekla. Ponovo potvrdi e-mail.'});}
  if(decoded.purpose!=='account-verification')return res.status(401).json({error:'Nedozvoljena sesija za verifikaciju.'});
  const code=String(req.body?.code||'').replace(/\s/g,'');if(!/^\d{4,10}$/.test(code))return res.status(400).json({error:'Unesi SMS kod koji si dobio.'});
  const c=await pool.connect();
@@ -390,7 +390,7 @@ const TABLE_COLUMNS = {
 const WRITE_COLUMNS = {
  ponude: ['naslov','opis','kategorija','lokacija','cena','valuta','emoji','kontakt_ime','telefon','zavrseno','pauziran','user_id','istaknuto'],
  zahtevi: ['naslov','opis','kategorija','lokacija','budzet','valuta','kontakt_ime','telefon','zavrseno','pauziran','user_id'],
- profiles: ['ime','prezime','telefon','grad','adresa','tip_lica','naziv_firme','pib','firma_verifikovana','blokiran','email'],
+ profiles: ['ime','prezime','telefon','grad','adresa','tip_lica','naziv_firme','pib'],
  user_roles: ['user_id','role'], pracenja: ['user_id','ponuda_id','zahtev_id','pocetna_cena','pocetni_budzet'],
  slike_oglasa: ['ponuda_id','zahtev_id','storage_path','external_url','pozicija'],
  poruke_podrske: ['ime','email','poruka'],
