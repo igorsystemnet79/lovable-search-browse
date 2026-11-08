@@ -37,9 +37,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           title="Obriši tekst"
           disabled={disabled}
           onClick={clearValue}
-          className="absolute right-1 top-1/2 z-20 flex h-[26px] w-[26px] -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="input-clear-button absolute right-1 top-1/2 z-20 flex !h-[26px] !w-[26px] min-h-0 min-w-0 max-h-[26px] max-w-[26px] shrink-0 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-orange-500 p-0 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <X className="h-4 w-4" strokeWidth={3} />
+          <X className="h-4 w-4 shrink-0" strokeWidth={3} />
         </button>
       </div>
     );
