@@ -34,6 +34,7 @@ function Prijava() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [lozinka, setLozinka] = useState("");
+  const [prikaziLozinku, setPrikaziLozinku] = useState(false);
   const [greska, setGreska] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
@@ -97,7 +98,26 @@ function Prijava() {
     <AuthShell title="Prijava" subtitle="Dobrodošao nazad!">
       <form onSubmit={onSubmit} className="space-y-3">
         <input className={inputCls} type="email" required autoComplete="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} />
-        <input className={inputCls} type="password" required autoComplete="current-password" placeholder="Lozinka" value={lozinka} onChange={(e) => setLozinka(e.target.value)} />
+        <div className="relative">
+          <input
+            className={inputCls + " pr-14"}
+            type={prikaziLozinku ? "text" : "password"}
+            required
+            autoComplete="current-password"
+            placeholder="Lozinka"
+            value={lozinka}
+            onChange={(e) => setLozinka(e.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => setPrikaziLozinku((trenutno) => !trenutno)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 min-h-10 rounded-full px-3 text-sm font-semibold text-brand hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+            aria-label={prikaziLozinku ? "Sakrij lozinku" : "Prikaži lozinku"}
+            aria-pressed={prikaziLozinku}
+          >
+            {prikaziLozinku ? "Sakrij" : "Prikaži"}
+          </button>
+        </div>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         {info && <p role="status" className="text-sm text-brand">{info}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Prijavljivanje..." : "Prijavi se"}</button>
