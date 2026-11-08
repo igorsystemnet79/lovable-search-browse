@@ -330,6 +330,7 @@ INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message) VALUES
 -- Encrypted TOTP credentials and one-time recovery hashes for administrator access.
 CREATE TABLE IF NOT EXISTS admin_2fa (
  user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ admin_password_hash text,
  secret_ciphertext text,
  pending_secret_ciphertext text,
  pending_expires_at timestamptz,
@@ -339,3 +340,5 @@ CREATE TABLE IF NOT EXISTS admin_2fa (
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS admin_password_hash text;
