@@ -8,7 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import type { ErrorRouteComponent } from "@tanstack/react-router";
-import { type ReactNode } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 
 import appCss from "../styles.css?url";
 
@@ -117,13 +117,49 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function MaintenanceNotice() {
+  const [maintenance, setMaintenance] = useState<{ active: boolean; message: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const check = async () => {
+      try {
+        const session = JSON.parse(localStorage.getItem("ponudimi_session") || "null");
+        const response = await fetch("/api/platform/status", {
+          cache: "no-store",
+          headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (alive) setMaintenance(data.maintenance && !data.isAdmin ? {
+          active: true,
+          message: data.message || "Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.",
+        } : null);
+      } catch { /* Keep the site usable if the status service is temporarily unavailable. */ }
+    };
+    check();
+    const timer = window.setInterval(check, 15000);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, []);
+  if (!maintenance?.active) return null;
+  return (
+    <div role="alertdialog" aria-modal="true" aria-label="Platforma je privremeno nedostupna" className="fixed inset-0 z-[100] flex items-center justify-center bg-brand px-6 text-center text-brand-foreground">
+      <div className="max-w-xl rounded-3xl bg-surface p-8 text-foreground shadow-2xl sm:p-12">
+        <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-highlight/20 text-3xl" aria-hidden="true">🛠️</div>
+        <h1 className="text-2xl font-bold sm:text-3xl">Privremeno održavanje</h1>
+        <p className="mt-4 text-base leading-relaxed text-muted-foreground">{maintenance.message}</p>
+        <p className="mt-5 text-sm text-muted-foreground">Hvala na razumevanju.</p>
+      </div>
+    </div>
+  );
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      <MaintenanceNotice />
     </QueryClientProvider>
   );
 }
