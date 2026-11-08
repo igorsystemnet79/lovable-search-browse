@@ -298,3 +298,14 @@ BEGIN
   INSERT INTO app_migrations(migration_key) VALUES('2026-11-account-verification-reset');
  END IF;
 END $$;
+
+
+-- Global platform maintenance switch, controlled only by administrators.
+CREATE TABLE IF NOT EXISTS platform_settings (
+ id smallint PRIMARY KEY CHECK (id=1),
+ maintenance_enabled boolean NOT NULL DEFAULT false,
+ maintenance_message text NOT NULL DEFAULT 'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.',
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ updated_by uuid REFERENCES users(id) ON DELETE SET NULL
+);
+INSERT INTO platform_settings(id,maintenance_enabled,maintenance_message) VALUES(1,false,'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.') ON CONFLICT(id) DO NOTHING;
