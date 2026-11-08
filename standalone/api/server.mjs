@@ -60,9 +60,14 @@ app.use('/api/auth/register', rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, st
 app.use('/api/auth/reset-request', rateLimit({ windowMs: 60 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false, message: { error: 'Previše zahteva za promenu lozinke. Pokušaj ponovo kasnije.' } }));
 app.use('/api/auth/phone/start', rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/auth/phone/check', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
-app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
+app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180, standardHeaders: true, legacyHeaders: false }));
+// Protect public search/RPC endpoints and expensive image operations from automated abuse.
+app.use('/api/db/rpc', rateLimit({ windowMs: 60 * 1000, limit: 90, standardHeaders: true, legacyHeaders: false }));
+app.use(['/api/ponude','/api/zahtevi'], rateLimit({ windowMs: 60 * 1000, limit: 90, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/oglasi', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/storage/upload', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
-app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
+app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false }));
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
