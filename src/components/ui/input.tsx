@@ -13,7 +13,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
     const clearable = ["text", "search", "email", "tel", "url", "number"].includes(type);
     const inputClassName = cn(
       "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-base shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
-      clearable && "pr-12",
+      clearable && "pr-10",
       className,
     );
     const clearValue = () => {
@@ -37,7 +37,7 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           title="Obriši tekst"
           disabled={disabled}
           onClick={clearValue}
-          className="absolute right-1 top-1/2 z-20 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-40"
+          className="absolute right-1 top-1/2 z-20 flex h-[26px] w-[26px] -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-orange-500 text-white opacity-100 shadow-md transition-colors hover:bg-orange-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-orange-500 disabled:cursor-not-allowed disabled:opacity-40"
         >
           <X className="h-4 w-4" strokeWidth={3} />
         </button>
