@@ -4,6 +4,7 @@ import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, 
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
+import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
 import { Input } from "@/components/ui/input";
@@ -819,7 +820,7 @@ function UpravljanjePravilima() {
     setBusy(true); setError("");
     try {
       const [current, past] = await Promise.all([ucitajPravilaPlatforme(), ucitajIstorijuPravilaPlatforme()]);
-      setText(current.data?.sadrzaj || ""); setVersion(current.data?.version ?? null); setHistory(past.data || []);
+      setText(current.data?.sadrzaj || defaultPlatformRulesText); setVersion(current.data?.version ?? null); setHistory(past.data || []);
     } catch (e) { setError(e instanceof Error ? e.message : "Pravila nije moguće učitati."); }
     finally { setBusy(false); }
   }, []);
