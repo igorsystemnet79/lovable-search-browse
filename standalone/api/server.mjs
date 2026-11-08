@@ -362,7 +362,7 @@ app.use(asyncRoute(async(req,res,next)=>{
  const setting=await pool.query('SELECT maintenance_enabled,maintenance_message FROM platform_settings WHERE id=1');
  const row=setting.rows[0];if(!row?.maintenance_enabled)return next();
  const token=(req.headers.authorization||'').replace(/^Bearer\s+/i,'');
- if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});const role=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[payload.sub]);if(role.rowCount)return next();}catch{}}
+ if(token){try{const payload=jwt.verify(token,JWT_SECRET,{algorithms:['HS256']});if(await isPlatformAdmin(payload))return next();}catch{}}
  return res.status(503).json({maintenance:true,error:row.maintenance_message||'Platforma je u fazi izrade ili prepravke. Molimo vas za strpljenje.'});
 }));
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
