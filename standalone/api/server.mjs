@@ -141,7 +141,7 @@ app.use((req,res,next)=>{
   const actor=req.user;if(!actor?.sub)return;
   const route=String(req.path||'/').slice(0,300),targetId=String(req.params?.id||req.params?.imageId||'').slice(0,100)||null;
   const action=({POST:'kreiranje',PUT:'izmena',PATCH:'izmena',DELETE:'brisanje'})[method]+' · '+route;
-  const safeDetails={body_fields:Object.keys(req.body||{}).filter(k=>!/password|token|secret|key|authorization|cookie|code/i.test(k)).slice(0,40)};
+  const safeDetails={body_fields:Object.keys(source).filter(k=>allowedFields.has(k)).slice(0,40),submitted_values:safeValues};
   pool.query('INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
    [actor.sub,String(actor.email||'').slice(0,254)||null,action,method,route,targetId,res.statusCode,JSON.stringify(safeDetails)]
   ).catch(error=>console.error('Evidencija aktivnosti nije sačuvana:',{code:error.code,message:error.message}));
