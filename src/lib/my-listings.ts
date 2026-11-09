@@ -35,8 +35,8 @@ export const pracenjaQuery = (userId: string) => ({
     if (error) throw error;
     if (offersError) throw offersError;
     if (requestsError) throw requestsError;
-    const offersById = new Map((offers ?? []).map((offer: Ponuda) => [offer.id, offer]));
-    const requestsById = new Map((requests ?? []).map((request: Zahtev) => [request.id, request]));
+    const offersById = new Map<string, Ponuda>((offers ?? []).map((offer: Ponuda) => [offer.id, offer] as const));
+    const requestsById = new Map<string, Zahtev>((requests ?? []).map((request: Zahtev) => [request.id, request] as const));
     return (data ?? []).map((follow: any) => ({
       ...follow,
       ponude: follow.ponuda_id ? offersById.get(follow.ponuda_id) ?? null : null,
