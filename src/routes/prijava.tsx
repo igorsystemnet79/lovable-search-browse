@@ -115,7 +115,8 @@ function Prijava() {
   }
 
   async function google() {
-    setGreska("Google prijava nije podešena na ovoj samostalnoj instalaciji. Prijavi se email adresom i lozinkom.");
+    setGreska("");
+    window.location.assign("/api/auth/google");
   }
 
   return (
