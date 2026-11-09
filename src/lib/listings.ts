@@ -10,6 +10,7 @@ export type Ponuda = {
   valuta: string;
   emoji: string | null;
   istaknuto: boolean;
+  status_trgovca?: 'trgovac' | 'nije_trgovac' | 'nepotvrdjeno';
   zavrseno?: boolean;
   pauziran?: boolean;
   updated_at?: string | null;
@@ -28,6 +29,7 @@ export type Zahtev = {
   kategorija: string;
   lokacija: string;
   budzet: number | null;
+  status_trgovca?: 'trgovac' | 'nije_trgovac' | 'nepotvrdjeno';
   zavrseno?: boolean;
   updated_at?: string | null;
   kontakt_ime?: string | null;
