@@ -123,7 +123,7 @@ const optionalAuth = asyncRoute(async (req,res,next) => {
  }
  next();
 });
-const isPlatformAdmin = async user => { if (String(user?.email || '').trim().toLowerCase() === 'igorsystemnet@gmail.com') return true; const r = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'", [user.sub]); return r.rowCount > 0; };
+const isPlatformAdmin = async user => { if (isConfiguredAdmin(user?.email)) return true; const r = await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'", [user.sub]); return r.rowCount > 0; };
 
 const adminIdentity = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
@@ -853,6 +853,8 @@ const WRITE_COLUMNS = {
  apr_firme: ['pib','maticni_broj','naziv','sediste','adresa','status','synced_at'],
  apr_sinhronizacije: ['pokrenuo','broj_firmi','uspeh','poruka'],
 };
+const configuredAdminEmails = () => String(process.env.ADMIN_EMAIL || 'igorsystemnet@gmail.com').split(',').map(email => email.trim().toLowerCase()).filter(Boolean);
+const isConfiguredAdmin = email => configuredAdminEmails().includes(String(email || '').trim().toLowerCase());
 const isAdmin = async id => { const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[id]); return r.rowCount>0; };
 const ident = value => { if (!/^[a-z_][a-z0-9_]*$/i.test(value)) throw new Error('Neispravno ime polja.'); return `"${value}"`; };
 const ownsImage = async (row,userId) => {
@@ -869,7 +871,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(action==='upsert') return res.status(400).json({error:'Operacija upsert nije podržana. Koristi dozvoljeno dodavanje ili izmenu.'});
  const columns=TABLE_COLUMNS[table]; if(!columns) return res.status(400).json({error:'Nepoznata tabela.'});
  const supplied=Array.isArray(values)?values:[values||{}];
- const userId=req.user?.sub || null; const roleAdmin=userId ? (String(req.user?.email||'').trim().toLowerCase()==='igorsystemnet@gmail.com' || await isAdmin(userId)) : false; const adminUser=roleAdmin;
+ const userId=req.user?.sub || null; const roleAdmin=userId ? (isConfiguredAdmin(req.user?.email) || await isAdmin(userId)) : false; const adminUser=roleAdmin;
  const write=action!=='select';
  if(write && !userId && !(table==='poruke_podrske' && action==='insert')) return res.status(401).json({error:'Prijava je obavezna.'});
  if(['apr_firme','apr_sinhronizacije'].includes(table) && !adminUser) return res.status(403).json({error:'Samo administrator ima pristup.'});
