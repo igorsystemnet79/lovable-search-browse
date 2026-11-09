@@ -257,6 +257,11 @@ export async function vratiVerzijuPravilaPlatforme(id: string) {
 }
 
 
+export async function sinhronizujFotografijeOglasa(id: string, kind: "ponuda" | "zahtev", form: FormData) {
+  form.set("tip", kind);
+  return api(`/api/oglasi/${encodeURIComponent(id)}/slike`, { method: "PUT", body: form });
+}
+
 export async function posaljiSignalPrisustva() {
   return api("/api/presence/heartbeat", { method: "POST" });
 }
