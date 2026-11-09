@@ -876,6 +876,12 @@ function AdminPoslovniPaketi() {
 }
 
 
+type AdminMessageArchive = {
+ id:string; conversation_id:string|null; file_name:string; sha256:string; message_count:number;
+ created_by_email:string|null; export_reason:string; created_at:string; listing_type:string|null;
+ listing_title:string|null; buyer_name:string|null; seller_name:string|null;
+};
+
 type AdminConversation = {
  id: string; listing_type: "ponude" | "zahtevi"; listing_id: string; listing_title: string | null;
  buyer_id: string; seller_id: string; buyer_email: string; buyer_name: string;
@@ -886,6 +892,7 @@ type AdminConversationMessage = { id: string; sender_id: string; body: string; c
 
 function AdminKorisnickePoruke() {
  const [rows,setRows]=useState<AdminConversation[]>([]);
+ const [archives,setArchives]=useState<AdminMessageArchive[]>([]);
  const [messages,setMessages]=useState<AdminConversationMessage[]>([]);
  const [selected,setSelected]=useState<AdminConversation|null>(null);
  const [filter,setFilter]=useState("");
@@ -907,7 +914,15 @@ function AdminKorisnickePoruke() {
   }catch(e){setError(e instanceof Error?e.message:"Greška pri učitavanju razgovora.");}
   finally{setBusy(false);}
  },[filter]);
- useEffect(()=>{load();},[load]);
+ async function loadArchives(){
+  try{
+   const response=await fetch('/api/admin/message-archives',{cache:'no-store',headers:headers()});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||'Arhive prepiski nisu dostupne.');
+   setArchives(data.data||[]);
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri učitavanju arhiva.');}
+ }
+ useEffect(()=>{load();loadArchives();},[load]);
  async function exportConversation(){
   if(!selected||reason.trim().length<10){setError("Pre izvoza unesi razlog od najmanje 10 karaktera.");return;}
   setBusy(true);setError("");setNotice("");
@@ -919,8 +934,32 @@ function AdminKorisnickePoruke() {
    const link=document.createElement("a");
    link.href=url;link.download=`ponudimi-prepiska-${selected.id}.json`;
    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-   setNotice("Arhiva prepiske je preuzeta. Sadrži podatke razgovora, vremenske oznake i SHA-256 kontrolni zbir.");
+   setNotice("Arhiva je sačuvana u administraciji i preuzeta na uređaj. Sadrži vremenske oznake i SHA-256 kontrolni zbir.");\n   await loadArchives();
   }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
+  finally{setBusy(false);}
+ }
+ async function downloadArchive(archive:AdminMessageArchive){
+  setBusy(true);setError('');
+  try{
+   const response=await fetch(`/api/admin/message-archives/${encodeURIComponent(archive.id)}/download`,{cache:'no-store',headers:headers()});
+   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Preuzimanje arhive nije uspelo.');}
+   const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
+   link.href=url;link.download=archive.file_name;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+   setNotice('Arhiva je preuzeta. Preuzimanje je evidentirano.');
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri preuzimanju arhive.');}
+  finally{setBusy(false);}
+ }
+ async function deleteArchive(archive:AdminMessageArchive){
+  if(reason.trim().length<10){setError('Pre brisanja arhive unesi razlog od najmanje 10 karaktera.');return;}
+  if(!window.confirm('Trajno obrisati sačuvanu arhivu prepiske? Preuzeta kopija na tvom uređaju neće biti obrisana.'))return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   const response=await fetch(`/api/admin/message-archives/${encodeURIComponent(archive.id)}`,{method:'DELETE',headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||'Brisanje arhive nije uspelo.');
+   setArchives(current=>current.filter(item=>item.id!==archive.id));
+   setNotice('Arhiva je trajno obrisana sa servera. Radnja je evidentirana u administratorskoj evidenciji.');
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri brisanju arhive.');}
   finally{setBusy(false);}
  }
  async function deleteMessage(message:AdminConversationMessage){
@@ -986,5 +1025,28 @@ function AdminKorisnickePoruke() {
     {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={small} onClick={()=>void exportConversation()} disabled={busy||reason.trim().length<10}>Izvezi prepisku (.json)</button><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy||reason.trim().length<10}>Obriši ceo razgovor</button></div></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy||reason.trim().length<10}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
    </div>
   </div>
+  <section className="space-y-3 rounded-2xl border border-input bg-surface p-4">
+   <div><h3 className="font-semibold">Izvezene arhive prepiski</h3><p className="mt-1 text-xs text-muted-foreground">Arhive se čuvaju u bazi PonudiMi. Brisanje ovde uklanja samo serversku arhivu; ranije preuzete kopije na uređajima ostaju.</p></div>
+   <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Sačuvanih arhiva: {archives.length}</span><button type="button" className={small} onClick={loadArchives} disabled={busy}>Osveži arhive</button></div>
+   <div className="space-y-2">
+    {archives.map(archive=><article key={archive.id} className="rounded-xl border border-input p-3">
+     <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1 text-sm">
+       <p className="font-semibold break-words">{archive.listing_title||'Prepiska bez naslova'}</p>
+       <p className="mt-1 text-xs text-muted-foreground">{archive.listing_type||'Razgovor'} · {archive.message_count} poruka · {new Date(archive.created_at).toLocaleString('sr-RS')}</p>
+       <p className="text-xs text-muted-foreground">Učesnici: {archive.buyer_name||'—'} ↔ {archive.seller_name||'—'}</p>
+       <p className="text-xs text-muted-foreground">Izvezao: {archive.created_by_email||'administrator'} · SHA-256: {archive.sha256.slice(0,16)}…</p>
+       <p className="mt-1 text-xs text-muted-foreground">Razlog: {archive.export_reason}</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+       <button type="button" className={small} onClick={()=>void downloadArchive(archive)} disabled={busy}>Preuzmi</button>
+       <button type="button" className={danger} onClick={()=>void deleteArchive(archive)} disabled={busy||reason.trim().length<10}>Obriši arhivu</button>
+      </div>
+     </div>
+    </article>)}
+    {!archives.length&&<p className="rounded-xl bg-secondary/50 p-3 text-sm text-muted-foreground">Nema sačuvanih arhiva. Sledeći izvoz prepiske biće sačuvan ovde.</p>}
+   </div>
+  </section>
+
  </section>;
 }
