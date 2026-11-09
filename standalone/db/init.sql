@@ -458,7 +458,7 @@ CREATE TABLE IF NOT EXISTS message_conversations (
  UNIQUE(listing_type,listing_id,buyer_id,seller_id)
 );
 -- Existing databases: remove the former restriction so an owner can create a self-test conversation.
-DO $
+DO $$
 DECLARE constraint_row record;
 BEGIN
  FOR constraint_row IN
@@ -469,7 +469,7 @@ BEGIN
  LOOP
   EXECUTE format('ALTER TABLE message_conversations DROP CONSTRAINT %I',constraint_row.conname);
  END LOOP;
-END $;
+END $$;
 CREATE INDEX IF NOT EXISTS message_conversations_buyer_idx ON message_conversations(buyer_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS message_conversations_seller_idx ON message_conversations(seller_id,updated_at DESC);
 CREATE TABLE IF NOT EXISTS marketplace_messages (
