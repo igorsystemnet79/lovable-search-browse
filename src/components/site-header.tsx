@@ -158,6 +158,7 @@ export function SiteHeader() {
           {user ? (
             <>
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
+              <Link to="/moj-nalog" className={outline}>Moj nalog</Link>
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
               <Link to="/poruke" search={{ razgovor: undefined }} className={outline}>Poruke</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
