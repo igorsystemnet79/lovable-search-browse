@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 
@@ -38,6 +38,30 @@ function Prijava() {
   const [greska, setGreska] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleError = params.get("google_error");
+    if (googleError) {
+      setGreska(googleError);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = fragment.get("google_access_token");
+    if (!accessToken) return;
+    window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    void (async () => {
+      setBusy(true);
+      try {
+        await ponudimi.auth.setSession({ access_token: accessToken });
+        await navigate({ to: "/" });
+      } catch {
+        setGreska("Google prijava nije završena. Pokušaj ponovo.");
+      } finally {
+        setBusy(false);
+      }
+    })();
+  }, [navigate]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
