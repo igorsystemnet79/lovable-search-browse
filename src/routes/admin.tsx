@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, type ChangeEvent } from "react";
+import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
@@ -156,7 +156,6 @@ function Prijave() {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
-  const [passwordInfoOpen, setPasswordInfoOpen] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
@@ -381,6 +380,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   const [filter, setFilter] = useState("");
   const [edit, setEdit] = useState<Profil | null>(null);
   const [msg, setMsg] = useState("");
+  const [passwordInfoOpen, setPasswordInfoOpen] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     const ucitajSve = async (tabela: "profiles" | "user_roles" | "ponude" | "zahtevi") => {
@@ -497,7 +497,7 @@ function Korisnici({ selfId }: { selfId: string }) {
               const username = String(profil.username || profil.user_metadata?.username || profil.metadata?.username || "—");
               const infoOpen = Boolean(passwordInfoOpen[p.id]);
               return (
-                <React.Fragment key={p.id}>
+                <Fragment key={p.id}>
                   <tr className="border-t border-input align-top">
                     <td className="px-3 py-3 font-medium">{(p.ime || "").trim().split(/\s+/)[0] || "—"}</td>
                     <td className="px-3 py-3">{p.prezime || ((p.ime || "").trim().split(/\s+/).slice(1).join(" ") || "—")}</td>
@@ -555,7 +555,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                       </td>
                     </tr>
                   )}
-                </React.Fragment>
+                </Fragment>
               );
             })}
             {!lista.length && <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</td></tr>}
