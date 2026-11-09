@@ -1,0 +1,29 @@
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useCallback,useEffect,useState } from "react";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
+import { useAuth } from "@/hooks/use-auth";
+import { API_ORIGIN } from "@/integrations/standalone/client";
+export const Route=createFileRoute("/poruke")({
+ validateSearch:(search:Record<string,unknown>)=>({razgovor:typeof search["razgovor"]==="string"?search["razgovor"]:undefined}),
+ head:()=>({meta:[{title:"Moje poruke — PonudiMi"},{name:"robots",content:"noindex"}]}),
+ component:PorukePage,
+});
+function PorukePage(){
+ const {razgovor}=Route.useSearch();
+ const navigate=useNavigate();
+ const {user,loading}=useAuth();
+ const [threads,setThreads]=useState<any[]>([]),[selected,setSelected]=useState<string|null>(razgovor||null),[messages,setMessages]=useState<any[]>([]),[draft,setDraft]=useState(""),[error,setError]=useState(""),[busy,setBusy]=useState(false),[userId,setUserId]=useState("");
+ const headers=()=>{let token="";try{token=JSON.parse(localStorage.getItem("ponudimi_session")||"null")?.access_token||"";}catch{}return {Authorization:`Bearer ${token}`,"Content-Type":"application/json"};};
+ const loadThreads=useCallback(async()=>{try{const r=await fetch(`${API_ORIGIN}/api/messages`,{cache:"no-store",headers:headers()});const d=await r.json();if(!r.ok)throw Error(d.error||"Poruke nisu dostupne.");setThreads(d.data||[]);try{setUserId(JSON.parse(localStorage.getItem("ponudimi_session")||"null")?.user?.id||"");}catch{}if(!selected&&d.data?.[0])setSelected(d.data[0].id);setError("");}catch(e){setError(e instanceof Error?e.message:"Greška pri učitavanju.");}},[selected]);
+ const loadMessages=useCallback(async(id:string)=>{try{const r=await fetch(`${API_ORIGIN}/api/messages/${id}`,{cache:"no-store",headers:headers()});const d=await r.json();if(!r.ok)throw Error(d.error||"Razgovor nije dostupan.");setMessages(d.messages||[]);}catch(e){setError(e instanceof Error?e.message:"Greška.");}},[]);
+ useEffect(()=>{if(!loading&&!user)navigate({to:"/prijava"});},[loading,user,navigate]);
+ useEffect(()=>{if(razgovor)setSelected(razgovor);},[razgovor]);
+ useEffect(()=>{if(user)loadThreads();},[user,loadThreads]);useEffect(()=>{if(selected&&user)loadMessages(selected);},[selected,user,loadMessages]);
+ useEffect(()=>{if(!selected||!user)return;const timer=window.setInterval(()=>{loadMessages(selected);loadThreads();},15000);return()=>window.clearInterval(timer);},[selected,user,loadMessages,loadThreads]);
+ async function send(){if(!selected||!draft.trim()||busy)return;setBusy(true);try{const r=await fetch(`${API_ORIGIN}/api/messages/${selected}`,{method:"POST",headers:headers(),body:JSON.stringify({message:draft.trim()})});const d=await r.json();if(!r.ok)throw Error(d.error||"Poruka nije poslata.");setDraft("");await loadMessages(selected);await loadThreads();}catch(e){setError(e instanceof Error?e.message:"Greška.");}finally{setBusy(false);}}
+ const active=threads.find(t=>t.id===selected);
+ return <div className="min-h-screen bg-background text-foreground"><SiteHeader/><main className="container-page py-8"><h1 className="mb-2 text-2xl font-bold">Moje poruke</h1>{loading&&<p className="mb-4 text-sm text-muted-foreground">Provera prijave...</p>}{!loading&&!user&&<p className="mb-4 text-sm text-muted-foreground">Preusmeravanje na prijavu...</p>}<p className="mb-6 text-sm text-muted-foreground">Privatna komunikacija između tebe i oglašivača.</p>{error&&<p role="alert" className="mb-4 rounded-xl bg-destructive/10 p-3 text-sm text-destructive">{error}</p>}
+ <div className="grid gap-4 lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)]"><section className="space-y-2">{threads.map(t=><button type="button" key={t.id} onClick={()=>setSelected(t.id)} className={`w-full rounded-xl border p-3 text-left ${selected===t.id?"border-brand bg-brand/5":"border-input bg-surface"}`}><p className="text-sm font-semibold">{t.other_user_name}</p><p className="text-xs text-muted-foreground">{t.listing_title||"Oglas"} · {t.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 line-clamp-2 text-sm">{t.last_message||"Nema poruka"}</p>{t.unread_count>0&&<span className="mt-1 inline-block rounded-full bg-brand px-2 py-0.5 text-xs text-brand-foreground">{t.unread_count} novih</span>}</button>)}{!threads.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nemaš poruka. Otvori oglas i izaberi „Pošalji privatnu poruku“.</p>}</section>
+ <section className="flex min-h-[420px] flex-col rounded-2xl border border-input bg-surface p-4">{active?<><div className="border-b border-input pb-3"><p className="font-semibold">{active.other_user_name}</p><p className="text-xs text-muted-foreground">{active.listing_title||"Oglas"}</p></div><div className="flex-1 space-y-3 overflow-y-auto py-4">{messages.map(m=><div key={m.id} className={`max-w-[88%] rounded-xl p-3 text-sm ${m.sender_id===userId?"ml-auto bg-brand/10":"bg-secondary"}`}><p className="whitespace-pre-wrap break-words">{m.body}</p><p className="mt-1 text-right text-[10px] text-muted-foreground">{new Date(m.created_at).toLocaleString("sr-RS")}</p></div>)}</div><div className="flex flex-col gap-2 border-t border-input pt-3 sm:flex-row"><textarea rows={2} maxLength={2000} value={draft} onChange={e=>setDraft(e.target.value)} className="min-w-0 flex-1 rounded-xl border border-input bg-background p-3 text-sm" placeholder="Napiši odgovor…"/><button type="button" disabled={!draft.trim()||busy} onClick={send} className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50">{busy?"Slanje…":"Pošalji"}</button></div></>:<p className="m-auto text-sm text-muted-foreground">Izaberi razgovor sa leve strane.</p>}</section></div></main><SiteFooter/></div>;
+}
