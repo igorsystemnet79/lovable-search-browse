@@ -351,6 +351,42 @@ ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS admin_password_hash text;
 ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS last_totp_step bigint;
 
 
+-- Business package subscriptions and payment history. All dates are stored in UTC.
+CREATE TABLE IF NOT EXISTS business_packages (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ package_code text NOT NULL CHECK (package_code IN ('monthly','quarterly','semiannual','annual_premium')),
+ package_name text NOT NULL,
+ price_eur numeric(10,2) NOT NULL CHECK (price_eur >= 0),
+ starts_at timestamptz NOT NULL,
+ ends_at timestamptz NOT NULL,
+ status text NOT NULL DEFAULT 'active' CHECK (status IN ('active','expired','cancelled','pending')),
+ granted_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ notes text,
+ reminder_10d_sent_at timestamptz,
+ reminder_3d_sent_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (ends_at > starts_at)
+);
+CREATE INDEX IF NOT EXISTS business_packages_user_status_idx ON business_packages(user_id,status,ends_at DESC);
+CREATE INDEX IF NOT EXISTS business_packages_expiry_idx ON business_packages(ends_at) WHERE status='active';
+CREATE TABLE IF NOT EXISTS business_package_payments (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ package_id uuid NOT NULL REFERENCES business_packages(id) ON DELETE CASCADE,
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ amount_eur numeric(10,2) NOT NULL CHECK (amount_eur >= 0),
+ currency text NOT NULL DEFAULT 'EUR' CHECK (currency='EUR'),
+ payment_method text,
+ payment_reference text,
+ status text NOT NULL DEFAULT 'recorded' CHECK (status IN ('pending','recorded','refunded','failed')),
+ paid_at timestamptz,
+ recorded_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ notes text,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS business_package_payments_user_idx ON business_package_payments(user_id,created_at DESC);
+
 -- In-app notifications and per-user delivery preferences.
 CREATE TABLE IF NOT EXISTS user_notifications (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
