@@ -154,7 +154,7 @@ async function createUserNotification(userId,type,title,message,link=null,metada
    inAppDelivered=!!notificationId;
   }
  }
- if(settings.email_enabled){
+ if(process.env.NOTIFICATION_EMAILS_ENABLED === 'true' && settings.email_enabled){
   const claimed=await pool.query(`INSERT INTO notification_email_deliveries(user_id,dedupe_key,notification_id) VALUES($1,$2,$3)
    ON CONFLICT(user_id,dedupe_key) DO UPDATE SET created_at=now(),notification_id=COALESCE(notification_email_deliveries.notification_id,EXCLUDED.notification_id)
    WHERE notification_email_deliveries.sent_at IS NULL AND notification_email_deliveries.created_at<now()-interval '10 minutes'
