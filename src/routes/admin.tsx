@@ -1064,7 +1064,7 @@ function AdminKorisnickePoruke() {
    const link=document.createElement("a");
    link.href=url;link.download=`ponudimi-prepiska-${selected.id}.txt`;
    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-   setNotice("Tekstualna prepiska (.txt) sačuvana je u arhivi i preuzeta na uređaj. Sadrži učesnike, datume, vreme i SHA-256 kontrolni zbir.");
+   setNotice("Tekstualna prepiska (.txt) sačuvana je u arhivi i preuzeta na uređaj.");
    await loadArchives();
   }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
   finally{setBusy(false);}
