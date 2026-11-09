@@ -2,6 +2,7 @@ import { ponudimi } from "@/integrations/standalone/client";
 
 export type Ponuda = {
   id: string;
+  user_id?: string | null;
   naslov: string;
   opis: string | null;
   kategorija: string;
