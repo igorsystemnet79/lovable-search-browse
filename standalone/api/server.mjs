@@ -863,6 +863,13 @@ const BUSINESS_PACKAGE_PLANS={
  semiannual:{name:'Šestomesečni paket',price:50,months:6},
  annual_premium:{name:'Premium godišnji paket',price:100,months:12}
 };
+app.get('/api/packages/me',auth,asyncRoute(async(req,res)=>{
+ const result=await pool.query(`SELECT id,package_code,package_name,price_eur,starts_at,ends_at,status,
+  GREATEST(0,CEIL(EXTRACT(EPOCH FROM (ends_at-now()))/86400))::int AS days_remaining
+  FROM business_packages WHERE user_id=$1 AND status='active' AND starts_at<=now() AND ends_at>now()
+  ORDER BY ends_at DESC LIMIT 1`,[req.user.sub]);
+ res.set('Cache-Control','private, no-store').json({data:result.rows[0]||null});
+}));
 app.get('/api/admin/packages',auth,admin,asyncRoute(async(req,res)=>{
  const status=String(req.query.status||'').trim();
  const q=String(req.query.q||'').trim().slice(0,160);
