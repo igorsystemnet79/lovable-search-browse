@@ -451,7 +451,7 @@ function EvidencijaAktivnosti() {
               <tr key={row.id} className="border-t border-input">
                 <td className="whitespace-nowrap p-3">{new Date(row.created_at).toLocaleString("sr-RS")}</td>
                 <td className="p-3">{row.actor_email || row.actor_id || "Nepoznat nalog"}</td>
-                <td className="p-3"><span className="font-medium">{row.action}</span><span className="block text-xs text-muted-foreground">{row.http_method} · {row.route}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Promenjena polja: {Object.keys((row.details?.submitted_values as Record<string, unknown>) || {}).join(", ") || "bez dodatnih podataka"}</span></td>
+                <td className="p-3"><span className="font-medium">{row.action}</span><span className="block text-xs text-muted-foreground">{row.http_method} · {row.route}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Promenjena polja: {Object.keys((row.details?.submitted_values as Record<string, unknown>) || {}).join(", ") || "bez dodatnih podataka"}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">{JSON.stringify(row.details?.submitted_values || {})}</span></td>
                 <td className="p-3">{row.target_id || "—"}</td>
                 <td className="p-3"><span className={row.response_status >= 400 ? "font-semibold text-destructive" : "font-semibold text-green-700"}>{row.response_status}</span></td>
               </tr>
