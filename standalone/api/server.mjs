@@ -1118,6 +1118,103 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
 }));
 
 
+
+function validUuid(value){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value||''));}
+async function notifyMessageRecipient(userId,conversationId,senderId){
+ const sender=await pool.query('SELECT coalesce(nullif(p.ime,\'\'),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[senderId]);
+ const name=String(sender.rows[0]?.display_name||'Korisnik').slice(0,100);
+ await createUserNotification(userId,'reply','Nova poruka',name+' ti je poslao/la poruku.','/poruke',{conversation_id:conversationId},'message:'+conversationId+':'+randomUUID());
+}
+async function getParticipantConversation(conversationId,userId){
+ const result=await pool.query('SELECT * FROM message_conversations WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[conversationId,userId]);
+ return result.rows[0]||null;
+}
+app.get('/api/messages',auth,asyncRoute(async(req,res)=>{
+ const result=await pool.query(`SELECT c.id,c.listing_type,c.listing_id,c.buyer_id,c.seller_id,c.created_at,c.updated_at,
+  CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END AS other_user_id,
+  coalesce(nullif(p.ime,''),u.email) AS other_user_name,
+  CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title,
+  (SELECT body FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+  (SELECT created_at FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
+  (SELECT count(*)::int FROM marketplace_messages m WHERE m.conversation_id=c.id AND m.sender_id<>$1 AND m.read_at IS NULL) AS unread_count
+  FROM message_conversations c
+  JOIN users u ON u.id=CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END
+  LEFT JOIN profiles p ON p.id=u.id
+  LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id
+  LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id
+  WHERE c.buyer_id=$1 OR c.seller_id=$1
+  ORDER BY c.updated_at DESC LIMIT 100`,[req.user.sub]);
+ res.set('Cache-Control','private, no-store').json({data:result.rows});
+}));
+app.post('/api/messages/start',auth,asyncRoute(async(req,res)=>{
+ const listingType=String(req.body?.listing_type||''),listingId=String(req.body?.listing_id||''),body=String(req.body?.message||'').trim();
+ if(!['ponude','zahtevi'].includes(listingType)||!validUuid(listingId)||body.length<1||body.length>2000)return res.status(400).json({error:'Podaci poruke nisu ispravni.'});
+ const listing=await pool.query(`SELECT id,user_id,naslov FROM ${listingType} WHERE id=$1 AND coalesce(moderation_status,'visible')='visible' AND coalesce(pauziran,false)=false AND coalesce(zavrseno,false)=false`,[listingId]);
+ if(!listing.rows[0])return res.status(404).json({error:'Oglas nije pronađen ili više nije aktivan.'});
+ const sellerId=listing.rows[0].user_id;
+ if(!sellerId)return res.status(400).json({error:'Za ovaj oglas nije moguće poslati privatnu poruku.'});
+ if(sellerId===req.user.sub)return res.status(400).json({error:'Ne možete poslati poruku na sopstveni oglas.'});
+ const conv=await pool.query(`INSERT INTO message_conversations(listing_type,listing_id,buyer_id,seller_id) VALUES($1,$2,$3,$4)
+  ON CONFLICT(listing_type,listing_id,buyer_id,seller_id) DO UPDATE SET updated_at=now() RETURNING id`,[listingType,listingId,req.user.sub,sellerId]);
+ const conversationId=conv.rows[0].id;
+ const msg=await pool.query('INSERT INTO marketplace_messages(conversation_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,conversation_id,sender_id,body,created_at,read_at',[conversationId,req.user.sub,body]);
+ await pool.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[conversationId]);
+ await notifyMessageRecipient(sellerId,conversationId,req.user.sub);
+ res.status(201).json({data:msg.rows[0],conversation_id:conversationId});
+}));
+app.get('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const conversation=await getParticipantConversation(req.params.id,req.user.sub);
+ if(!conversation)return res.status(404).json({error:'Razgovor nije pronađen.'});
+ await pool.query('UPDATE marketplace_messages SET read_at=now() WHERE conversation_id=$1 AND sender_id<>$2 AND read_at IS NULL',[conversation.id,req.user.sub]);
+ const messages=await pool.query('SELECT id,conversation_id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC LIMIT 500',[conversation.id]);
+ res.set('Cache-Control','private, no-store').json({conversation,messages:messages.rows});
+}));
+app.post('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const body=String(req.body?.message||'').trim();
+ if(body.length<1||body.length>2000)return res.status(400).json({error:'Poruka mora imati od 1 do 2000 karaktera.'});
+ const conversation=await getParticipantConversation(req.params.id,req.user.sub);
+ if(!conversation)return res.status(404).json({error:'Razgovor nije pronađen.'});
+ const recipient=conversation.buyer_id===req.user.sub?conversation.seller_id:conversation.buyer_id;
+ const result=await pool.query('INSERT INTO marketplace_messages(conversation_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,conversation_id,sender_id,body,created_at,read_at',[conversation.id,req.user.sub,body]);
+ await pool.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[conversation.id]);
+ await notifyMessageRecipient(recipient,conversation.id,req.user.sub);
+ res.status(201).json({data:result.rows[0]});
+}));
+app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
+ const q=String(req.query.q||'').trim().slice(0,160);
+ const result=await pool.query(`SELECT c.id,c.listing_type,c.listing_id,c.buyer_id,c.seller_id,c.created_at,c.updated_at,
+  CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title,
+  bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
+  su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name,
+  (SELECT body FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
+  (SELECT created_at FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
+  (SELECT count(*)::int FROM marketplace_messages m WHERE m.conversation_id=c.id) AS message_count
+  FROM message_conversations c JOIN users bu ON bu.id=c.buyer_id JOIN users su ON su.id=c.seller_id
+  LEFT JOIN profiles bp ON bp.id=bu.id LEFT JOIN profiles sp ON sp.id=su.id
+  LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id
+  LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id
+  WHERE ($1='' OR bu.email ILIKE '%'||$1||'%' OR su.email ILIKE '%'||$1||'%' OR coalesce(o.naslov,z.naslov,'') ILIKE '%'||$1||'%')
+  ORDER BY c.updated_at DESC LIMIT 200`,[q]);
+ res.set('Cache-Control','no-store').json({data:result.rows});
+}));
+app.get('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const conversation=await pool.query(`SELECT c.*,bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
+  su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name,
+  CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title
+  FROM message_conversations c JOIN users bu ON bu.id=c.buyer_id JOIN users su ON su.id=c.seller_id
+  LEFT JOIN profiles bp ON bp.id=bu.id LEFT JOIN profiles sp ON sp.id=su.id
+  LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id
+  LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id WHERE c.id=$1`,[req.params.id]);
+ if(!conversation.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
+ await pool.query('INSERT INTO message_admin_access_log(admin_id,conversation_id,action) VALUES($1,$2,\'view\')',[req.user.sub,req.params.id]);
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',req.params.id,JSON.stringify({conversation_id:req.params.id})]);
+ const messages=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC LIMIT 1000',[req.params.id]);
+ res.set('Cache-Control','no-store').json({conversation:conversation.rows[0],messages:messages.rows});
+}));
+
 app.get('/api/admin/audit-log',auth,admin,asyncRoute(async(req,res)=>{
  const limit=Math.min(500,Math.max(1,Number.parseInt(req.query.limit||'100',10)||100)),offset=Math.max(0,Number.parseInt(req.query.offset||'0',10)||0);
  const actor=String(req.query.actor||'').trim().slice(0,254),action=String(req.query.action||'').trim().slice(0,120),from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();
