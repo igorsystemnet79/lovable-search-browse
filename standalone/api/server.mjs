@@ -11,7 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { randomUUID, randomBytes, createHash } from 'node:crypto';
+import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -21,6 +21,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imat
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
+app.use((req,_res,next)=>{const raw=String(req.headers.cookie||'');req.cookies=Object.fromEntries(raw.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}));next();});
 app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }));
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
@@ -112,6 +113,65 @@ app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{const
 app.post('/api/admin/platform-rules/restore',auth,admin,asyncRoute(async(req,res)=>{const id=String(req.body?.id||'');const c=await pool.connect();try{await c.query('BEGIN');const found=await c.query('SELECT sadrzaj FROM platform_rules_versions WHERE id=$1',[id]);if(!found.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Verzija nije pronađena.'});}const current=await c.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');const version=current.rows[0].version+1;const inserted=await c.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[found.rows[0].sadrzaj,version,req.user.sub]);await c.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[found.rows[0].sadrzaj,version,req.user.sub]);await c.query('COMMIT');res.json({data:inserted.rows[0]});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava','/kriterijumi-rangiranja']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
+
+const googleRedirectUri = () => String(process.env.GOOGLE_REDIRECT_URI || 'https://ponudimi-test-api.onrender.com/api/auth/google/callback').trim();
+const googleFrontendUrl = () => String(process.env.PUBLIC_APP_URL || 'https://ponudimi-novo.onrender.com').trim().replace(/\/+$/,'');
+app.get('/api/auth/google', (req,res) => {
+ const clientId=String(process.env.GOOGLE_CLIENT_ID||'').trim();
+ const secret=String(process.env.GOOGLE_CLIENT_SECRET||'').trim();
+ if(!clientId || !secret) return res.status(503).json({error:'Google prijava nije podešena na API servisu.'});
+ const state=randomBytes(32).toString('hex');
+ res.cookie('ponudimi_google_state',state,{httpOnly:true,secure:true,sameSite:'lax',maxAge:10*60*1000,path:'/api/auth/google'});
+ const params=new URLSearchParams({client_id:clientId,redirect_uri:googleRedirectUri(),response_type:'code',scope:'openid email profile',state,prompt:'select_account'});
+ res.redirect(302,'https://accounts.google.com/o/oauth2/v2/auth?'+params.toString());
+});
+app.get('/api/auth/google/callback',asyncRoute(async(req,res)=>{
+ const expected=String(req.cookies?.ponudimi_google_state||'');
+ const received=String(req.query?.state||'');
+ res.clearCookie('ponudimi_google_state',{httpOnly:true,secure:true,sameSite:'lax',path:'/api/auth/google'});
+ const fail=(message)=>res.redirect(302,googleFrontendUrl()+'/prijava?google_error='+encodeURIComponent(message));
+ if(!expected || !received || expected.length!==received.length || !timingSafeEqual(Buffer.from(expected),Buffer.from(received))) return fail('Google prijava nije potvrđena. Pokušaj ponovo.');
+ const code=String(req.query?.code||'');
+ if(!code) return fail('Google nije vratio autorizacioni kod.');
+ const clientId=String(process.env.GOOGLE_CLIENT_ID||'').trim();
+ const clientSecret=String(process.env.GOOGLE_CLIENT_SECRET||'').trim();
+ if(!clientId || !clientSecret) return fail('Google prijava nije podešena na API servisu.');
+ const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams({code,client_id:clientId,client_secret:clientSecret,redirect_uri:googleRedirectUri(),grant_type:'authorization_code'})});
+ const tokenData=await tokenResponse.json().catch(()=>({}));
+ if(!tokenResponse.ok || !tokenData.access_token) return fail('Google potvrda nije uspela. Proveri OAuth podešavanja.');
+ const profileResponse=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{headers:{Authorization:'Bearer '+tokenData.access_token}});
+ const googleUser=await profileResponse.json().catch(()=>({}));
+ const email=String(googleUser.email||'').trim().toLowerCase();
+ if(!profileResponse.ok || !email || googleUser.email_verified!==true) return fail('Google nalog nema potvrđenu email adresu.');
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  let found=await c.query('SELECT * FROM users WHERE email=$1 FOR UPDATE',[email]);
+  let user=found.rows[0];
+  if(!user){
+   const displayName=String(googleUser.name||'').trim();
+   const parts=displayName.split(/\s+/).filter(Boolean);
+   const base=String(email.split('@')[0]||'korisnik').toLowerCase().replace(/[^a-z0-9._-]/g,'').slice(0,20)||'korisnik';
+   const username=base+'_'+randomBytes(3).toString('hex');
+   const metadata={ime:String(googleUser.given_name||parts[0]||'').slice(0,60),prezime:String(googleUser.family_name||parts.slice(1).join(' ')||'').slice(0,60),google_sub:String(googleUser.sub||''),provider:'google'};
+   const randomPassword=randomBytes(48).toString('base64url');
+   const inserted=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,now(),$3) RETURNING *',[email,await bcrypt.hash(randomPassword,12),JSON.stringify(metadata)]);
+   user=inserted.rows[0];
+   await c.query('INSERT INTO profiles(id,ime,prezime,korisnicko_ime,tip_lica,email) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO NOTHING',[user.id,metadata.ime||null,metadata.prezime||null,username,'fizicko',email]);
+   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user') ON CONFLICT(user_id,role) DO NOTHING",[user.id]);
+  }else{
+   await c.query("UPDATE users SET email_confirmed_at=COALESCE(email_confirmed_at,now()),metadata=COALESCE(metadata,'{}'::jsonb) || $2::jsonb WHERE id=$1",[user.id,JSON.stringify({google_sub:String(googleUser.sub||''),provider:'google'})]);
+   await c.query('INSERT INTO profiles(id,email) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET email=COALESCE(profiles.email,EXCLUDED.email)',[user.id,email]);
+  }
+  const blocked=await c.query('SELECT blokiran FROM profiles WHERE id=$1',[user.id]);
+  if(blocked.rows[0]?.blokiran){await c.query('ROLLBACK');return fail('Ovaj nalog je privremeno blokiran.');}
+  await c.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[user.id]);
+  await c.query('COMMIT');
+  const token=sign(user);
+  res.redirect(302,googleFrontendUrl()+'/prijava#access_token='+encodeURIComponent(token));
+ }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
+}));
+
 app.post('/api/auth/register', asyncRoute(async(req,res)=>{
  const maintenance=await pool.query('SELECT enabled,message FROM platform_maintenance WHERE singleton=true');if(maintenance.rows[0]?.enabled)return res.status(503).json({error:maintenance.rows[0].message,code:'MAINTENANCE_MODE',maintenance:true});
  const {email,password,metadata={}}=req.body||{}; const e=String(email||'').trim().toLowerCase();
