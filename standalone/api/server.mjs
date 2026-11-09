@@ -384,7 +384,7 @@ app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{
  res.setHeader('Cache-Control','no-store');res.json({data:result.rows[0]||null});
 }));
 app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{
- const result=await pool.query('SELECT id,sadrzaj,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');
+ const result=await pool.query('SELECT id,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');
  res.json({data:result.rows});
 }));
 app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{
@@ -393,24 +393,29 @@ app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query('BEGIN');
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('platform_rules_versions'))");
   const current=await client.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');
   const version=current.rows[0].version+1;
   const inserted=await client.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[sadrzaj,version,req.user.sub]);
   await client.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[sadrzaj,version,req.user.sub]);
+  await client.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'platform_rules_published','PUT','/api/admin/platform-rules',$3,200,$4::jsonb)",[req.user.sub,req.user.email,String(inserted.rows[0].id),JSON.stringify({version,sadrzaj_length:sadrzaj.length})]);
   await client.query('COMMIT');res.json({data:inserted.rows[0]});
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }));
 app.post('/api/admin/platform-rules/restore',auth,admin,asyncRoute(async(req,res)=>{
  const id=String(req.body?.id||'');
+ if(!validUuid(id))return res.status(400).json({error:'ID verzije nije ispravan.'});
  const client=await pool.connect();
  try{
   await client.query('BEGIN');
+  await client.query("SELECT pg_advisory_xact_lock(hashtext('platform_rules_versions'))");
   const found=await client.query('SELECT sadrzaj FROM platform_rules_versions WHERE id=$1',[id]);
   if(!found.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Verzija nije pronađena.'});}
   const current=await client.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');
   const version=current.rows[0].version+1;
   const inserted=await client.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[found.rows[0].sadrzaj,version,req.user.sub]);
   await client.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[found.rows[0].sadrzaj,version,req.user.sub]);
+  await client.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'platform_rules_restored','POST','/api/admin/platform-rules/restore',$3,200,$4::jsonb)",[req.user.sub,req.user.email,String(inserted.rows[0].id),JSON.stringify({version,source_version_id:id})]);
   await client.query('COMMIT');res.json({data:inserted.rows[0]});
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }));
@@ -1202,9 +1207,9 @@ app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
   ORDER BY c.updated_at DESC LIMIT 200`,[q]);
  res.set('Cache-Control','no-store').json({data:result.rows});
 }));
-app.get('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
+app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
  if(!validUuid(req.params.id))return res.status(400).json({error:'ID razgovora nije ispravan.'});
- const reason=String(req.query.reason||'').trim().slice(0,500);
+ const reason=String(req.body?.reason||'').trim().slice(0,500);
  if(reason.length<10)return res.status(400).json({error:'Pre pregleda razgovora navedite opravdan razlog (najmanje 10 karaktera).'});
  const conversation=await pool.query(`SELECT c.*,bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
   su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name,
@@ -1217,7 +1222,7 @@ app.get('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
  await pool.query("INSERT INTO message_admin_access_log(admin_id,conversation_id,action,reason) VALUES($1,$2,'view',$3)",[req.user.sub,req.params.id,reason]);
  await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',req.params.id,JSON.stringify({conversation_id:req.params.id,reason})]);
  const messages=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC LIMIT 1000',[req.params.id]);
- res.set('Cache-Control','no-store').json({conversation:conversation.rows[0],messages:messages.rows});
+ res.set('Cache-Control','private, no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
 
 app.get('/api/admin/audit-log',auth,admin,asyncRoute(async(req,res)=>{
