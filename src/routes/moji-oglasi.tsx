@@ -40,7 +40,8 @@ function MojiOglasi() {
     const column = table === "ponude" ? "ponuda_id" : "zahtev_id";
     const { data: photos, error: photosError } = await ponudimi.from("slike_oglasa").select("storage_path").eq(column, id);
     if (photosError) { alert("Fotografije nisu mogle da se pripreme za brisanje."); return; }
-    const paths = (photos ?? []).map((photo) => photo.storage_path).filter((path): path is string => !!path);
+    const photoRows = (photos ?? []) as Array<{ storage_path: string | null }>;
+    const paths = photoRows.map((photo: { storage_path: string | null }) => photo.storage_path).filter((path: string | null): path is string => !!path);
     if (paths.length) {
       const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove(paths);
       if (storageError) { alert("Fotografije nisu mogle da se obrišu. Oglas nije obrisan."); return; }
