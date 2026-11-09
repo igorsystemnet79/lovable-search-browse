@@ -136,12 +136,38 @@ const admin = asyncRoute(async (req,res,next) => {
 });
 
 async function createUserNotification(userId,type,title,message,link=null,metadata={},dedupeKey=null){
- const pref=await pool.query('SELECT in_app_enabled,listing_updates,important_changes FROM notification_preferences WHERE user_id=$1',[userId]);
- const settings=pref.rows[0];
- if(settings&&!settings.in_app_enabled)return;
- if(type==='listing_update'&&settings&&!settings.listing_updates)return;
- if(type==='platform'&&settings&&!settings.important_changes)return;
- await pool.query('INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING',[userId,type,title,message,link,JSON.stringify(metadata),dedupeKey]);
+ const pref=await pool.query('SELECT in_app_enabled,listing_updates,important_changes,new_offers,new_requests,email_enabled FROM notification_preferences WHERE user_id=$1',[userId]);
+ const settings=pref.rows[0]||{in_app_enabled:true,listing_updates:true,important_changes:true,new_offers:false,new_requests:false,email_enabled:false};
+ if(type==='listing_update'&&!settings.listing_updates)return;
+ if(type==='platform'&&!settings.important_changes)return;
+ if(type==='new_offer'&&!settings.new_offers)return;
+ if(type==='new_request'&&!settings.new_requests)return;
+ const key=dedupeKey||randomUUID();
+ let notificationId=null;
+ if(settings.in_app_enabled){
+  const inserted=await pool.query('INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id',[userId,type,title,message,link,JSON.stringify(metadata),key]);
+  notificationId=inserted.rows[0]?.id||null;
+ }
+ if(settings.email_enabled){
+  const claimed=await pool.query('INSERT INTO notification_email_deliveries(user_id,dedupe_key,notification_id) VALUES($1,$2,$3) ON CONFLICT(user_id,dedupe_key) DO NOTHING RETURNING id',[userId,key,notificationId]);
+  if(claimed.rows[0]){
+   try{
+    const recipient=await pool.query('SELECT email FROM users WHERE id=$1',[userId]);
+    const email=recipient.rows[0]?.email;
+    if(email){
+     const transport=await mailTransport();
+     const base=new URL(process.env.PUBLIC_APP_URL||'http://localhost').origin;
+     const target=typeof link==='string'&&link.startsWith('/')?new URL(link,base).toString():base;
+     const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+     await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — '+String(title).slice(0,120),text:String(message)+'\\n\\nOtvori PonudiMi: '+target,html:'<p>'+escapeHtml(message)+'</p><p><a href="'+escapeHtml(target)+'">Otvori PonudiMi</a></p>'});
+    }
+    await pool.query('UPDATE notification_email_deliveries SET sent_at=now() WHERE id=$1',[claimed.rows[0].id]);
+   }catch(error){
+    await pool.query('DELETE FROM notification_email_deliveries WHERE id=$1',[claimed.rows[0].id]).catch(()=>{});
+    console.error('E-mail obaveštenje nije poslato:',{code:error?.code||null,message:error?.message||'Nepoznata greška'});
+   }
+  }
+ }
 }
 async function notifyListingFollowers(table,listing,actorId){
  if(!listing?.id)return;
