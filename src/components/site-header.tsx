@@ -63,6 +63,7 @@ export function SiteHeader() {
             <>
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
+              <Link to="/poruke" className={outline}>Poruke</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
               <span className="inline-flex min-h-10 items-center justify-center px-1 text-center text-brand-foreground/80">
                 <span className="hidden sm:inline">{(user.user_metadata?.["ime"] as string) || user.email}</span>
