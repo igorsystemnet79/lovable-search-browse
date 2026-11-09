@@ -376,7 +376,8 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500; const off=Number.isInteger(offset)?Math.max(0,Math.min(offset,10000000)):0;
    const ownListingFilter=(filters||[]).some(f=>f.column==='user_id'&&f.op==='eq'&&f.value===userId);
    const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false AND moderacija_blokirana=false':'';
-   const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false AND moderacija_blokirana=false`:'}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
+   const publicListingWhere=publicPauseFilter?(whereSql?publicPauseFilter:' WHERE pauziran=false AND moderacija_blokirana=false'):'';
+   const sql=`SELECT * FROM ${ident(table)}${whereSql}${publicListingWhere}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params); let data=(table==='ponude'||table==='zahtevi')?zastitiJavneKontakte(rows,Boolean(userId)):rows;
    if(count==='exact'){const countWhere=whereSql?`${whereSql}${publicPauseFilter}`:publicPauseFilter?` WHERE pauziran=false AND moderacija_blokirana=false`:'';const countSql=`SELECT count(*)::int n FROM ${ident(table)}${countWhere}`;const counted=await pool.query(countSql,params);result={data,count:counted.rows[0].n};}else result={data};
  } else if(action==='insert'||action==='upsert'){
