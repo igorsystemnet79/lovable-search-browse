@@ -425,6 +425,8 @@ CREATE TABLE IF NOT EXISTS message_admin_access_log (
  admin_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  conversation_id uuid NOT NULL REFERENCES message_conversations(id) ON DELETE CASCADE,
  action text NOT NULL DEFAULT 'view' CHECK (action IN ('view')),
+ reason text NOT NULL DEFAULT 'Administratorski pregled',
  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE message_admin_access_log ADD COLUMN IF NOT EXISTS reason text NOT NULL DEFAULT 'Administratorski pregled';
 CREATE INDEX IF NOT EXISTS message_admin_access_log_created_idx ON message_admin_access_log(created_at DESC);
