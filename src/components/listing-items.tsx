@@ -73,6 +73,7 @@ export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; m
         ) : <p>{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
       </div>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
+      <FollowButton zahtev={zahtev} />
     </li>
   );
 }
