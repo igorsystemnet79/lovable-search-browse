@@ -196,6 +196,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/moji-oglasi'
+    | '/moj-nalog'
     | '/podrska'
     | '/ponude'
     | '/praceni-oglasi'
@@ -214,6 +215,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/moji-oglasi'
+    | '/moj-nalog'
     | '/podrska'
     | '/ponude'
     | '/praceni-oglasi'
@@ -377,6 +379,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
   MojiOglasiRoute: MojiOglasiRoute,
+  MojNalogRoute: MojNalogRoute,
   PodrskaRoute: PodrskaRoute,
   PonudeRoute: PonudeRoute,
   PraceniOglasiRoute: PraceniOglasiRoute,
