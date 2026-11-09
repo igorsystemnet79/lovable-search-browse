@@ -1392,10 +1392,14 @@ const formatConversationText = ({conversation,messages=[]}={}) => {
   const recipient=isBuyer
    ? (conversation?.seller_name||conversation?.seller_email||'Prodavac')
    : (conversation?.buyer_name||conversation?.buyer_email||'Kupac');
-  lines.push('Datum i vreme: '+(message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'—'));
+  const sentAt=message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'';
+  lines.push('Datum i vreme: '+sentAt);
   lines.push('Ko šalje: '+sender);
-  lines.push('Tekst poruke: '+String(message.body||''));
-  lines.push('Kome je poslata: '+recipient);
+  lines.push('');
+  lines.push(String(message.body||''));
+  lines.push('');
+  lines.push('Kome se šalje: '+recipient);
+  lines.push('Vreme primljene poruke: '+sentAt);
   lines.push('');
  }
  return lines.join('\\n').trim();
@@ -1447,12 +1451,9 @@ app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(r
  if(!result.rows[0])return res.status(404).json({error:'Arhiva nije pronađena.'});
  await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_download_message_archive','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/message-archives/:id/download',req.params.id,JSON.stringify({archive_id:req.params.id})]);
  const document=result.rows[0].document||{};
- let content=typeof document.text_content==='string'?document.text_content:'';
- if(!content){
-  const conversation=document.conversation||{};
-  const messages=Array.isArray(document.messages)?document.messages:[];
-  content=formatConversationText({conversation,messages});
- }
+ const conversation=document.conversation||{};
+ const messages=Array.isArray(document.messages)?document.messages:[];
+ const content=formatConversationText({conversation,messages});
  const filename=String(result.rows[0].file_name||'ponudimi-prepiska.txt').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/\\.json$/i,'.txt');
  res.set({'Cache-Control':'private, no-store','Content-Type':'text/plain; charset=utf-8','Content-Disposition':'attachment; filename="'+(filename.endsWith('.txt')?filename:filename+'.txt')+'"'}).send(content);
 }));
