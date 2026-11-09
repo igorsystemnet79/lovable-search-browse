@@ -106,12 +106,14 @@ CREATE TABLE IF NOT EXISTS prijave_oglasa (
  prijavio_id uuid REFERENCES users(id) ON DELETE SET NULL,
  razlog text NOT NULL CHECK (razlog IN ('sumnja_na_prevaru','netacni_podaci','neispravan_kontakt','neprimeren_sadrzaj','dupliran_oglas','ostalo')),
  detalji text CHECK (detalji IS NULL OR char_length(detalji) <= 1000),
- status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','pregledano','odbijeno')),
+ status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','pregledano','odbijeno','oglas_uklonjen','vracen_u_prikaz')),
  admin_napomena text,
  odlucio_id uuid REFERENCES users(id) ON DELETE SET NULL,
  odluceno_at timestamptz,
  created_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE prijave_oglasa DROP CONSTRAINT IF EXISTS prijave_oglasa_status_check;
+ALTER TABLE prijave_oglasa ADD CONSTRAINT prijave_oglasa_status_check CHECK (status IN ('na_cekanju','pregledano','odbijeno','oglas_uklonjen','vracen_u_prikaz'));
 CREATE INDEX IF NOT EXISTS prijave_oglasa_status_idx ON prijave_oglasa(status,created_at DESC);
 CREATE INDEX IF NOT EXISTS prijave_oglasa_listing_idx ON prijave_oglasa(tabela,oglas_id,created_at DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS prijave_oglasa_jedna_otvorena_po_korisniku
@@ -788,6 +790,8 @@ ALTER TABLE prihvatanja_uslova ADD COLUMN IF NOT EXISTS upoznat_sa_privatnoscu b
 CREATE INDEX IF NOT EXISTS prihvatanja_uslova_user_idx ON prihvatanja_uslova(user_id,prihvaceno_at DESC);
  
 -- Status prodavca za jasno obaveštavanje kupaca na onlajn tržištu.
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS moderacija_blokirana boolean NOT NULL DEFAULT false;
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderacija_blokirana boolean NOT NULL DEFAULT false;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
 ALTER TABLE ponude ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
 ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
