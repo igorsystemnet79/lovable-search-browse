@@ -161,7 +161,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <option value="pravno">Pravno lice</option>
                   </select>
                   <div className="flex gap-2">
-                    <button className={small} onClick={() => { const { id, ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit; update(id, { ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj</button>
+                    <button className={small} onClick={() => { const { id, ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit; update(id, { ime, prezime: prezime ?? null, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj</button>
                     <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                   </div>
                 </div>
@@ -595,7 +595,7 @@ function AdminObavestenja() {
 }
 
 type AuditRow = {
-  id: string; actor_email: string | null; action: string; http_method: string;
+  id: string; actor_id: string | null; actor_email: string | null; action: string; http_method: string;
   route: string; target_id: string | null; response_status: number;
   details: Record<string, unknown>; created_at: string; total: number;
 };
@@ -669,7 +669,7 @@ function EvidencijaAktivnosti() {
               <tr key={row.id} className="border-t border-input">
                 <td className="whitespace-nowrap p-3">{new Date(row.created_at).toLocaleString("sr-RS")}</td>
                 <td className="p-3">{row.actor_email || row.actor_id || "Nepoznat nalog"}</td>
-                <td className="p-3"><span className="font-medium">{row.action}</span><span className="block text-xs text-muted-foreground">{row.http_method} · {row.route}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Promenjena polja: {Object.keys((row.details?.submitted_values as Record<string, unknown>) || {}).join(", ") || "bez dodatnih podataka"}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Razlog administratorskog pristupa: {String(row.details?.reason || "—")}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">{JSON.stringify(row.details?.submitted_values || {})}</span></td>
+                <td className="p-3"><span className="font-medium">{row.action}</span><span className="block text-xs text-muted-foreground">{row.http_method} · {row.route}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Promenjena polja: {Object.keys((row.details?.["submitted_values"] as Record<string, unknown>) || {}).join(", ") || "bez dodatnih podataka"}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">Razlog administratorskog pristupa: {String(row.details?.["reason"] || "—")}</span><span className="mt-1 block max-w-[420px] break-words text-xs text-muted-foreground">{JSON.stringify(row.details?.submitted_values || {})}</span></td>
                 <td className="p-3">{row.target_id || "—"}</td>
                 <td className="p-3"><span className={row.response_status >= 400 ? "font-semibold text-destructive" : "font-semibold text-green-700"}>{row.response_status}</span></td>
               </tr>
