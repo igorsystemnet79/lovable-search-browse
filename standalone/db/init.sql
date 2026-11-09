@@ -33,6 +33,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS prezime text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS korisnicko_ime text;
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_active_at timestamptz NOT NULL DEFAULT now();
+UPDATE profiles p SET prezime=NULLIF(BTRIM(u.metadata->>'prezime'),'') FROM users u WHERE u.id=p.id AND (p.prezime IS NULL OR BTRIM(p.prezime)='') AND NULLIF(BTRIM(u.metadata->>'prezime'),'') IS NOT NULL;
+UPDATE profiles p SET korisnicko_ime=LOWER(NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'')) FROM users u WHERE u.id=p.id AND (p.korisnicko_ime IS NULL OR p.korisnicko_ime='') AND NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'') IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_korisnicko_ime_unique ON profiles (lower(korisnicko_ime)) WHERE korisnicko_ime IS NOT NULL AND korisnicko_ime <> '';
 CREATE TABLE IF NOT EXISTS user_roles (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
