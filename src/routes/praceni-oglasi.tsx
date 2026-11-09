@@ -22,6 +22,7 @@ export const Route = createFileRoute("/praceni-oglasi")({
 });
 
 const label = { pala: "Cena je pala", porasla: "Cena je porasla", ista: "Cena nije promenjena" };
+const budgetLabel = { pala: "Budžet je smanjen", porasla: "Budžet je povećan", ista: "Budžet nije promenjen" };
 
 function Praceni() {
   const { user, loading } = useAuth();
@@ -32,7 +33,7 @@ function Praceni() {
       <main className="container-page py-10">
         <h1 className="text-3xl font-bold">Praćeni oglasi</h1>
         {!loading && !user && <p className="mt-4">Da pratiš oglase, <Link to="/prijava" className="font-semibold text-brand underline">prijavi se</Link>.</p>}
-        {user && q.data?.length === 0 && <p className="mt-4 text-muted-foreground">Ne pratiš nijedan oglas. Klikni „Prati oglas“ ispod ponude.</p>}
+        {user && q.data?.length === 0 && <p className="mt-4 text-muted-foreground">Ne pratiš nijednu ponudu ni zahtev. Klikni „Prati objavu“ na ponudi ili zahtevu.</p>}
         <ul className="mt-6 grid gap-4 lg:grid-cols-2">
           {q.data?.map((f) => (
             <div key={f.id}>
@@ -47,7 +48,7 @@ function Praceni() {
                 <ZahtevItem zahtev={f.zahtevi} />
                 <p className="mt-2 px-4 text-sm">
                   Početni budžet: {formatCena(f.pocetni_budzet, f.zahtevi.valuta)} · Sada: {formatCena(f.zahtevi.budzet, f.zahtevi.valuta)} ·{" "}
-                  <strong className={promenaCene(f.pocetni_budzet, f.zahtevi.budzet) === "pala" ? "text-brand" : ""}>{label[promenaCene(f.pocetni_budzet, f.zahtevi.budzet)]}</strong>
+                  <strong className={promenaCene(f.pocetni_budzet, f.zahtevi.budzet) === "pala" ? "text-brand" : ""}>{budgetLabel[promenaCene(f.pocetni_budzet, f.zahtevi.budzet)]}</strong>
                 </p>
               </>}
             </div>
