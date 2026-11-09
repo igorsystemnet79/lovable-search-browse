@@ -257,9 +257,10 @@ function Poruke() {
   useEffect(() => { load(); }, [load]);
   async function openThread(thread: any) {
     setSelected(thread);
-    if (accessReason.trim().length < 10) { setMessages([]); setError("Pre pregleda privatne prepiske unesite konkretan razlog (najmanje 10 karaktera), npr. broj prijave ili sumnju na zloupotrebu."); return; }
+    setMessages([]);
+    if (accessReason.trim().length < 10) { setError("Pre pregleda privatne prepiske unesite konkretan razlog (najmanje 10 karaktera), npr. broj prijave ili sumnju na zloupotrebu."); return; }
     try {
-      const r = await fetch(`/api/admin/messages/${thread.id}?reason=${encodeURIComponent(accessReason.trim())}`, { cache: "no-store", headers: headers() });
+      const r = await fetch(`/api/admin/messages/${thread.id}/view`, { method: "POST", cache: "no-store", headers: { ...headers(), "Content-Type": "application/json" }, body: JSON.stringify({ reason: accessReason.trim() }) });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Razgovor nije moguće otvoriti.");
       setMessages(data.messages || []);
