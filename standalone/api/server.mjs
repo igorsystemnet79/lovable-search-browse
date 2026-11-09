@@ -1367,6 +1367,32 @@ app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
  res.set('Cache-Control','private, no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
 
+app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
+ const conversationId=req.params.id;
+ if(!validUuid(conversationId))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const reason=String(req.query.reason||'').trim().slice(0,500);
+ if(reason.length<10)return res.status(400).json({error:'Za izvoz navedite razlog od najmanje 10 karaktera.'});
+ const result=await pool.query(`SELECT c.id,c.listing_type,c.listing_id,c.buyer_id,c.seller_id,c.created_at,c.updated_at,
+  CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title,
+  bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
+  su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name
+  FROM message_conversations c JOIN users bu ON bu.id=c.buyer_id JOIN users su ON su.id=c.seller_id
+  LEFT JOIN profiles bp ON bp.id=bu.id LEFT JOIN profiles sp ON sp.id=su.id
+  LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id
+  LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id
+  WHERE c.id=$1`,[conversationId]);
+ if(!result.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
+ const conversation=result.rows[0];
+ const messageResult=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC',[conversationId]);
+ const messages=messageResult.rows.map(m=>({...m,sender_name:m.sender_id===conversation.buyer_id?conversation.buyer_name:conversation.seller_name,sender_email:m.sender_id===conversation.buyer_id?conversation.buyer_email:conversation.seller_email}));
+ const payload={document_type:'PonudiMi — arhiva privatne prepiske',format_version:1,exported_at:new Date().toISOString(),exported_by:{user_id:req.user.sub,email:req.user.email||null},export_reason:reason,conversation,messages};
+ const canonical=JSON.stringify(payload);
+ const sha256=createHash('sha256').update(canonical,'utf8').digest('hex');
+ const document={...payload,integrity:{algorithm:'SHA-256',hash:sha256,hash_scope:'SHA-256 nad UTF-8 bajtovima JSON objekta bez ovog integrity polja; proverava integritet izvezenog sadržaja.'}};
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_export_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/export',conversationId,JSON.stringify({conversation_id:conversationId,message_count:messages.length,reason,sha256})]);
+ const filename='ponudimi-prepiska-'+conversationId+'.json';
+ res.set({'Cache-Control':'private, no-store','Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="'+filename+'"'}).send(JSON.stringify(document,null,2));
+}));
 app.delete('/api/admin/messages/:id/message/:messageId',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id,messageId=req.params.messageId;
  if(!validUuid(conversationId)||!validUuid(messageId))return res.status(400).json({error:'ID razgovora ili poruke nije ispravan.'});
