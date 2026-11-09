@@ -53,12 +53,15 @@ services:
     build:
       context: ..
       dockerfile: standalone/Dockerfile.web
+      args:
+        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production
       PORT: 3000
       HOST: 0.0.0.0
       API_INTERNAL_URL: http://api:4000
+      PUBLIC_APP_URL: ${PUBLIC_APP_URL:-http://localhost}
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 15s
