@@ -908,6 +908,21 @@ function AdminKorisnickePoruke() {
   finally{setBusy(false);}
  },[filter]);
  useEffect(()=>{load();},[load]);
+ async function exportConversation(){
+  if(!selected||reason.trim().length<10){setError("Pre izvoza unesi razlog od najmanje 10 karaktera.");return;}
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`/api/admin/messages/${encodeURIComponent(selected.id)}/export?reason=${encodeURIComponent(reason.trim())}`,{headers:headers()});
+   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"Izvoz prepiske nije uspeo.");}
+   const blob=await response.blob();
+   const url=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=url;link.download=`ponudimi-prepiska-${selected.id}.json`;
+   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+   setNotice("Arhiva prepiske je preuzeta. Sadrži podatke razgovora, vremenske oznake i SHA-256 kontrolni zbir.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
+  finally{setBusy(false);}
+ }
  async function deleteMessage(message:AdminConversationMessage){
   if(!selected||reason.trim().length<10){setError("Pre brisanja unesi razlog od najmanje 10 karaktera.");return;}
   if(!window.confirm("Trajno obrisati ovu poruku? Ova radnja se ne može poništiti."))return;
@@ -968,7 +983,7 @@ function AdminKorisnickePoruke() {
     {!busy&&!rows.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
    </div>
    <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
-    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy||reason.trim().length<10}>Obriši ceo razgovor</button></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy||reason.trim().length<10}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={small} onClick={()=>void exportConversation()} disabled={busy||reason.trim().length<10}>Izvezi prepisku (.json)</button><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy||reason.trim().length<10}>Obriši ceo razgovor</button></div></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy||reason.trim().length<10}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
    </div>
   </div>
  </section>;
