@@ -61,6 +61,8 @@ Skripta traži potvrdu pre upisa. SQL vraćanje radi u postojeću bazu i može p
 
 ## Oporavak lozinke i integracije
 
+Paketi pravnih lica imaju cene 10 € mesečno, 20 € za tri meseca, 50 € za šest meseci i 100 € za 12 meseci. Paket može biti aktiviran samo za APR-verifikovano pravno lice nakon evidentirane uplate ili administratorskog oslobađanja. API proverava pakete na svakih šest sati i šalje e-mail podsetnik 10 dana pre isteka kada su SMTP podešavanja dostupna. SMS podsetnici nisu uključeni jer SMS provajder još nije konfigurisan.
+
 Oporavak lozinke šalje jednokratni link koji važi jedan sat. Za to moraju biti podešeni SMTP podaci. APR sinhronizacija radi samo kada dobiješ i uneseš važeći pristup APR API servisu. Google OAuth nije uključen u ovu samostalnu verziju; email i lozinka rade bez spoljnog identiteta.
 
 ## Migracija starih naloga i podataka
