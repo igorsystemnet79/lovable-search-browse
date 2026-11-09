@@ -132,8 +132,8 @@ app.use('/api',asyncRoute(async(req,res,next)=>{
  res.set('Cache-Control','no-store');return res.status(503).json({error:state.rows[0].message||'Platforma je privremeno na održavanju.',code:'MAINTENANCE_MODE',maintenance:true});
 }));
 
-app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
-app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
+app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND NOT p.moderacija_blokirana AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
+app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND NOT moderacija_blokirana AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
 for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.post(`/api/${table}`,auth,asyncRoute(async(req,res)=>{const b=req.body||{};const required=['naslov','kategorija','lokacija'];if(required.some(k=>!String(b[k]||'').trim())||String(b.naslov).length>150||String(b.opis||'').length>3000)return res.status(400).json({error:'Proveri obavezna polja oglasa.'});const {rows}=await pool.query(`INSERT INTO ${table}(naslov,opis,kategorija,lokacija,${amount},valuta,emoji,user_id,kontakt_ime,telefon) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[b.naslov,b.opis||null,b.kategorija,b.lokacija,b[amount]??null,b.valuta||'EUR',b.emoji||null,req.user.sub,b.kontakt_ime||null,b.telefon||null]);res.status(201).json(rows[0]);}));
  app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json(rows[0]);}));
@@ -227,12 +227,28 @@ app.get('/api/admin/reports',auth,admin,asyncRoute(async(_req,res)=>{
  res.json(result.rows);
 }));
 app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=>{
- const status=req.body?.status;
- if(!['pregledano','odbijeno'].includes(status))return res.status(400).json({error:'Izaberi ispravan status prijave.'});
- const note=String(req.body?.napomena||'').trim().slice(0,1000)||null;
- const result=await pool.query("UPDATE prijave_oglasa SET status=$1,admin_napomena=$2,odlucio_id=$3,odluceno_at=now() WHERE id=$4 AND status='na_cekanju' RETURNING *",[status,note,req.user.sub,req.params.id]);
- if(!result.rows[0])return res.status(409).json({error:'Prijava ne postoji ili je već obrađena.'});
- res.json(result.rows[0]);
+  const status=String(req.body?.status||'');
+  if(!['pregledano','odbijeno','oglas_uklonjen','vracen_u_prikaz'].includes(status))return res.status(400).json({error:'Izaberi ispravan status prijave.'});
+  const note=String(req.body?.napomena||'').trim().slice(0,1000)||null;
+  const c=await pool.connect();
+  try{
+   await c.query('BEGIN');
+   const found=await c.query('SELECT * FROM prijave_oglasa WHERE id=$1 FOR UPDATE',[req.params.id]);
+   const report=found.rows[0];
+   if(!report)return res.status(404).json({error:'Prijava nije pronađena.'});
+   const allowedTransition=(status==='vracen_u_prikaz'&&report.status==='oglas_uklonjen')||
+     (status==='oglas_uklonjen'&&report.status==='na_cekanju')||
+     (['pregledano','odbijeno'].includes(status)&&report.status==='na_cekanju');
+   if(!allowedTransition){await c.query('ROLLBACK');return res.status(409).json({error:'Prijava je već obrađena ili promena statusa nije dozvoljena.'});}
+   if(status==='oglas_uklonjen'||status==='vracen_u_prikaz'){
+     const table=report.tabela==='ponude'?'ponude':'zahtevi';
+     const updatedListing=await c.query('UPDATE '+table+' SET moderacija_blokirana=$1 WHERE id=$2 RETURNING id',[status==='oglas_uklonjen',report.oglas_id]);
+     if(!updatedListing.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'Oglas više ne postoji.'});}
+   }
+   const updated=await c.query('UPDATE prijave_oglasa SET status=$1,admin_napomena=$2,odlucio_id=$3,odluceno_at=now() WHERE id=$4 RETURNING *',[status,note,req.user.sub,req.params.id]);
+   await c.query('COMMIT');
+   res.json(updated.rows[0]);
+  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }));
 app.get('/api/admin/stats',auth,admin,asyncRoute(async(_req,res)=>{
  const queries=await Promise.all([
@@ -359,7 +375,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const orderSql=(orders||[]).filter(o=>columns.includes(o.column)).map(o=>`${ident(o.column)} ${o.ascending===false?'DESC':'ASC'}`).join(',');
    const lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500; const off=Number.isInteger(offset)?Math.max(0,Math.min(offset,10000000)):0;
    const ownListingFilter=(filters||[]).some(f=>f.column==='user_id'&&f.op==='eq'&&f.value===userId);
-   const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false':'';
+   const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false AND moderacija_blokirana=false':'';
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false`:''}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params); let data=(table==='ponude'||table==='zahtevi')?zastitiJavneKontakte(rows,Boolean(userId)):rows;
    if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data,count:c.rows[0].n};}else result={data};
@@ -394,7 +410,7 @@ app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
   if(valuta&&!['EUR','RSD'].includes(valuta))return res.status(400).json({error:'Izabrana valuta nije podržana.'});
   if((minCena!==null||maxCena!==null)&&!valuta)return res.status(400).json({error:'Izaberi valutu za precizno filtriranje cene.'});
   const orderBy={najnovije:'created_at DESC',najstarije:'created_at ASC',cena_rastuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' ASC, created_at DESC',cena_opadajuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' DESC, created_at DESC'}[sort]||'created_at DESC';
-  const sql='SELECT * FROM '+table+' WHERE pauziran=false AND pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
+  const sql='SELECT * FROM '+table+' WHERE pauziran=false AND moderacija_blokirana=false AND pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
   const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:zastitiJavneKontakte(rows,Boolean(userId))});
  }
  return res.status(400).json({error:'Nepoznata funkcija.'});
