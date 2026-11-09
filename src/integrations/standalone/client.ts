@@ -1,7 +1,8 @@
 /* PonudiMi standalone client compatibility layer.
  * Keeps the existing application call sites while using the self-hosted API.
  */
-export const API_ORIGIN = "https://ponudimi-test-api.onrender.com";
+const configuredApiOrigin = (import.meta as any).env?.VITE_API_ORIGIN;
+export const API_ORIGIN = String(configuredApiOrigin || (typeof window !== "undefined" ? window.location.origin : process.env.PUBLIC_APP_URL || "http://localhost")).replace(/\\/+$/, "");
 const SESSION_KEY = "ponudimi_session";
 type AnyRecord = Record<string, any>;
 
@@ -83,8 +84,8 @@ async function api(path: string, init: RequestInit = {}) {
   if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
   if (!(init.body instanceof FormData) && init.body && !headers.has("Content-Type")) headers.set("Content-Type", "application/json");
   const apiOrigin = typeof window === "undefined"
-    ? (process.env.API_INTERNAL_URL || "https://ponudimi-test-api.onrender.com")
-    : "https://ponudimi-test-api.onrender.com";
+    ? (process.env.API_INTERNAL_URL || API_ORIGIN)
+    : API_ORIGIN;
   const target = `${apiOrigin}${path}`;
   const response = await fetch(target, { ...init, headers });
   const body = await response.json().catch(() => ({}));
