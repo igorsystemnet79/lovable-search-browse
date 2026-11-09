@@ -1385,7 +1385,7 @@ const ensureAdminMessageArchives = async () => {
  await pool.query('CREATE INDEX IF NOT EXISTS admin_message_archives_created_at_idx ON admin_message_archives(created_at DESC)');
 };
 const formatConversationText = ({conversation,messages=[]}={}) => {
- const lines=[];
+ const blocks=[];
  for(const message of messages){
   const isBuyer=String(message.sender_id||'')===String(conversation?.buyer_id||'');
   const sender=message.sender_name||message.sender_email||(isBuyer?'Kupac':'Prodavac');
@@ -1393,16 +1393,22 @@ const formatConversationText = ({conversation,messages=[]}={}) => {
    ? (conversation?.seller_name||conversation?.seller_email||'Prodavac')
    : (conversation?.buyer_name||conversation?.buyer_email||'Kupac');
   const sentAt=message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'';
-  lines.push('Datum i vreme: '+sentAt);
-  lines.push('Ko šalje: '+sender);
-  lines.push('');
-  lines.push(String(message.body||''));
-  lines.push('');
-  lines.push('Kome se šalje: '+recipient);
-  lines.push('Vreme primljene poruke: '+sentAt);
-  lines.push('');
+  const receivedAt=sentAt;
+  blocks.push([
+   'Datum i vreme:',
+   sentAt,
+   'Ko salje:',
+   sender,
+   '',
+   String(message.body||''),
+   '',
+   'Kome se salje:',
+   recipient,
+   'Vreme primljene poruke:',
+   receivedAt,
+  ].join('\n'));
  }
- return lines.join('\\n').trim();
+ return blocks.join('\n\n');
 };
 app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id;
