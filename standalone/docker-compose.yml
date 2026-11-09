@@ -54,7 +54,7 @@ services:
       context: ..
       dockerfile: standalone/Dockerfile.web
       args:
-        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-}
+        VITE_API_ORIGIN: ${VITE_API_ORIGIN:-same-origin}
     restart: unless-stopped
     environment:
       NODE_ENV: production
