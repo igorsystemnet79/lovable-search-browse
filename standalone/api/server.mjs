@@ -1204,6 +1204,8 @@ app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
 }));
 app.get('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
  if(!validUuid(req.params.id))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const reason=String(req.query.reason||'').trim().slice(0,500);
+ if(reason.length<10)return res.status(400).json({error:'Pre pregleda razgovora navedite opravdan razlog (najmanje 10 karaktera).'});
  const conversation=await pool.query(`SELECT c.*,bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
   su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name,
   CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title
@@ -1212,8 +1214,8 @@ app.get('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
   LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id
   LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id WHERE c.id=$1`,[req.params.id]);
  if(!conversation.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
- await pool.query('INSERT INTO message_admin_access_log(admin_id,conversation_id,action) VALUES($1,$2,\'view\')',[req.user.sub,req.params.id]);
- await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',req.params.id,JSON.stringify({conversation_id:req.params.id})]);
+ await pool.query("INSERT INTO message_admin_access_log(admin_id,conversation_id,action,reason) VALUES($1,$2,'view',$3)",[req.user.sub,req.params.id,reason]);
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',req.params.id,JSON.stringify({conversation_id:req.params.id,reason})]);
  const messages=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC LIMIT 1000',[req.params.id]);
  res.set('Cache-Control','no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
