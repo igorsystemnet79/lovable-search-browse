@@ -912,7 +912,7 @@ app.post('/api/admin/packages/:userId',auth,admin,asyncRoute(async(req,res)=>{
   res.status(201).json({data:inserted.rows[0]});
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 }));
-app.post('/api/admin/packages/reminders/run',auth,admin,asyncRoute(async(_req,res)=>{
+async function processPackageExpiryReminders(){
  const due=await pool.query(`SELECT bp.id,bp.user_id,bp.package_name,bp.ends_at,u.email
   FROM business_packages bp JOIN users u ON u.id=bp.user_id
   WHERE bp.status='active' AND bp.starts_at<=now() AND bp.ends_at>now() AND bp.ends_at<=now()+interval '10 days'
@@ -925,7 +925,11 @@ app.post('/api/admin/packages/reminders/run',auth,admin,asyncRoute(async(_req,re
   sent++;
  }
  const expired=await pool.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE status='active' AND ends_at<=now()");
- res.json({ok:true,reminders_processed:sent,expired:expired.rowCount});
+ return {reminders_processed:sent,expired:expired.rowCount};
+}
+app.post('/api/admin/packages/reminders/run',auth,admin,asyncRoute(async(_req,res)=>{
+ const result=await processPackageExpiryReminders();
+ res.json({ok:true,...result});
 }));
 app.get('/api/admin/packages/:id/payments',auth,admin,asyncRoute(async(req,res)=>{
  if(!validUuid(req.params.id))return res.status(400).json({error:'ID paketa nije ispravan.'});
@@ -1400,6 +1404,15 @@ async function startServer(){
  app.listen(port,'0.0.0.0',()=>{
   console.log(`PonudiMi API sluša na ${port}`);
   console.log('API spreman; administratorske uloge dodeljuju se isključivo ručnom serverskom komandom.');
+  const runReminders=async()=>{
+   try{
+    const result=await processPackageExpiryReminders();
+    if(result.reminders_processed||result.expired)console.log('Automatska obrada poslovnih paketa:',result);
+   }catch(error){console.error('Automatska obrada isteka paketa nije uspela:',error?.message||'Nepoznata greška');}
+  };
+  setTimeout(runReminders,15000);
+  const reminderTimer=setInterval(runReminders,6*60*60*1000);
+  reminderTimer.unref?.();
  });
 }
 startServer().catch(async err=>{
