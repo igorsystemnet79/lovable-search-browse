@@ -1006,72 +1006,178 @@ function UpravljanjeOdrzavanjem() {
 }
 
 
-type AdminConversation = {
-  id: string; listing_type: "ponude" | "zahtevi"; listing_title: string | null;
-  buyer_id: string; seller_id: string; buyer_email: string; buyer_name: string;
-  seller_email: string; seller_name: string; updated_at: string; last_message_at: string | null; message_count: number;
+type AdminMessageArchive = {
+ id:string; conversation_id:string|null; file_name:string; sha256:string; message_count:number;
+ created_by_email:string|null; export_reason:string; created_at:string; listing_type:string|null;
+ listing_title:string|null; buyer_name:string|null; seller_name:string|null;
 };
-type AdminConversationMessage = { id: string; sender_id: string; body: string; created_at: string };
+
+type AdminConversation = {
+ id: string; listing_type: "ponude" | "zahtevi"; listing_id: string; listing_title: string | null;
+ buyer_id: string; seller_id: string; buyer_email: string; buyer_name: string;
+ seller_email: string; seller_name: string; created_at: string; updated_at: string;
+ last_message_at: string | null; message_count: number;
+};
+type AdminConversationMessage = { id: string; sender_id: string; body: string; created_at: string; read_at: string | null };
 
 function AdminKorisnickePoruke() {
-  const [rows, setRows] = useState<AdminConversation[]>([]);
-  const [messages, setMessages] = useState<AdminConversationMessage[]>([]);
-  const [selected, setSelected] = useState<AdminConversation | null>(null);
-  const [filter, setFilter] = useState("");
-  const [reason, setReason] = useState("");
-  const [selectedReason, setSelectedReason] = useState("");
-  const [error, setError] = useState("");
-  const [notice, setNotice] = useState("");
-  const [busy, setBusy] = useState(false);
-  const token = () => { try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; } catch { return ""; } };
-  const headers = () => ({ Authorization: `Bearer ${token()}`, "Content-Type": "application/json" });
-  const load = useCallback(async () => {
-    setBusy(true); setError("");
-    try {
-      const response = await fetch(`${API_ORIGIN}/api/admin/messages?q=${encodeURIComponent(filter)}`, { cache: "no-store", headers: headers() });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Razgovori korisnika nisu dostupni.");
-      setRows(data.data || []);
-    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju razgovora."); }
-    finally { setBusy(false); }
-  }, [filter]);
-  useEffect(() => { load(); }, [load]);
-  async function openConversation(row: AdminConversation) {
-    const reviewReason = reason.trim();
-    setSelected(null); setMessages([]); setSelectedReason(""); setError(""); setNotice("");
-    if (reviewReason.length < 10) { setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera."); return; }
-    setReason(""); setBusy(true);
-    try {
-      const response = await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(row.id)}/view`, { method: "POST", headers: headers(), body: JSON.stringify({ reason: reviewReason }) });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error || "Pregled razgovora nije dozvoljen.");
-      setSelected(row); setMessages(data.messages || []); setSelectedReason(reviewReason);
-      setNotice("Pristup razgovoru je evidentiran u administratorskoj evidenciji.");
-    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri otvaranju razgovora."); }
-    finally { setBusy(false); }
-  }
-  return <section className="space-y-4">
-    <div><h2 className="text-xl font-semibold">Privatne poruke korisnika</h2><p className="mt-1 text-sm text-muted-foreground">Privatnu prepisku otvaraj samo kada postoji opravdan razlog. Svaki pristup se evidentira.</p></div>
-    <div className="rounded-2xl bg-surface p-4 shadow-card space-y-3">
-      <label className="block text-sm font-medium">Razlog administratorskog pregleda (obavezno, najmanje 10 karaktera)
-        <textarea className={inputCls + " mt-1 w-full"} rows={2} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} placeholder="Npr. provera prijave korisnika zbog sumnje na prevaru..."/>
-      </label>
-      <div className="flex flex-wrap items-center gap-2"><div className="w-full max-w-sm"><Input className={inputCls} placeholder="Pretraga po korisniku, e-mailu ili oglasu" value={filter} onChange={e => setFilter(e.target.value)}/></div><button type="button" className={small} onClick={load} disabled={busy}>Osveži</button><span className="text-xs text-muted-foreground">Razgovora: {rows.length}</span></div>
-    </div>
-    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}{notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
-    <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)]">
-      <div className="space-y-2">
-        {rows.map(row => <button type="button" key={row.id} onClick={() => openConversation(row)} disabled={busy || reason.trim().length < 10} className={`w-full rounded-xl border p-3 text-left disabled:opacity-50 ${selected?.id === row.id ? "border-brand bg-brand/5" : "border-input bg-surface"}`}>
-          <p className="text-sm font-semibold">{row.listing_title || "Oglas bez naslova"}</p><p className="mt-1 text-xs text-muted-foreground">{row.listing_type === "ponude" ? "Ponuda" : "Zahtev"} · {row.message_count} poruka</p>
-          <p className="mt-2 text-xs">Kupac: {row.buyer_name} <span className="text-muted-foreground">({row.buyer_email})</span></p><p className="text-xs">Prodavac: {row.seller_name} <span className="text-muted-foreground">({row.seller_email})</span></p>
-          <p className="mt-1 text-[11px] text-muted-foreground">Poslednja aktivnost: {row.last_message_at ? new Date(row.last_message_at).toLocaleString("sr-RS") : new Date(row.updated_at).toLocaleString("sr-RS")}</p>
-        </button>)}
-        {!busy && !rows.length && <p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
+ const [rows,setRows]=useState<AdminConversation[]>([]);
+ const [archives,setArchives]=useState<AdminMessageArchive[]>([]);
+ const [messages,setMessages]=useState<AdminConversationMessage[]>([]);
+ const [selected,setSelected]=useState<AdminConversation|null>(null);
+ const [filter,setFilter]=useState("");
+ const [reason,setReason]=useState("");
+ const [selectedReason,setSelectedReason]=useState("");
+ const [error,setError]=useState("");
+ const [notice,setNotice]=useState("");
+ const [busy,setBusy]=useState(false);
+ const token=()=>{try{return JSON.parse(localStorage.getItem("ponudimi_session")||"null")?.access_token||"";}catch{return "";}};
+ const headers=()=>({Authorization:`Bearer ${token()}`,"Content-Type":"application/json"});
+ const load=useCallback(async()=>{
+  setBusy(true);setError("");
+  try{
+   const params=new URLSearchParams();if(filter.trim())params.set("q",filter.trim());
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages?"+params.toString(),{cache:"no-store",headers:headers()});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Razgovori korisnika nisu dostupni.");
+   setRows(data.data||[]);
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri učitavanju razgovora.");}
+  finally{setBusy(false);}
+ },[filter]);
+ async function loadArchives(){
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/message-archives',{cache:'no-store',headers:headers()});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||'Arhive prepiski nisu dostupne.');
+   setArchives(data.data||[]);
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri učitavanju arhiva.');}
+ }
+ useEffect(()=>{load();loadArchives();},[load]);
+ async function exportConversation(){
+  if(!selected||reason.trim().length<10){setError("Pre izvoza unesi razlog od najmanje 10 karaktera.");return;}
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(selected.id)}/export?reason=${encodeURIComponent(reason.trim())}`,{headers:headers()});
+   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||"Izvoz prepiske nije uspeo.");}
+   const blob=await response.blob();
+   const url=URL.createObjectURL(blob);
+   const link=document.createElement("a");
+   link.href=url;link.download=`ponudimi-prepiska-${selected.id}.json`;
+   document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+   setNotice("Arhiva je sačuvana u administraciji i preuzeta na uređaj. Sadrži vremenske oznake i SHA-256 kontrolni zbir.");
+   await loadArchives();
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
+  finally{setBusy(false);}
+ }
+ async function downloadArchive(archive:AdminMessageArchive){
+  setBusy(true);setError('');
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/message-archives/${encodeURIComponent(archive.id)}/download`,{cache:'no-store',headers:headers()});
+   if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Preuzimanje arhive nije uspelo.');}
+   const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
+   link.href=url;link.download=archive.file_name;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+   setNotice('Arhiva je preuzeta. Preuzimanje je evidentirano.');
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri preuzimanju arhive.');}
+  finally{setBusy(false);}
+ }
+ async function deleteArchive(archive:AdminMessageArchive){
+  if(reason.trim().length<10){setError('Pre brisanja arhive unesi razlog od najmanje 10 karaktera.');return;}
+  if(!window.confirm('Trajno obrisati sačuvanu arhivu prepiske? Preuzeta kopija na tvom uređaju neće biti obrisana.'))return;
+  setBusy(true);setError('');setNotice('');
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/message-archives/${encodeURIComponent(archive.id)}`,{method:'DELETE',headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||'Brisanje arhive nije uspelo.');
+   setArchives(current=>current.filter(item=>item.id!==archive.id));
+   setNotice('Arhiva je trajno obrisana sa servera. Radnja je evidentirana u administratorskoj evidenciji.');
+  }catch(e){setError(e instanceof Error?e.message:'Greška pri brisanju arhive.');}
+  finally{setBusy(false);}
+ }
+ async function deleteMessage(message:AdminConversationMessage){
+  if(!selected||reason.trim().length<10){setError("Pre brisanja unesi razlog od najmanje 10 karaktera.");return;}
+  if(!window.confirm("Trajno obrisati ovu poruku? Ova radnja se ne može poništiti."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(selected.id)}/message/${encodeURIComponent(message.id)}`,{method:"DELETE",headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Brisanje poruke nije uspelo.");
+   setReason("");setMessages(current=>current.filter(item=>item.id!==message.id));
+   setRows(current=>current.map(row=>row.id===selected.id?{...row,message_count:Math.max(0,row.message_count-1)}:row));
+   setNotice("Poruka je obrisana. Radnja je zabeležena u administratorskoj evidenciji.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri brisanju poruke.");}
+  finally{setBusy(false);}
+ }
+ async function deleteConversation(){
+  if(!selected||reason.trim().length<10){setError("Pre brisanja unesi razlog od najmanje 10 karaktera.");return;}
+  if(!window.confirm("Trajno obrisati ceo razgovor i sve poruke između ovih korisnika? Ova radnja se ne može poništiti."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(selected.id)}`,{method:"DELETE",headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Brisanje razgovora nije uspelo.");
+   setRows(current=>current.filter(row=>row.id!==selected.id));setSelected(null);setMessages([]);setSelectedReason("");setReason("");
+   setNotice("Razgovor i sve njegove poruke su obrisani. Radnja je zabeležena u administratorskoj evidenciji.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri brisanju razgovora.");}
+  finally{setBusy(false);}
+ }
+ async function openConversation(row:AdminConversation){
+  const reviewReason=reason.trim();
+  setSelected(null);setMessages([]);setSelectedReason("");setError("");setNotice("");
+  if(reviewReason.length<10){setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera.");return;}
+  setReason("");
+  setBusy(true);
+  try{
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(row.id)}/view`,{method:"POST",headers:headers(),body:JSON.stringify({reason:reviewReason})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Pregled razgovora nije dozvoljen.");
+   setSelected(row);setMessages(data.messages||[]);setSelectedReason(reviewReason);setNotice("Pristup razgovoru je evidentiran u administratorskoj evidenciji.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri otvaranju razgovora.");}
+  finally{setBusy(false);}
+ }
+ return <section className="space-y-4">
+  <div><h2 className="text-xl font-semibold">Privatne poruke korisnika</h2><p className="mt-1 text-sm text-muted-foreground">Pregled razgovora kupaca i prodavaca. Privatnu prepisku otvaraj samo kada postoji opravdan razlog; svaki pristup se beleži.</p></div>
+  <div className="rounded-2xl bg-surface p-4 shadow-card space-y-3">
+   <label className="block text-sm font-medium">Razlog pregleda ili brisanja (obavezno, najmanje 10 karaktera)
+    <textarea className={inputCls+" mt-1 w-full"} rows={2} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Npr. provera prijave korisnika zbog sumnje na prevaru..."/>
+   </label>
+   <div className="flex flex-wrap items-center gap-2"><div className="w-full max-w-sm"><Input className={inputCls} placeholder="Pretraga po korisniku, e-mailu ili oglasu" value={filter} onChange={e=>setFilter(e.target.value)}/></div><button type="button" className={small} onClick={load} disabled={busy}>Osveži</button><span className="text-xs text-muted-foreground">Razgovora: {rows.length}</span></div>
+  </div>
+  {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}{notice&&<p role="status" className="text-sm text-green-700">{notice}</p>}
+  <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)]">
+   <div className="space-y-2">
+    {rows.map(row=><button type="button" key={row.id} onClick={()=>openConversation(row)} disabled={busy||reason.trim().length<10} className={`w-full rounded-xl border p-3 text-left disabled:opacity-50 ${selected?.id===row.id?"border-brand bg-brand/5":"border-input bg-surface"}`}>
+     <p className="text-sm font-semibold">{row.listing_title||"Oglas bez naslova"}</p><p className="mt-1 text-xs text-muted-foreground">{row.listing_type==="ponude"?"Ponuda":"Zahtev"} · {row.message_count} poruka</p>{row.buyer_id===row.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}
+     <p className="mt-2 text-xs">Kupac: {row.buyer_name} <span className="text-muted-foreground">({row.buyer_email})</span></p><p className="text-xs">Prodavac: {row.seller_name} <span className="text-muted-foreground">({row.seller_email})</span></p>
+     <p className="mt-1 text-[11px] text-muted-foreground">Poslednja aktivnost: {row.last_message_at?new Date(row.last_message_at).toLocaleString("sr-RS"):new Date(row.updated_at).toLocaleString("sr-RS")}</p>
+    </button>)}
+    {!busy&&!rows.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
+   </div>
+   <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
+    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={small} onClick={()=>void exportConversation()} disabled={busy||reason.trim().length<10}>Izvezi prepisku (.json)</button><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy||reason.trim().length<10}>Obriši ceo razgovor</button></div></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy||reason.trim().length<10}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+   </div>
+  </div>
+  <section className="space-y-3 rounded-2xl border border-input bg-surface p-4">
+   <div><h3 className="font-semibold">Izvezene arhive prepiski</h3><p className="mt-1 text-xs text-muted-foreground">Arhive se čuvaju u bazi PonudiMi. Brisanje ovde uklanja samo serversku arhivu; ranije preuzete kopije na uređajima ostaju.</p></div>
+   <div className="flex flex-wrap items-center gap-2"><span className="text-xs text-muted-foreground">Sačuvanih arhiva: {archives.length}</span><button type="button" className={small} onClick={loadArchives} disabled={busy}>Osveži arhive</button></div>
+   <div className="space-y-2">
+    {archives.map(archive=><article key={archive.id} className="rounded-xl border border-input p-3">
+     <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0 flex-1 text-sm">
+       <p className="font-semibold break-words">{archive.listing_title||'Prepiska bez naslova'}</p>
+       <p className="mt-1 text-xs text-muted-foreground">{archive.listing_type||'Razgovor'} · {archive.message_count} poruka · {new Date(archive.created_at).toLocaleString('sr-RS')}</p>
+       <p className="text-xs text-muted-foreground">Učesnici: {archive.buyer_name||'—'} ↔ {archive.seller_name||'—'}</p>
+       <p className="text-xs text-muted-foreground">Izvezao: {archive.created_by_email||'administrator'} · SHA-256: {archive.sha256.slice(0,16)}…</p>
+       <p className="mt-1 text-xs text-muted-foreground">Razlog: {archive.export_reason}</p>
       </div>
-      <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
-        {selected ? <><div className="border-b border-input pb-3"><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title || "Oglas"} · {selected.listing_type === "ponude" ? "Ponuda" : "Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Razlog pregleda: {selectedReason}</p></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m => <article key={m.id} className="rounded-xl bg-secondary/70 p-3"><p className="mb-1 text-[11px] font-semibold text-muted-foreground">{m.sender_id === selected.buyer_id ? selected.buyer_name : selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length && <p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></> : <p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+      <div className="flex flex-wrap gap-2">
+       <button type="button" className={small} onClick={()=>void downloadArchive(archive)} disabled={busy}>Preuzmi</button>
+       <button type="button" className={danger} onClick={()=>void deleteArchive(archive)} disabled={busy||reason.trim().length<10}>Obriši arhivu</button>
       </div>
-    </div>
-  </section>;
-}
+     </div>
+    </article>)}
+    {!archives.length&&<p className="rounded-xl bg-secondary/50 p-3 text-sm text-muted-foreground">Nema sačuvanih arhiva. Sledeći izvoz prepiske biće sačuvan ovde.</p>}
+   </div>
+  </section>
 
+ </section>;
+}
