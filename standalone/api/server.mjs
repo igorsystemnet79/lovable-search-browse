@@ -444,7 +444,7 @@ app.post('/api/notifications/read-all',auth,asyncRoute(async(req,res)=>{
  res.json({ok:true,updated:result.rowCount});
 }));
 app.get('/api/notifications/preferences',auth,asyncRoute(async(req,res)=>{
- const result=await pool.query('INSERT INTO notification_preferences(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING in_app_enabled,listing_updates,important_changes,email_enabled,updated_at',[req.user.sub]);
+ const result=await pool.query('INSERT INTO notification_preferences(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING in_app_enabled,listing_updates,important_changes,new_offers,new_requests,email_enabled,updated_at',[req.user.sub]);
  res.json({data:result.rows[0]});
 }));
 app.put('/api/notifications/preferences',auth,asyncRoute(async(req,res)=>{
