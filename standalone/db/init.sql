@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS moderation_actions (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  listing_table text NOT NULL CHECK (listing_table IN ('ponude','zahtevi','users')),
  listing_id uuid NOT NULL,
- actor_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ actor_id uuid,
  action text NOT NULL CHECK (action IN ('hide','restore','block_user','unblock_user')),
  reason_code text NOT NULL,
  note text,
