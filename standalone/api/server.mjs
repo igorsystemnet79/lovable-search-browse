@@ -143,20 +143,22 @@ async function createUserNotification(userId,type,title,message,link=null,metada
  if(type==='new_offer'&&!settings.new_offers)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
  if(type==='new_request'&&!settings.new_requests)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
  const key=dedupeKey||randomUUID();
- let inAppDelivered=false,emailDelivered=false;
+ let inAppDelivered=false,emailDelivered=false,notificationId=null;
  if(settings.in_app_enabled){
   const inserted=await pool.query('INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id',[userId,type,title,message,link,JSON.stringify(metadata),key]);
-  inAppDelivered=!!inserted.rows[0]?.id;
+  notificationId=inserted.rows[0]?.id||null;
+  inAppDelivered=!!notificationId;
   if(!inAppDelivered){
    const existing=await pool.query('SELECT id FROM user_notifications WHERE user_id=$1 AND dedupe_key=$2 LIMIT 1',[userId,key]);
-   inAppDelivered=!!existing.rows[0]?.id;
+   notificationId=existing.rows[0]?.id||null;
+   inAppDelivered=!!notificationId;
   }
  }
  if(settings.email_enabled){
   const claimed=await pool.query(`INSERT INTO notification_email_deliveries(user_id,dedupe_key,notification_id) VALUES($1,$2,$3)
-   ON CONFLICT(user_id,dedupe_key) DO UPDATE SET created_at=now()
+   ON CONFLICT(user_id,dedupe_key) DO UPDATE SET created_at=now(),notification_id=COALESCE(notification_email_deliveries.notification_id,EXCLUDED.notification_id)
    WHERE notification_email_deliveries.sent_at IS NULL AND notification_email_deliveries.created_at<now()-interval '10 minutes'
-   RETURNING id`,[userId,key,null]);
+   RETURNING id`,[userId,key,notificationId]);
   if(claimed.rows[0]){
    try{
     const recipient=await pool.query('SELECT email FROM users WHERE id=$1',[userId]);
