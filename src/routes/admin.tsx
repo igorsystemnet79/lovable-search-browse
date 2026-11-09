@@ -156,6 +156,7 @@ function Prijave() {
   const [filter, setFilter] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState("");
+  const [passwordInfoOpen, setPasswordInfoOpen] = useState<Record<string, boolean>>({});
 
   const load = useCallback(async () => {
     try {
@@ -438,8 +439,10 @@ function Korisnici({ selfId }: { selfId: string }) {
   const filtrirani = profili.filter((p) => {
     if (prikaz === "firme" ? p.tip_lica !== "pravno" : p.tip_lica === "pravno") return false;
     if (!pojmoviPretrage.length) return true;
+    const profil = p as Profil & { username?: string; user_metadata?: Record<string, unknown>; metadata?: Record<string, unknown> };
+    const korisnickoIme = String(profil.username || profil.user_metadata?.username || profil.metadata?.username || "");
     const pretraziviTekst = normalizujPretragu(
-      [p.ime, p.prezime, p.email, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
+      [p.ime, p.prezime, p.email, korisnickoIme, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
         .filter(Boolean)
         .join(" ")
     );
@@ -461,69 +464,109 @@ function Korisnici({ selfId }: { selfId: string }) {
   });
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center gap-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="flex flex-wrap gap-2">
           <button type="button" className={prikaz === "fizicka" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("fizicka"); setFilter(""); setEdit(null); }}>Fizička lica</button>
           <button type="button" className={prikaz === "firme" ? `${small} bg-brand text-brand-foreground` : small} onClick={() => { setPrikaz("firme"); setFilter(""); setEdit(null); }}>Registrovane firme</button>
         </div>
-        <Input className={`${inputCls} min-w-0 w-full sm:max-w-sm`} placeholder={prikaz === "firme" ? "Pretraži naziv firme, PIB..." : "Pretraži ime ili prezime..."} value={filter} onChange={(e) => setFilter(e.target.value)} />
-        <span className="whitespace-nowrap text-sm text-muted-foreground">{prikaz === "firme" ? "Registrovanih firmi" : "Registrovanih korisnika"}: {filtrirani.length}</span>
-        {msg && <span className="text-sm text-brand">{msg}</span>}
+        <Input className={`${inputCls} min-w-0 w-full sm:max-w-md`} placeholder="Pretraži ime, prezime, e-mail, korisničko ime, telefon..." value={filter} onChange={(e) => setFilter(e.target.value)} />
+        <span className="whitespace-nowrap text-sm text-muted-foreground">Prikazano: {lista.length} / {profili.filter((p) => prikaz === "firme" ? p.tip_lica === "pravno" : p.tip_lica !== "pravno").length}</span>
+        {msg && <span role="status" className="text-sm text-brand">{msg}</span>}
       </div>
-      <div className="space-y-3">
-        {lista.map((p) => {
-          const r = uloge[p.id] ?? [];
-          return (
-            <div key={p.id} className="rounded-2xl bg-surface p-4 shadow-card">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="text-sm">
-                  <p className="font-semibold">{[p.ime, p.prezime].filter(Boolean).join(" ") || "—"} <span className="font-normal text-muted-foreground">· {p.email}</span></p>
-                  <p className="text-muted-foreground">
-                    {p.tip_lica === "pravno" ? `Pravno lice: ${p.naziv_firme ?? "—"}, PIB ${p.pib ?? "—"} ${p.firma_verifikovana ? "✔ verifikovano" : "✖ nije verifikovano"}` : "Fizičko lice"}
-                    {" · "}{p.telefon ?? "bez telefona"}{" · "}{[p.grad, p.adresa].filter(Boolean).join(", ") || "bez adrese"}
-                  </p>
-                  <p className="mt-1 flex flex-wrap gap-2 text-xs">
-                    <span className={p.email_confirmed_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.email_confirmed_at ? `E-mail potvrđen · ${new Date(p.email_confirmed_at).toLocaleString("sr-RS")}` : "E-mail nije potvrđen"}</span>
-                    <span className={p.telefon_verifikovan_at ? "font-semibold text-green-700" : "font-semibold text-destructive"}>{p.telefon_verifikovan_at ? `Telefon potvrđen · ${new Date(p.telefon_verifikovan_at).toLocaleString("sr-RS")}` : "Telefon nije potvrđen"}</span>
-                    {p.email_confirmed_at && p.telefon_verifikovan_at && <span className="font-bold text-green-700">✓ VERIFIKOVAN KORISNIK</span>}
-                    {p.duplikat_sumnja && <span className="font-semibold text-amber-700">PROVERITI MOGUĆI DUPLIKAT</span>}
-                    {p.blokiran && <span className="font-semibold text-destructive">BLOKIRAN</span>}
-                  </p>
-                  <p className="mt-1 text-xs">Uloge: {r.join(", ") || "nema"}</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Ponude: {aktivnost[p.id]?.ponude ?? 0} · Zahtevi: {aktivnost[p.id]?.zahtevi ?? 0} · Poslednja aktivnost: {p.last_active_at ? new Date(p.last_active_at).toLocaleString("sr-RS") : "Nema podataka"}</p>
-                  <p className="text-xs text-muted-foreground">Registrovan: {p.created_at ? new Date(p.created_at).toLocaleDateString("sr-RS") : "—"}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
-                  <button className={small} disabled={p.id === selfId} onClick={() => toggleUloga(p.id, "admin")}>{r.includes("admin") ? "Ukini admina" : "Daj admina"}</button>
-                  <button className={small} onClick={() => toggleUloga(p.id, "moderator")}>{r.includes("moderator") ? "Ukini moderatora" : "Daj moderatora"}</button>
-                  <button className={small} disabled={p.id === selfId} onClick={() => update(p.id, { blokiran: !p.blokiran })}>{p.blokiran ? "Vrati sve privilegije" : "Ukini sve privilegije"}</button>
-                  {p.tip_lica === "pravno" && <button className={small} onClick={() => update(p.id, { firma_verifikovana: !p.firma_verifikovana })}>{p.firma_verifikovana ? "Poništi verifikaciju" : "Verifikuj firmu"}</button>}
-                  {p.id !== selfId && <button className={danger} onClick={() => obrisi(p)}>Obriši</button>}
-                </div>
-              </div>
-              {edit?.id === p.id && (
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  {(["ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
-                    <Input key={k} className={inputCls} placeholder={k} value={edit[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null })} />
-                  ))}
-                  <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value })}>
-                    <option value="fizicko">Fizičko lice</option>
-                    <option value="pravno">Pravno lice</option>
-                  </select>
-                  <div className="flex gap-2">
-                    <button className={small} onClick={() => { const { id, ime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit; update(id, { ime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj</button>
-                    <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
-                  </div>
-                </div>
-              )}            </div>          );
-        })}
-        {lista.length === 0 && <p className="rounded-2xl bg-surface p-4 text-sm text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</p>}
+
+      <div className="overflow-x-auto rounded-2xl border border-input bg-surface shadow-card">
+        <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+          <thead className="bg-secondary/60 text-xs uppercase tracking-wide text-muted-foreground">
+            <tr>
+              <th className="px-3 py-3">Ime</th>
+              <th className="px-3 py-3">Prezime</th>
+              <th className="px-3 py-3">E-mail</th>
+              <th className="px-3 py-3">Korisničko ime</th>
+              <th className="px-3 py-3">Lozinka</th>
+              <th className="px-3 py-3">Telefon / mesto</th>
+              <th className="px-3 py-3">Uloge / status</th>
+              <th className="px-3 py-3">Aktivnost</th>
+              <th className="px-3 py-3">Radnje</th>
+            </tr>
+          </thead>
+          <tbody>
+            {lista.map((p) => {
+              const roles = uloge[p.id] ?? [];
+              const profil = p as Profil & { username?: string; user_metadata?: Record<string, unknown>; metadata?: Record<string, unknown> };
+              const username = String(profil.username || profil.user_metadata?.username || profil.metadata?.username || "—");
+              const infoOpen = Boolean(passwordInfoOpen[p.id]);
+              return (
+                <React.Fragment key={p.id}>
+                  <tr className="border-t border-input align-top">
+                    <td className="px-3 py-3 font-medium">{(p.ime || "").trim().split(/\s+/)[0] || "—"}</td>
+                    <td className="px-3 py-3">{p.prezime || ((p.ime || "").trim().split(/\s+/).slice(1).join(" ") || "—")}</td>
+                    <td className="max-w-[220px] break-all px-3 py-3">{p.email || "—"}</td>
+                    <td className="px-3 py-3">{username}</td>
+                    <td className="px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <span aria-label="Lozinka je zaštićena">••••••••</span>
+                        <button type="button" className="rounded-md p-1 text-muted-foreground hover:bg-secondary hover:text-foreground" aria-label={infoOpen ? "Sakrij objašnjenje lozinke" : "Objasni zaštitu lozinke"} aria-expanded={infoOpen} title="Informacije o zaštiti lozinke" onClick={() => setPasswordInfoOpen((current) => ({ ...current, [p.id]: !current[p.id] }))}>
+                          {infoOpen ? "×" : "◉"}
+                        </button>
+                      </div>
+                      {infoOpen && <p className="mt-1 max-w-[190px] text-xs text-muted-foreground">Lozinka je kriptografski zaštićena i ne može se prikazati. Korisnik može postaviti novu lozinku kroz bezbedan postupak promene lozinke.</p>}
+                    </td>
+                    <td className="px-3 py-3">{p.telefon || "—"}<br /><span className="text-xs text-muted-foreground">{[p.grad, p.adresa].filter(Boolean).join(", ") || "—"}</span></td>
+                    <td className="px-3 py-3">
+                      <div className="flex flex-col gap-1 text-xs">
+                        <span>{roles.join(", ") || "bez uloge"}</span>
+                        <span className={p.blokiran ? "font-semibold text-destructive" : "text-green-700"}>{p.blokiran ? "Blokiran" : "Aktivan"}</span>
+                        {p.tip_lica === "pravno" && <span>{p.naziv_firme || "Firma"} · PIB {p.pib || "—"} · {p.firma_verifikovana ? "Verifikovana" : "Nije verifikovana"}</span>}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-xs text-muted-foreground">
+                      <div>Ponude: {aktivnost[p.id]?.ponude ?? 0}</div>
+                      <div>Zahtevi: {aktivnost[p.id]?.zahtevi ?? 0}</div>
+                      <div>Registrovan: {p.created_at ? new Date(p.created_at).toLocaleDateString("sr-RS") : "—"}</div>
+                    </td>
+                    <td className="px-3 py-3">
+                      <div className="flex min-w-[150px] flex-wrap gap-1">
+                        <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
+                        <button className={small} disabled={p.id === selfId} onClick={() => toggleUloga(p.id, "admin")}>{roles.includes("admin") ? "Ukini admina" : "Daj admina"}</button>
+                        <button className={small} onClick={() => toggleUloga(p.id, "moderator")}>{roles.includes("moderator") ? "Ukini moderatora" : "Daj moderatora"}</button>
+                        <button className={small} disabled={p.id === selfId} onClick={() => update(p.id, { blokiran: !p.blokiran })}>{p.blokiran ? "Odblokiraj" : "Blokiraj"}</button>
+                        {p.tip_lica === "pravno" && <button className={small} onClick={() => update(p.id, { firma_verifikovana: !p.firma_verifikovana })}>{p.firma_verifikovana ? "Poništi verifikaciju" : "Verifikuj firmu"}</button>}
+                        {p.id !== selfId && <button className={danger} onClick={() => obrisi(p)}>Obriši</button>}
+                      </div>
+                    </td>
+                  </tr>
+                  {edit?.id === p.id && (
+                    <tr className="border-t border-input bg-background">
+                      <td colSpan={9} className="p-4">
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                          {(["ime", "prezime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
+                            <Input key={k} className={inputCls} placeholder={k === "prezime" ? "Prezime" : k} value={(edit as any)[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null } as Profil)} />
+                          ))}
+                          <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value } as Profil)}>
+                            <option value="fizicko">Fizičko lice</option>
+                            <option value="pravno">Pravno lice</option>
+                          </select>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <button className={small} onClick={() => { const { id, ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
+                          <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
+              );
+            })}
+            {!lista.length && <tr><td colSpan={9} className="px-4 py-8 text-center text-muted-foreground">{prikaz === "firme" ? "Nema registrovanih firmi." : "Nema registrovanih fizičkih lica."}</td></tr>}
+          </tbody>
+        </table>
       </div>
+      <p className="text-xs text-muted-foreground">Na telefonu se tabela može pomerati levo i desno. Lozinke se nikada ne prikazuju u čitljivom obliku.</p>
     </div>
   );
 }
+
 
 type Oglas = { id: string; user_id: string; naslov: string; opis: string | null; kategorija: string; lokacija: string; kontakt_ime: string | null; telefon: string | null; created_at: string; cena?: number | null; budzet?: number | null; valuta?: string; zavrseno?: boolean; pauziran?: boolean };
 type AdminImage = { id: string; storage_path: string | null; external_url: string | null; pozicija: number };
