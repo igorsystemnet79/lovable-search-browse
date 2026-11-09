@@ -3,6 +3,7 @@ export type ProfileRow = {
   ime: string | null;
   prezime: string | null;
   korisnicko_ime: string | null;
+  status_trgovca: 'trgovac' | 'nije_trgovac' | 'nepotvrdjeno';
   telefon_normalizovan?: string | null;
   telefon_verifikovan_at?: string | null;
   email_confirmed_at?: string | null;
