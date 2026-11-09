@@ -29,7 +29,7 @@ const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
 const storage = multer.diskStorage({ destination: uploadDir, filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`) });
-const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 7 }, fileFilter: (_req, f, cb) => cb(null, ['image/jpeg','image/png','image/webp'].includes(f.mimetype)) });
+const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 7 }, fileFilter: (_req, f, cb) => imageMime.has(f.mimetype) ? cb(null, true) : cb(new Error('Dozvoljeni su samo JPG, PNG i WebP formati.')) });
 async function normalizeImage(buffer) {
  const output = await sharp(buffer, { limitInputPixels: 100000000 }).rotate().resize(800, 600, { fit: 'contain', background: '#ffffff', withoutEnlargement: false }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
  return output;
@@ -42,6 +42,34 @@ async function saveImage(key, buffer, contentType) {
  if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
  if (s3) await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
  else { await pool.query('INSERT INTO storage_objects(object_key,content_type,body) VALUES($1,$2,$3) ON CONFLICT(object_key) DO UPDATE SET content_type=EXCLUDED.content_type,body=EXCLUDED.body,created_at=now()',[key,contentType,buffer]); }
+}
+async function attachListingImages({ table, listingId, ownerId, files }) {
+ const col=table==='ponude'?'ponuda_id':'zahtev_id';
+ const c=await pool.connect();
+ const savedKeys=[];
+ try {
+  await c.query('BEGIN');
+  const listing=await c.query(`SELECT id,user_id FROM ${table} WHERE id=$1 FOR UPDATE`,[listingId]);
+  if(!listing.rows[0]){await c.query('ROLLBACK');return {status:404,error:'Oglas nije pronađen.'};}
+  if(ownerId && listing.rows[0].user_id!==ownerId){await c.query('ROLLBACK');return {status:404,error:'Oglas nije pronađen.'};}
+  const count=await c.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[listingId]);
+  if(count.rows[0].n+files.length>7){await c.query('ROLLBACK');return {status:400,error:'Najviše 7 fotografija po oglasu.'};}
+  const out=[];
+  for(const [i,file] of files.entries()){
+   const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
+   const normalized=await normalizeImage(file.buffer);
+   await saveImage(key,normalized,'image/jpeg');
+   savedKeys.push(key);
+   const inserted=await c.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[listingId,`/uploads/${key}`,count.rows[0].n+i]);
+   out.push(inserted.rows[0]);
+  }
+  await c.query('COMMIT');
+  return {status:201,data:out};
+ } catch(error) {
+  await c.query('ROLLBACK').catch(()=>{});
+  for(const key of savedKeys){try{await removeImage(key);}catch(cleanupError){console.error('Image cleanup failed:',cleanupError);}}
+  throw error;
+ } finally {c.release();}
 }
 async function removeImage(key) {
  if (s3) await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
@@ -139,28 +167,22 @@ for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json(rows[0]);}));
  app.delete(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const {rowCount}=await pool.query(`DELETE FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json({ok:true});}));
 }
-app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';const table=kind==='ponuda'?'ponude':'zahtevi';const col=kind==='ponuda'?'ponuda_id':'zahtev_id';const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen.'});const old=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);if(old.rows[0].n+(req.files?.length||0)>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});const out=[];for(const [i,f] of (req.files||[]).entries()){const filename=`${randomUUID()}.jpg`;const key=`${req.user.sub}/${filename}`;const normalized=await normalizeImage(f.buffer);await saveImage(key,normalized,'image/jpeg');const p=`/uploads/${key}`;const {rows}=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,p,old.rows[0].n+i]);out.push(rows[0]);}res.status(201).json(out);}));
+app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
+ const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';
+ const table=kind==='ponuda'?'ponude':'zahtevi';
+ if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju.'});
+ const result=await attachListingImages({table,listingId:req.params.id,ownerId:req.user.sub,files:req.files});
+ if(result.error)return res.status(result.status).json({error:result.error});
+ res.status(result.status).json(result.data);
+}));
 
 app.post('/api/admin/listings/:kind/:id/images',auth,admin,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
  const table=req.params.kind==='ponude'?'ponude':req.params.kind==='zahtevi'?'zahtevi':null;
  if(!table)return res.status(400).json({error:'Nepoznat tip oglasa.'});
  if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju.'});
- const listing=await pool.query(`SELECT id,user_id FROM ${table} WHERE id=$1`,[req.params.id]);
- if(!listing.rows[0])return res.status(404).json({error:'Oglas nije pronađen.'});
- const col=table==='ponude'?'ponuda_id':'zahtev_id';
- const count=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);
- if(count.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});
- const out=[];
- for(const [i,file] of req.files.entries()){
-  const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
-  const normalized=await normalizeImage(file.buffer);
-  await saveImage(key,normalized,'image/jpeg');
-  try{
-   const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
-   out.push(inserted.rows[0]);
-  }catch(error){await removeImage(key);throw error;}
- }
- res.status(201).json(out);
+ const result=await attachListingImages({table,listingId:req.params.id,files:req.files});
+ if(result.error)return res.status(result.status).json({error:result.error});
+ res.status(result.status).json(result.data);
 }));
 app.delete('/api/admin/images/:imageId',auth,admin,asyncRoute(async(req,res)=>{
  const found=await pool.query('SELECT * FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
