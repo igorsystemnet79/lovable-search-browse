@@ -24,6 +24,8 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Verify standalone API syntax
         run: node --check standalone/api/server.mjs
+      - name: Validate standalone Docker Compose configuration
+        run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml config --quiet
       - name: Build frontend
         run: npm run build
       - name: Assemble standalone ZIP package
