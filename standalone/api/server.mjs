@@ -183,6 +183,68 @@ for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json(rows[0]);}));
  app.delete(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const {rowCount}=await pool.query(`DELETE FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json({ok:true});}));
 }
+app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
+ const kind=req.body?.tip==='zahtev'?'zahtev':'ponuda';
+ const table=kind==='ponuda'?'ponude':'zahtevi';
+ const col=kind==='ponuda'?'ponuda_id':'zahtev_id';
+ let plan;
+ try { plan=JSON.parse(String(req.body?.meta||'[]')); } catch { return res.status(400).json({error:'Podaci o redosledu fotografija nisu ispravni.'}); }
+ if(!Array.isArray(plan)||plan.length>7)return res.status(400).json({error:'Dozvoljeno je najviše 7 fotografija po oglasu.'});
+ const files=req.files||[];
+ const fileIndexes=new Set();
+ for(const item of plan){
+  if(item?.type==='existing'){
+   if(typeof item.id!=='string')return res.status(400).json({error:'ID postojeće fotografije nije ispravan.'});
+  } else if(item?.type==='external'){
+   let url;try{url=new URL(String(item.url||''));}catch{return res.status(400).json({error:'Adresa fotografije nije ispravna.'});}
+   if(!['http:','https:'].includes(url.protocol))return res.status(400).json({error:'Dozvoljene su samo HTTP/HTTPS adrese fotografija.'});
+  } else if(item?.type==='file'){
+   if(!Number.isInteger(item.fileIndex)||item.fileIndex<0||item.fileIndex>=files.length||fileIndexes.has(item.fileIndex))return res.status(400).json({error:'Izabrani fajl fotografije nije ispravan.'});
+   fileIndexes.add(item.fileIndex);
+  } else return res.status(400).json({error:'Nepoznat tip fotografije.'});
+ }
+ if(fileIndexes.size!==files.length)return res.status(400).json({error:'Broj poslatih fotografija se ne poklapa sa izabranim redosledom.'});
+ const c=await pool.connect(),savedKeys=[];
+ try{
+  await c.query('BEGIN');
+  const listing=await c.query(`SELECT id,user_id FROM ${table} WHERE id=$1 AND user_id=$2 FOR UPDATE`,[req.params.id,req.user.sub]);
+  if(!listing.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});}
+  const existing=await c.query(`SELECT * FROM slike_oglasa WHERE ${col}=$1 FOR UPDATE`,[req.params.id]);
+  const existingById=new Map(existing.rows.map(row=>[row.id,row]));
+  const keepIds=new Set();
+  for(const item of plan)if(item.type==='existing'){
+   if(!existingById.has(item.id)||keepIds.has(item.id)){await c.query('ROLLBACK');return res.status(400).json({error:'Fotografija više nije deo ovog oglasa ili je ponovljena.'});}
+   keepIds.add(item.id);
+  }
+  const out=[];
+  for(const [position,item] of plan.entries()){
+   if(item.type==='existing'){
+    const updated=await c.query('UPDATE slike_oglasa SET pozicija=$1 WHERE id=$2 RETURNING *',[position,item.id]);
+    out.push(updated.rows[0]);
+   } else if(item.type==='external'){
+    const inserted=await c.query(`INSERT INTO slike_oglasa(${col},external_url,storage_path,pozicija) VALUES($1,$2,NULL,$3) RETURNING *`,[req.params.id,String(item.url),position]);
+    out.push(inserted.rows[0]);
+   } else {
+    const file=files[item.fileIndex];
+    const key=`${listing.rows[0].user_id}/${randomUUID()}.jpg`;
+    const normalized=await normalizeImage(file.buffer);
+    await saveImage(key,normalized,'image/jpeg');
+    savedKeys.push(key);
+    const inserted=await c.query(`INSERT INTO slike_oglasa(${col},storage_path,external_url,pozicija) VALUES($1,$2,NULL,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,position]);
+    out.push(inserted.rows[0]);
+   }
+  }
+  const removed=existing.rows.filter(row=>!keepIds.has(row.id));
+  if(removed.length)await c.query('DELETE FROM slike_oglasa WHERE id=ANY($1::uuid[])', [removed.map(row=>row.id)]);
+  await c.query('COMMIT');
+  for(const row of removed)if(row.storage_path){const parts=String(row.storage_path).split('/').filter(Boolean);if(parts[0]==='uploads')parts.shift();try{await removeImage(parts.join('/'));}catch(error){console.error('Stara fotografija nije očišćena sa skladišta:',error);}}
+  res.json({data:out.sort((a,b)=>a.pozicija-b.pozicija)});
+ }catch(error){
+  await c.query('ROLLBACK').catch(()=>{});
+  for(const key of savedKeys){try{await removeImage(key);}catch(cleanupError){console.error('Neuspelo čišćenje neuspešno sačuvane fotografije:',cleanupError);}}
+  throw error;
+ }finally{c.release();}
+}));
 app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
  const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';
  const table=kind==='ponuda'?'ponude':'zahtevi';
