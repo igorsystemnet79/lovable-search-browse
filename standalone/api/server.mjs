@@ -504,7 +504,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
 }));
 app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
  const {fn,args={}}=req.body||{}; const userId=req.user?.sub||null;
- if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
+ if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});if(role==='admin')return res.json({data:!!(userId&&await isPlatformAdmin(req.user))});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
  if(fn==='pretrazi_ponude'||fn==='pretrazi_zahteve'){
   const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';
   const amount=table==='ponude'?'cena':'budzet';
