@@ -131,7 +131,7 @@ export function ListingImages({
           <ImagePlus className="h-4 w-4" /> Izaberi sa uređaja
         </button>
       </div>
-      <p className="text-xs text-muted-foreground">Fotografije se obrađuju na serveru i čuvaju kao JPEG 800 × 600 px. Ulazni fajl može imati do 20 MB.</p>
+      <p className="text-xs text-muted-foreground">Fotografije sa uređaja i URL adrese koje dozvoljavaju preuzimanje obrađuju se na serveru kao JPEG 800 × 600 px. Ako izvor blokira preuzimanje, koristi se direktna adresa. Ulazni fajl može imati do 20 MB.</p>
       <div className="flex flex-col gap-2 sm:flex-row">
         <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Nalepi direktnu adresu fotografije (https://...)" className="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm" disabled={disabled || busy || value.length >= MAX_PHOTOS} />
         <button type="button" onClick={() => void addUrl()} disabled={disabled || busy || !url.trim() || value.length >= MAX_PHOTOS} className="inline-flex items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-secondary disabled:opacity-50">
