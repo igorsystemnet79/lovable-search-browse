@@ -62,3 +62,10 @@ export async function odluciOPredlogu(id: string, decision: "odobreno" | "odbije
 export async function ucitajAdminStatistiku() {
   return adminRequest("/api/admin/stats", "GET");
 }
+
+export type FirmaZaPaket = { user_id:string; naziv_firme:string|null; pib:string|null; email:string|null; telefon:string|null; firma_verifikovana:boolean };
+export type PaketFirme = { id:string; user_id:string; paket:string; cena_eur:number; status:string; status_uplate:string; vazi_od:string; vazi_do:string; napomena:string|null; referenca_uplate:string|null; email_podsetnik_poslat_at:string|null; email_podsetnik_greska:string|null; naziv_firme:string|null; pib:string|null; email:string|null; telefon:string|null; firma_verifikovana:boolean };
+export async function pretraziFirmeZaPaket(q:string){return adminRequest(`/api/admin/business-firms?q=${encodeURIComponent(q)}`,"GET") as Promise<{data:FirmaZaPaket[]}>;}
+export async function ucitajPaketeFirmi(){return adminRequest("/api/admin/business-packages","GET") as Promise<{data:PaketFirme[]}>;}
+export async function dodeliPaketFirmi(data:{user_id:string;paket:string;status_uplate:string;napomena?:string;referenca_uplate?:string}){return adminRequest("/api/admin/business-packages","POST",data);}
+export async function otkaziPaketFirme(id:string){return adminRequest(`/api/admin/business-packages/${encodeURIComponent(id)}/cancel`,"POST",{});}
