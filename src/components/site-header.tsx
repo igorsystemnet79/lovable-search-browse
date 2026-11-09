@@ -159,7 +159,7 @@ export function SiteHeader() {
             <>
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
-              <Link to="/poruke" className={outline}>Poruke</Link>
+              <Link to="/poruke" search={{}} className={outline}>Poruke</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
               <NotificationsBell />
               <span className="hidden px-2 text-brand-foreground/80 sm:inline">
