@@ -391,3 +391,37 @@ ALTER TABLE admin_audit_log DROP CONSTRAINT IF EXISTS admin_audit_log_actor_id_f
 
 ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS new_offers boolean NOT NULL DEFAULT false;
 ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS new_requests boolean NOT NULL DEFAULT false;
+
+
+-- Private marketplace conversations. Only the two participants and authorized admins can read them.
+CREATE TABLE IF NOT EXISTS message_conversations (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ listing_type text NOT NULL CHECK (listing_type IN ('ponude','zahtevi')),
+ listing_id uuid NOT NULL,
+ buyer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ seller_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (buyer_id <> seller_id),
+ UNIQUE(listing_type,listing_id,buyer_id,seller_id)
+);
+CREATE INDEX IF NOT EXISTS message_conversations_buyer_idx ON message_conversations(buyer_id,updated_at DESC);
+CREATE INDEX IF NOT EXISTS message_conversations_seller_idx ON message_conversations(seller_id,updated_at DESC);
+CREATE TABLE IF NOT EXISTS marketplace_messages (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ conversation_id uuid NOT NULL REFERENCES message_conversations(id) ON DELETE CASCADE,
+ sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ read_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS marketplace_messages_conversation_idx ON marketplace_messages(conversation_id,created_at ASC);
+CREATE INDEX IF NOT EXISTS marketplace_messages_unread_idx ON marketplace_messages(conversation_id,created_at DESC) WHERE read_at IS NULL;
+CREATE TABLE IF NOT EXISTS message_admin_access_log (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ admin_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ conversation_id uuid NOT NULL REFERENCES message_conversations(id) ON DELETE CASCADE,
+ action text NOT NULL DEFAULT 'view' CHECK (action IN ('view')),
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS message_admin_access_log_created_idx ON message_admin_access_log(created_at DESC);
