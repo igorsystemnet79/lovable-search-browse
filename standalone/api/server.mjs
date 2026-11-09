@@ -533,7 +533,7 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   if(sameName.rows[0])await c.query('UPDATE profiles SET duplikat_sumnja=true WHERE id=$1',[sameName.rows[0].id]);
   const acceptedRules=await c.query('SELECT version FROM platform_rules WHERE singleton=true');
   const rulesVersion=Number(acceptedRules.rows[0]?.version||1);
-  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja,pravila_prihvacena_at,pravila_verzija,politika_privatnosti_potvrdjena_at,politika_privatnosti_verzija,punoletstvo_potvrdjeno_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),$14,now(),'1.0',now())',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount,rulesVersion]);
+  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja,pravila_prihvacena_at,pravila_verzija,politika_privatnosti_potvrdjena_at,politika_privatnosti_verzija,punoletstvo_potvrdjeno_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),$14,now(),$15,now())',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount,rulesVersion,'1.0']);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
   const session={access_token:sign(u),token_type:'bearer',expires_in:604800,user:publicUser(u)};
