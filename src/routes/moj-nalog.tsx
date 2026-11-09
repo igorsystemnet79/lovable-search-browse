@@ -24,8 +24,10 @@ function MojNalogPage() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) { setActivePackage(null); setError(""); setBusy(false); return; }
     let mounted = true;
+    setActivePackage(null);
+    setError("");
     async function loadPackage() {
       setBusy(true);
       setError("");
