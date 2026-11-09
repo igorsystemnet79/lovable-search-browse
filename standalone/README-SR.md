@@ -86,7 +86,7 @@ Oporavak lozinke šalje jednokratni link koji važi jedan sat. Za to moraju biti
 
 ## Migracija starih naloga i podataka
 
-Nova instalacija ne povezuje se sa starom Supabase bazom. Ne pokreći Supabase migracije `0000`–`0009` nad ovom bazom. Migracija postojećih naloga zahteva izvoz korisnika i podataka iz izvornog Supabase projekta; lozinke se ne mogu bezbedno preuzeti kao običan tekst, pa korisnici mogu morati da postave nove lozinke. ZIP ne briše niti menja staru aktivnu instalaciju.
+Nova instalacija koristi sopstvenu, praznu PostgreSQL bazu. Ne pokreći migracije iz drugih instalacija nad ovom bazom. Ako se prenose postojeći nalozi i podaci, prvo napravi proverenu rezervnu kopiju i pripremi zaseban plan migracije; lozinke se ne izvoze kao običan tekst, pa korisnici mogu morati da postave nove lozinke. ZIP ne briše niti menja drugu aktivnu instalaciju.
 
 ## Provera
 
