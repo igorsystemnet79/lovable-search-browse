@@ -109,8 +109,6 @@ export interface FileRoutesByFullPath {
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
-  '/oglas/$kind/$id': typeof OglasKindIdRoute
-  '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/poruke': typeof PorukeRoute
 }
 export interface FileRoutesByTo {
