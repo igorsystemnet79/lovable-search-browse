@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ponudimi-quality-checks-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   application:
     name: Frontend build, lint and API syntax
