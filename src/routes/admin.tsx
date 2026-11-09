@@ -448,7 +448,7 @@ function Korisnici({ selfId }: { selfId: string }) {
     const pretraziviTekst = normalizujPretragu(
       [
         p.id, p.ime, p.prezime, p.email, korisnickoIme, p.naziv_firme, p.pib,
-        p.telefon, p.grad, p.adresa, p.tip_lica, p.created_at, statusNaloga,
+        p.telefon, p.grad, p.adresa, p.tip_lica, p.status_trgovca, p.created_at, statusNaloga,
         statusFirme, ...(uloge[p.id] ?? []), statistika.ponude, statistika.zahtevi,
       ]
         .filter((value) => value !== null && value !== undefined && value !== "")
@@ -525,6 +525,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                       <div className="flex flex-col gap-1 text-xs">
                         <span>{roles.join(", ") || "bez uloge"}</span>
                         <span className={p.blokiran ? "font-semibold text-destructive" : "text-green-700"}>{p.blokiran ? "Blokiran" : "Aktivan"}</span>
+                        <span>Status prodavca: {p.status_trgovca === "trgovac" ? "Trgovac" : p.status_trgovca === "nije_trgovac" ? "Privatno lice" : "Nije potvrđen"}</span>
                         {p.tip_lica === "pravno" && <span>{p.naziv_firme || "Firma"} · PIB {p.pib || "—"} · {p.firma_verifikovana ? "Verifikovana" : "Nije verifikovana"}</span>}
                       </div>
                     </td>
@@ -551,13 +552,18 @@ function Korisnici({ selfId }: { selfId: string }) {
                           {(["ime", "prezime", "korisnicko_ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
                             <Input key={k} className={inputCls} placeholder={k === "prezime" ? "Prezime" : k === "korisnicko_ime" ? "Korisničko ime" : k} value={(edit as any)[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null } as Profil)} />
                           ))}
+                          <select className={inputCls} value={edit.status_trgovca || "nepotvrdjeno"} onChange={(e) => setEdit({ ...edit, status_trgovca: e.target.value } as Profil)}>
+                            <option value="trgovac">Trgovac</option>
+                            <option value="nije_trgovac">Privatno lice</option>
+                            <option value="nepotvrdjeno">Nije potvrđen</option>
+                          </select>
                           <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value } as Profil)}>
                             <option value="fizicko">Fizičko lice</option>
                             <option value="pravno">Pravno lice</option>
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
+                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
                           <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                         </div>
                       </td>
