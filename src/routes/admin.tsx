@@ -29,7 +29,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "Paketi firmi", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -60,6 +60,7 @@ function AdminPage() {
             {tab === "Statistika" && <Statistika />}
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
+            {tab === "Poruke korisnika" && <AdminKorisnickePoruke />}
             {tab === "APR firme" && <Apr />}
             {tab === "Paketi firmi" && <PaketiFirmi />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
@@ -1003,3 +1004,74 @@ function UpravljanjeOdrzavanjem() {
     {error && <p role="alert" className="mt-3 text-sm text-red-700">{error}</p>}
   </section>;
 }
+
+
+type AdminConversation = {
+  id: string; listing_type: "ponude" | "zahtevi"; listing_title: string | null;
+  buyer_id: string; seller_id: string; buyer_email: string; buyer_name: string;
+  seller_email: string; seller_name: string; updated_at: string; last_message_at: string | null; message_count: number;
+};
+type AdminConversationMessage = { id: string; sender_id: string; body: string; created_at: string };
+
+function AdminKorisnickePoruke() {
+  const [rows, setRows] = useState<AdminConversation[]>([]);
+  const [messages, setMessages] = useState<AdminConversationMessage[]>([]);
+  const [selected, setSelected] = useState<AdminConversation | null>(null);
+  const [filter, setFilter] = useState("");
+  const [reason, setReason] = useState("");
+  const [selectedReason, setSelectedReason] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const token = () => { try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; } catch { return ""; } };
+  const headers = () => ({ Authorization: `Bearer ${token()}`, "Content-Type": "application/json" });
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/admin/messages?q=${encodeURIComponent(filter)}`, { cache: "no-store", headers: headers() });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Razgovori korisnika nisu dostupni.");
+      setRows(data.data || []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju razgovora."); }
+    finally { setBusy(false); }
+  }, [filter]);
+  useEffect(() => { load(); }, [load]);
+  async function openConversation(row: AdminConversation) {
+    const reviewReason = reason.trim();
+    setSelected(null); setMessages([]); setSelectedReason(""); setError(""); setNotice("");
+    if (reviewReason.length < 10) { setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera."); return; }
+    setReason(""); setBusy(true);
+    try {
+      const response = await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(row.id)}/view`, { method: "POST", headers: headers(), body: JSON.stringify({ reason: reviewReason }) });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Pregled razgovora nije dozvoljen.");
+      setSelected(row); setMessages(data.messages || []); setSelectedReason(reviewReason);
+      setNotice("Pristup razgovoru je evidentiran u administratorskoj evidenciji.");
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri otvaranju razgovora."); }
+    finally { setBusy(false); }
+  }
+  return <section className="space-y-4">
+    <div><h2 className="text-xl font-semibold">Privatne poruke korisnika</h2><p className="mt-1 text-sm text-muted-foreground">Privatnu prepisku otvaraj samo kada postoji opravdan razlog. Svaki pristup se evidentira.</p></div>
+    <div className="rounded-2xl bg-surface p-4 shadow-card space-y-3">
+      <label className="block text-sm font-medium">Razlog administratorskog pregleda (obavezno, najmanje 10 karaktera)
+        <textarea className={inputCls + " mt-1 w-full"} rows={2} maxLength={500} value={reason} onChange={e => setReason(e.target.value)} placeholder="Npr. provera prijave korisnika zbog sumnje na prevaru..."/>
+      </label>
+      <div className="flex flex-wrap items-center gap-2"><div className="w-full max-w-sm"><Input className={inputCls} placeholder="Pretraga po korisniku, e-mailu ili oglasu" value={filter} onChange={e => setFilter(e.target.value)}/></div><button type="button" className={small} onClick={load} disabled={busy}>Osveži</button><span className="text-xs text-muted-foreground">Razgovora: {rows.length}</span></div>
+    </div>
+    {error && <p role="alert" className="text-sm text-destructive">{error}</p>}{notice && <p role="status" className="text-sm text-green-700">{notice}</p>}
+    <div className="grid gap-4 xl:grid-cols-[minmax(280px,0.85fr)_minmax(0,1.15fr)]">
+      <div className="space-y-2">
+        {rows.map(row => <button type="button" key={row.id} onClick={() => openConversation(row)} disabled={busy || reason.trim().length < 10} className={`w-full rounded-xl border p-3 text-left disabled:opacity-50 ${selected?.id === row.id ? "border-brand bg-brand/5" : "border-input bg-surface"}`}>
+          <p className="text-sm font-semibold">{row.listing_title || "Oglas bez naslova"}</p><p className="mt-1 text-xs text-muted-foreground">{row.listing_type === "ponude" ? "Ponuda" : "Zahtev"} · {row.message_count} poruka</p>
+          <p className="mt-2 text-xs">Kupac: {row.buyer_name} <span className="text-muted-foreground">({row.buyer_email})</span></p><p className="text-xs">Prodavac: {row.seller_name} <span className="text-muted-foreground">({row.seller_email})</span></p>
+          <p className="mt-1 text-[11px] text-muted-foreground">Poslednja aktivnost: {row.last_message_at ? new Date(row.last_message_at).toLocaleString("sr-RS") : new Date(row.updated_at).toLocaleString("sr-RS")}</p>
+        </button>)}
+        {!busy && !rows.length && <p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
+      </div>
+      <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
+        {selected ? <><div className="border-b border-input pb-3"><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title || "Oglas"} · {selected.listing_type === "ponude" ? "Ponuda" : "Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Razlog pregleda: {selectedReason}</p></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m => <article key={m.id} className="rounded-xl bg-secondary/70 p-3"><p className="mb-1 text-[11px] font-semibold text-muted-foreground">{m.sender_id === selected.buyer_id ? selected.buyer_name : selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length && <p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></> : <p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+      </div>
+    </div>
+  </section>;
+}
+
