@@ -856,6 +856,71 @@ app.get('/api/admin/stats',auth,adminIdentity,asyncRoute(async(_req,res)=>{
  ]);
  res.json({korisnici:queries[0].rows[0],ponude:queries[1].rows[0],zahtevi:queries[2].rows[0],azurirano_at:new Date().toISOString()});
 }));
+// Business package administration. Only administrators can grant or alter paid packages.
+const BUSINESS_PACKAGE_PLANS={
+ monthly:{name:'Mesečni paket',price:10,months:1},
+ quarterly:{name:'Tromesečni paket',price:20,months:3},
+ semiannual:{name:'Šestomesečni paket',price:50,months:6},
+ annual_premium:{name:'Premium godišnji paket',price:100,months:12}
+};
+app.get('/api/admin/packages',auth,admin,asyncRoute(async(req,res)=>{
+ const status=String(req.query.status||'').trim();
+ const q=String(req.query.q||'').trim().slice(0,160);
+ const rows=await pool.query(`SELECT bp.*,u.email,p.ime,p.prezime,p.naziv_firme,p.pib,
+  (SELECT count(*)::int FROM business_package_payments pay WHERE pay.package_id=bp.id) AS payment_count,
+  (SELECT coalesce(sum(pay.amount_eur),0)::numeric(10,2) FROM business_package_payments pay WHERE pay.package_id=bp.id AND pay.status='recorded') AS paid_total
+  FROM business_packages bp JOIN users u ON u.id=bp.user_id LEFT JOIN profiles p ON p.id=u.id
+  WHERE ($1='' OR bp.status=$1) AND ($2='' OR u.email ILIKE '%'||$2||'%' OR coalesce(p.naziv_firme,'') ILIKE '%'||$2||'%')
+  ORDER BY bp.ends_at ASC LIMIT 500`,[status,q]);
+ res.set('Cache-Control','no-store').json({data:rows.rows,plans:BUSINESS_PACKAGE_PLANS});
+}));
+app.post('/api/admin/packages/:userId',auth,admin,asyncRoute(async(req,res)=>{
+ const plan=BUSINESS_PACKAGE_PLANS[String(req.body?.package_code||'')];
+ const userId=String(req.params.userId||'');
+ if(!plan||!validUuid(userId))return res.status(400).json({error:'Izabrani paket ili korisnik nisu ispravni.'});
+ const profile=await pool.query("SELECT id,tip_lica FROM profiles WHERE id=$1",[userId]);
+ if(!profile.rows[0])return res.status(404).json({error:'Korisnički profil nije pronađen.'});
+ if(profile.rows[0].tip_lica!=='pravno')return res.status(400).json({error:'Poslovni paket može dobiti samo registrovano pravno lice.'});
+ const startsAt=req.body?.starts_at?new Date(req.body.starts_at):new Date();
+ const months=plan.months;
+ if(Number.isNaN(startsAt.getTime()))return res.status(400).json({error:'Datum početka paketa nije ispravan.'});
+ const endsAt=req.body?.ends_at?new Date(req.body.ends_at):new Date(startsAt);
+ if(!req.body?.ends_at)endsAt.setUTCMonth(endsAt.getUTCMonth()+months);
+ if(Number.isNaN(endsAt.getTime())||endsAt<=startsAt)return res.status(400).json({error:'Datum isteka mora biti nakon početka paketa.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  await c.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE user_id=$1 AND status='active'",[userId]);
+  const inserted=await c.query("INSERT INTO business_packages(user_id,package_code,package_name,price_eur,starts_at,ends_at,status,granted_by,notes) VALUES($1,$2,$3,$4,$5,$6,'active',$7,$8) RETURNING *",[userId,req.body.package_code,plan.name,plan.price,startsAt.toISOString(),endsAt.toISOString(),req.user.sub,String(req.body?.notes||'').trim().slice(0,500)||null]);
+  const payment=Number(req.body?.amount_paid_eur);
+  if(Number.isFinite(payment)&&payment>=0){
+   await c.query("INSERT INTO business_package_payments(package_id,user_id,amount_eur,currency,payment_method,payment_reference,status,paid_at,recorded_by,notes) VALUES($1,$2,$3,'EUR',$4,$5,'recorded',now(),$6,$7)",[inserted.rows[0].id,userId,payment,String(req.body?.payment_method||'').slice(0,80)||null,String(req.body?.payment_reference||'').slice(0,120)||null,req.user.sub,String(req.body?.payment_notes||'').slice(0,500)||null]);
+  }
+  await c.query('COMMIT');
+  await createUserNotification(userId,'platform','Aktiviran poslovni paket',`Aktiviran je paket ${plan.name}, koji važi do ${endsAt.toLocaleDateString('sr-RS',{timeZone:'Europe/Belgrade'})}.`,'/moj-nalog',{package_id:inserted.rows[0].id},'package-start:'+inserted.rows[0].id);
+  res.status(201).json({data:inserted.rows[0]});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
+app.post('/api/admin/packages/reminders/run',auth,admin,asyncRoute(async(_req,res)=>{
+ const due=await pool.query(`SELECT bp.id,bp.user_id,bp.package_name,bp.ends_at,u.email
+  FROM business_packages bp JOIN users u ON u.id=bp.user_id
+  WHERE bp.status='active' AND bp.ends_at>now() AND bp.ends_at<=now()+interval '10 days'
+   AND bp.reminder_10d_sent_at IS NULL ORDER BY bp.ends_at ASC LIMIT 500`);
+ let sent=0;
+ for(const item of due.rows){
+  const days=Math.max(0,Math.ceil((new Date(item.ends_at)-Date.now())/86400000));
+  await createUserNotification(item.user_id,'package_expiry','Ističe poslovni paket',`Paket „${item.package_name}“ ističe za ${days} dana. Produžite paket na vreme kako ne bi došlo do prekida.`,'/moj-nalog',{package_id:item.id,ends_at:item.ends_at},'package-expiry-10d:'+item.id);
+  await pool.query('UPDATE business_packages SET reminder_10d_sent_at=now(),updated_at=now() WHERE id=$1 AND reminder_10d_sent_at IS NULL',[item.id]);
+  sent++;
+ }
+ const expired=await pool.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE status='active' AND ends_at<=now()");
+ res.json({ok:true,reminders_processed:sent,expired:expired.rowCount});
+}));
+app.get('/api/admin/packages/:id/payments',auth,admin,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID paketa nije ispravan.'});
+ const result=await pool.query('SELECT * FROM business_package_payments WHERE package_id=$1 ORDER BY created_at DESC',[req.params.id]);
+ res.set('Cache-Control','no-store').json({data:result.rows});
+}));
 app.get('/api/admin/profiles',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT p.*,u.email,u.email_confirmed_at FROM profiles p JOIN users u ON u.id=p.id ORDER BY p.created_at DESC');res.json(rows);}));
 app.get('/api/admin/support',auth,admin,asyncRoute(async(_req,res)=>{const {rows}=await pool.query('SELECT * FROM poruke_podrske ORDER BY created_at DESC');res.json(rows);}));
 
