@@ -71,7 +71,7 @@ export function ListingImages({
     setBusy(true);
     setError("");
     try {
-      // Ako izvor dozvoljava CORS, fotografiju preuzimamo, normalizujemo i čuvamo u našem Storage-u.
+      // Ako izvor dozvoljava CORS, fotografiju preuzimamo i šaljemo serveru na automatsku obradu.
       // Ako izvor blokira preuzimanje, čuvamo direktan URL kao rezervnu opciju.
       try {
         const response = await fetch(candidate, { mode: "cors" });
@@ -86,7 +86,7 @@ export function ListingImages({
           img.onload = () => {
             if (img.naturalWidth > 0 && img.naturalHeight > 0) resolve();
             else reject(new Error("Fotografija nema ispravne dimenzije."));
-          };;
+          };
           img.onerror = () => reject(new Error("Adresa ne vodi direktno do dostupne fotografije."));
           img.src = candidate;
         });
