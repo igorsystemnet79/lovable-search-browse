@@ -1037,7 +1037,7 @@ function AdminKorisnickePoruke() {
   setBusy(true);setError("");
   try{
    const params=new URLSearchParams();if(filter.trim())params.set("q",filter.trim());
-   const response=await fetch(`${API_ORIGIN}/api/admin/messages?"+params.toString(),{cache:"no-store",headers:headers()});
+   const response=await fetch(`${API_ORIGIN}/api/admin/messages?${params.toString()}`,{cache:"no-store",headers:headers()});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Razgovori korisnika nisu dostupni.");
    setRows(data.data||[]);
@@ -1046,7 +1046,7 @@ function AdminKorisnickePoruke() {
  },[filter]);
  async function loadArchives(){
   try{
-   const response=await fetch(`${API_ORIGIN}/api/admin/message-archives',{cache:'no-store',headers:headers()});
+   const response=await fetch(`${API_ORIGIN}/api/admin/message-archives`,{cache:'no-store',headers:headers()});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||'Arhive prepiski nisu dostupne.');
    setArchives(data.data||[]);
