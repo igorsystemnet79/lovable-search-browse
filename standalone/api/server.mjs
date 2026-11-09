@@ -1384,37 +1384,21 @@ const ensureAdminMessageArchives = async () => {
  )`);
  await pool.query('CREATE INDEX IF NOT EXISTS admin_message_archives_created_at_idx ON admin_message_archives(created_at DESC)');
 };
-const formatConversationText = ({conversation,messages=[],exportedAt,exportedBy,exportReason,archiveId,sha256}={}) => {
- const lines=[
-  'PONUDIMI — PREPISKA KORISNIKA',
-  '='.repeat(48),
-  '',
-  'PODACI O RAZGOVORU',
-  'Oglas: '+(conversation?.listing_title||'Bez naslova'),
-  'Vrsta: '+(conversation?.listing_type==='ponude'?'Ponuda':conversation?.listing_type==='zahtevi'?'Zahtev':'Razgovor'),
-  'Kupac: '+(conversation?.buyer_name||'—')+' ('+(conversation?.buyer_email||'—')+')',
-  'Prodavac: '+(conversation?.seller_name||'—')+' ('+(conversation?.seller_email||'—')+')',
-  'Razgovor otvoren: '+(conversation?.created_at?new Date(conversation.created_at).toLocaleString('sr-RS'):'—'),
-  'Broj poruka: '+messages.length,
-  '',
-  'PREPISKA',
-  '='.repeat(48),
-  ''
- ];
+const formatConversationText = ({conversation,messages=[]}={}) => {
+ const lines=[];
  for(const message of messages){
-  lines.push((message.sender_name||message.sender_email||'Korisnik')+' — '+(message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'datum nije dostupan'));
-  lines.push(String(message.body||''));
+  const isBuyer=String(message.sender_id||'')===String(conversation?.buyer_id||'');
+  const sender=message.sender_name||message.sender_email||(isBuyer?'Kupac':'Prodavac');
+  const recipient=isBuyer
+   ? (conversation?.seller_name||conversation?.seller_email||'Prodavac')
+   : (conversation?.buyer_name||conversation?.buyer_email||'Kupac');
+  lines.push('Datum i vreme: '+(message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'—'));
+  lines.push('Ko šalje: '+sender);
+  lines.push('Tekst poruke: '+String(message.body||''));
+  lines.push('Kome je poslata: '+recipient);
   lines.push('');
  }
- lines.push('PODACI O IZVOZU');
- lines.push('Izvezeno: '+(exportedAt?new Date(exportedAt).toLocaleString('sr-RS'):'—'));
- lines.push('Izvezao administrator: '+(exportedBy?.email||'—'));
- lines.push('Razlog izvoza: '+(exportReason||'—'));
- lines.push('Oznaka arhive: '+(archiveId||'—'));
- if(sha256)lines.push('SHA-256: '+sha256);
- lines.push('');
- lines.push('Dokument je automatski generisan sa platforme PonudiMi.');
- return lines.join('\\n');
+ return lines.join('\\n').trim();
 };
 app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id;
@@ -1435,9 +1419,9 @@ app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const messageResult=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC',[conversationId]);
  const messages=messageResult.rows.map(m=>({...m,sender_name:m.sender_id===conversation.buyer_id?conversation.buyer_name:conversation.seller_name,sender_email:m.sender_id===conversation.buyer_id?conversation.buyer_email:conversation.seller_email}));
  const archiveId=randomUUID(),exportedAt=new Date().toISOString(),exportedBy={user_id:req.user.sub,email:req.user.email||null};
- const baseText=formatConversationText({conversation,messages,exportedAt,exportedBy,exportReason:reason,archiveId});
+ const baseText=formatConversationText({conversation,messages});
  const sha256=createHash('sha256').update(baseText,'utf8').digest('hex');
- const textContent=formatConversationText({conversation,messages,exportedAt,exportedBy,exportReason:reason,archiveId,sha256});
+ const textContent=formatConversationText({conversation,messages});
  const document={document_type:'PonudiMi — tekstualna arhiva privatne prepiske',format_version:2,archive_id:archiveId,exported_at:exportedAt,exported_by:exportedBy,export_reason:reason,conversation,messages,text_content:textContent,integrity:{algorithm:'SHA-256',hash:sha256,hash_scope:'Kontrolni zbir teksta prepiske bez završne linije SHA-256.'}};
  const filename='ponudimi-prepiska-'+conversationId+'.txt';
  await ensureAdminMessageArchives();
@@ -1467,7 +1451,7 @@ app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(r
  if(!content){
   const conversation=document.conversation||{};
   const messages=Array.isArray(document.messages)?document.messages:[];
-  content=formatConversationText({conversation,messages,exportedAt:document.exported_at,exportedBy:document.exported_by,exportReason:document.export_reason,archiveId:document.archive_id||req.params.id,sha256:result.rows[0].sha256});
+  content=formatConversationText({conversation,messages});
  }
  const filename=String(result.rows[0].file_name||'ponudimi-prepiska.txt').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/\\.json$/i,'.txt');
  res.set({'Cache-Control':'private, no-store','Content-Type':'text/plain; charset=utf-8','Content-Disposition':'attachment; filename="'+(filename.endsWith('.txt')?filename:filename+'.txt')+'"'}).send(content);
