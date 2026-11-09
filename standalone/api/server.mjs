@@ -516,6 +516,7 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  if(!phone)return res.status(400).json({error:'Unesi ispravan mobilni broj u formatu +3816xxxxxxx ili 06xxxxxxx.'});
  if(city.length<2||city.length>60)return res.status(400).json({error:'Mesto stanovanja je obavezno.'});
  if(!['fizicko','pravno'].includes(metadata.tip_lica))return res.status(400).json({error:'Izaberi tip naloga.'});
+ if(metadata.pravila_prihvacena!==true||metadata.politika_privatnosti_potvrdjena!==true)return res.status(400).json({error:'Pre registracije moraš prihvatiti Pravilnik o ponašanju i potvrditi da si pročitao Politiku privatnosti.'});
  if(metadata.tip_lica==='pravno'&&(!String(metadata.naziv_firme||'').trim()||!validPib(metadata.pib)))return res.status(400).json({error:'Naziv firme ili PIB nisu ispravni.'});
  const c=await pool.connect();
  try{
@@ -525,7 +526,9 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
   const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
   const sameName=await c.query("SELECT id FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
   if(sameName.rows[0])await c.query('UPDATE profiles SET duplikat_sumnja=true WHERE id=$1',[sameName.rows[0].id]);
-  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount]);
+  const acceptedRules=await c.query('SELECT version FROM platform_rules WHERE singleton=true');
+  const rulesVersion=Number(acceptedRules.rows[0]?.version||1);
+  await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja,pravila_prihvacena_at,pravila_verzija,politika_privatnosti_potvrdjena_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),$14,now())',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount,rulesVersion]);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
   const session={access_token:sign(u),token_type:'bearer',expires_in:604800,user:publicUser(u)};
