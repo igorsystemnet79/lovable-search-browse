@@ -26,3 +26,25 @@ jobs:
         run: node --check standalone/api/server.mjs
       - name: Build frontend
         run: npm run build
+      - name: Assemble standalone ZIP package
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_DIR="$RUNNER_TEMP/ponudimi-package"
+          ZIP_FILE="$RUNNER_TEMP/PonudiMi-samostalna-instalacija.zip"
+          mkdir -p "$PACKAGE_DIR"
+          git archive --format=tar HEAD | tar -xf - -C "$PACKAGE_DIR"
+          {
+            echo "PonudiMi standalone package"
+            echo "Commit: $GITHUB_SHA"
+            echo "Built: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            echo "Build verification: successful"
+          } > "$PACKAGE_DIR/BUILD-INFO.txt"
+          (cd "$PACKAGE_DIR" && zip -qr "$ZIP_FILE" .)
+      - name: Upload standalone ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: PonudiMi-samostalna-instalacija
+          path: ${{ runner.temp }}/PonudiMi-samostalna-instalacija.zip
+          if-no-files-found: error
+          retention-days: 30
