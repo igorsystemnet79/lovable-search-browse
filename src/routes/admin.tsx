@@ -890,6 +890,7 @@ function AdminKorisnickePoruke() {
  const [selected,setSelected]=useState<AdminConversation|null>(null);
  const [filter,setFilter]=useState("");
  const [reason,setReason]=useState("");
+ const [selectedReason,setSelectedReason]=useState("");
  const [error,setError]=useState("");
  const [notice,setNotice]=useState("");
  const [busy,setBusy]=useState(false);
@@ -908,13 +909,16 @@ function AdminKorisnickePoruke() {
  },[filter]);
  useEffect(()=>{load();},[load]);
  async function openConversation(row:AdminConversation){
-  if(reason.trim().length<10){setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera.");return;}
-  setBusy(true);setError("");setNotice("");
+  const reviewReason=reason.trim();
+  setSelected(null);setMessages([]);setSelectedReason("");setError("");setNotice("");
+  if(reviewReason.length<10){setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera.");return;}
+  setReason("");
+  setBusy(true);
   try{
-   const response=await fetch(`/api/admin/messages/${encodeURIComponent(row.id)}/view`,{method:"POST",headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const response=await fetch(`/api/admin/messages/${encodeURIComponent(row.id)}/view`,{method:"POST",headers:headers(),body:JSON.stringify({reason:reviewReason})});
    const data=await response.json().catch(()=>({}));
    if(!response.ok)throw new Error(data.error||"Pregled razgovora nije dozvoljen.");
-   setSelected(row);setMessages(data.messages||[]);setNotice("Pristup razgovoru je evidentiran u administratorskoj evidenciji.");
+   setSelected(row);setMessages(data.messages||[]);setSelectedReason(reviewReason);setNotice("Pristup razgovoru je evidentiran u administratorskoj evidenciji.");
   }catch(e){setError(e instanceof Error?e.message:"Greška pri otvaranju razgovora.");}
   finally{setBusy(false);}
  }
@@ -937,7 +941,7 @@ function AdminKorisnickePoruke() {
     {!busy&&!rows.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
    </div>
    <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
-    {selected?<><div className="border-b border-input pb-3"><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {reason}</p></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><p className="mb-1 text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+    {selected?<><div className="border-b border-input pb-3"><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><p className="mb-1 text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
    </div>
   </div>
  </section>;
