@@ -882,8 +882,13 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(table==='pracenja' && action==='insert') for(const row of supplied){
    const hasOffer=!!row.ponuda_id, hasRequest=!!row.zahtev_id;
    if(hasOffer===hasRequest) return res.status(400).json({error:'Praćenje mora pripadati tačno jednoj ponudi ili zahtevu.'});
-   const listing=hasOffer?await pool.query('SELECT id FROM ponude WHERE id=$1',[row.ponuda_id]):await pool.query('SELECT id FROM zahtevi WHERE id=$1',[row.zahtev_id]);
-   if(!listing.rowCount) return res.status(404).json({error:'Oglas koji želiš da pratiš ne postoji.'});
+   const listing=hasOffer
+     ? await pool.query("SELECT id,user_id,cena FROM ponude WHERE id=$1 AND coalesce(moderation_status,'visible')='visible' AND coalesce(pauziran,false)=false AND coalesce(zavrseno,false)=false",[row.ponuda_id])
+     : await pool.query("SELECT id,user_id,budzet FROM zahtevi WHERE id=$1 AND coalesce(moderation_status,'visible')='visible' AND coalesce(pauziran,false)=false AND coalesce(zavrseno,false)=false",[row.zahtev_id]);
+   if(!listing.rows[0]) return res.status(404).json({error:'Objava ne postoji ili više nije aktivna.'});
+   if(listing.rows[0].user_id===userId) return res.status(400).json({error:'Ne možeš pratiti sopstvenu objavu.'});
+   row.pocetna_cena=hasOffer?listing.rows[0].cena:null;
+   row.pocetni_budzet=hasRequest?listing.rows[0].budzet:null;
  }
  for(const item of supplied) for(const key of Object.keys(item||{})) {
    if(!columns.includes(key) || ['id','created_at','updated_at'].includes(key)) return res.status(400).json({error:`Polje ${key} nije dozvoljeno za izmenu.`});
