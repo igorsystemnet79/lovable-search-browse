@@ -345,6 +345,33 @@ ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS admin_password_hash text;
 
 ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS last_totp_step bigint;
 
+
+-- In-app notifications and per-user delivery preferences.
+CREATE TABLE IF NOT EXISTS user_notifications (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ type text NOT NULL CHECK (type IN ('listing_update','new_offer','new_request','reply','package_expiry','platform')),
+ title text NOT NULL CHECK (char_length(title) BETWEEN 1 AND 120),
+ message text NOT NULL CHECK (char_length(message) BETWEEN 1 AND 500),
+ link text,
+ metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+ dedupe_key text,
+ read_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS user_notifications_inbox_idx ON user_notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS user_notifications_unread_idx ON user_notifications(user_id,created_at DESC) WHERE read_at IS NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS user_notifications_dedupe_idx ON user_notifications(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS notification_preferences (
+ user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+ in_app_enabled boolean NOT NULL DEFAULT true,
+ listing_updates boolean NOT NULL DEFAULT true,
+ important_changes boolean NOT NULL DEFAULT true,
+ email_enabled boolean NOT NULL DEFAULT false,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+
 -- Append-only audit trail for authenticated changes across the platform.
 CREATE TABLE IF NOT EXISTS admin_audit_log (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid,
