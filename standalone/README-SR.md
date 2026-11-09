@@ -15,7 +15,7 @@ Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotogr
 2. Uđi u direktorijum `standalone`.
 3. Pokreni `./scripts/install.sh`. Skripta proverava Docker Compose, traži domen i email prvog administratora, automatski generiše jake tajne i pokreće servise.
 4. Za lokalni test unesi `:80` i otvori `http://localhost`. Za javnu instalaciju unesi svoj domen (npr. `ponudimi.rs`), usmeri DNS na server i otvori `https://TVOJ-DOMEN`.
-5. Ako želiš oporavak lozinke emailom, nakon instalacije dopuni SMTP vrednosti u `.env` i pokreni `docker compose up -d`.
+5. Za oporavak lozinke i automatske e-mail podsetnike o isteku paketa (10 dana unapred), dopuni `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS` i `SMTP_FROM` u `.env`, pa pokreni `docker compose up -d`.
 6. Ako imaš zvaničan APR API pristup, dopuni `APR_API_URL` i `APR_API_KEY` u `.env`, pa ponovo pokreni `docker compose up -d`.
 
 Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni `localhost` koristi se HTTP.
