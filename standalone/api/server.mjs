@@ -962,7 +962,7 @@ const WRITE_COLUMNS = {
  apr_firme: ['pib','maticni_broj','naziv','sediste','adresa','status','synced_at'],
  apr_sinhronizacije: ['pokrenuo','broj_firmi','uspeh','poruka'],
 };
-const configuredAdminEmails = () => String(process.env.ADMIN_EMAIL || 'igorsystemnet@gmail.com').split(',').map(email => email.trim().toLowerCase()).filter(Boolean);
+const configuredAdminEmails = () => String(process.env.ADMIN_EMAIL || 'igorsystem@gmail.com').split(',').map(email => email.trim().toLowerCase()).filter(Boolean);
 const isConfiguredAdmin = email => configuredAdminEmails().includes(String(email || '').trim().toLowerCase());
 const isAdmin = async id => { const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[id]); return r.rowCount>0; };
 const ident = value => { if (!/^[a-z_][a-z0-9_]*$/i.test(value)) throw new Error('Neispravno ime polja.'); return `"${value}"`; };
