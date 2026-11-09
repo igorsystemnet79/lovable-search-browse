@@ -235,7 +235,7 @@ app.post('/api/admin/reports/:id/decision',auth,admin,asyncRoute(async(req,res)=
    await c.query('BEGIN');
    const found=await c.query('SELECT * FROM prijave_oglasa WHERE id=$1 FOR UPDATE',[req.params.id]);
    const report=found.rows[0];
-   if(!report)return res.status(404).json({error:'Prijava nije pronađena.'});
+   if(!report){await c.query('ROLLBACK');return res.status(404).json({error:'Prijava nije pronađena.'});}
    const allowedTransition=(status==='vracen_u_prikaz'&&report.status==='oglas_uklonjen')||
      (status==='oglas_uklonjen'&&report.status==='na_cekanju')||
      (['pregledano','odbijeno'].includes(status)&&report.status==='na_cekanju');
@@ -378,7 +378,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false AND moderacija_blokirana=false':'';
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${whereSql?publicPauseFilter:publicPauseFilter?` WHERE pauziran=false`:''}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params); let data=(table==='ponude'||table==='zahtevi')?zastitiJavneKontakte(rows,Boolean(userId)):rows;
-   if(count==='exact'){const c=await pool.query(`SELECT count(*)::int n FROM ${ident(table)}${whereSql}`,params);result={data,count:c.rows[0].n};}else result={data};
+   if(count==='exact'){const countSql=`SELECT count(*)::int n FROM ${ident(table)}${whereSql}${publicPauseFilter}`;const counted=await pool.query(countSql,params);result={data,count:counted.rows[0].n};}else result={data};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
    for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);}
