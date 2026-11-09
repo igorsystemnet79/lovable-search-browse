@@ -1,0 +1,1349 @@
+PONUDIMI — RAZVOJ I PODEŠAVANJA
+Glavni tehnički dnevnik i uputstvo za samostalnu instalaciju
+
+Verzija dokumenta: 1.0
+Datum provere i dopune: 09.11.2026.
+Vreme provere: 09:35, Europe/Belgrade
+Status: POČETNA GLAVNA VERZIJA — dokumentovanje je završeno; samostalna Docker instalacija još nije potvrđena.
+Glavni izvor koda: https://github.com/igorsystemnet79/lovable-search-browse
+Dokumentaciona grana: docs/ponudimi-prirucnik
+Putanja dokumenta: PONUDIMI-RAZVOJ-I-PODEŠAVANJA.txt
+
+VAŽNO
+Ovaj dokument razdvaja ono što je potvrđeno pregledom repozitorijuma i Render podešavanja od onoga što nije testirano. Nijedna lozinka, token, privatni ključ, produkcioni URL baze sa parametrima ili druga tajna ne sme biti upisana u ovaj dokument. Primeri su generički i moraju se zameniti vrednostima vlasnika servera.
+
+===============================================================================
+1. SVRHA I PRAVILA ODRŽAVANJA DOKUMENTA
+===============================================================================
+
+Ovaj fajl je jedinstveni glavni dnevnik tehničkog razvoja i budućeg samostalnog postavljanja PonudiMi platforme. Čuva se kao zaseban dokumentacioni fajl, a ne kao deo automatski objavljivanih grana aplikacije.
+
+Pravila:
+1. Pre svake dopune proveriti GitHub grane, njihove poslednje commit-e i Render grane koje se zaista koriste.
+2. Ne pretpostavljati da je main jedina aktivna grana.
+3. Svaku novu funkcionalnost, ispravku i tehničku odluku povezati sa datumom, putanjom fajla i commit-om kada je podatak dostupan.
+4. Ne brisati važeća uputstva. Ako je nešto zastarelo, označiti ga kao ZASTARELO i objasniti šta ga je zamenilo.
+5. Ne upisivati stvarne tajne, korisničke lozinke, tokene, privatne podatke, sadržaj baze ili produkcione kredencijale.
+6. Ne tvrditi da je instalacija, migracija, backup, obnova ili test uspeo ako to nije stvarno izvršeno.
+7. Ne menjati aplikacioni kod, bazu, naloge, oglase ili produkciona podešavanja tokom dokumentacione provere.
+8. Pre svake buduće izmene koda prvo napraviti backup i proveriti na kojoj grani je odgovarajući servis.
+
+U repozitorijumu i dostupnoj Library pretrazi na dan 09.11.2026. nije pronađen raniji fajl sa ovim tačnim nazivom. Ova verzija zato predstavlja prvi objedinjeni glavni dokument. Važeće postojeće uputstvo iz standalone/README-SR.md preneto je i dopunjeno, uz posebno označavanje neslaganja između README-a i trenutnog koda.
+
+===============================================================================
+2. AKTIVNE GRANE I TRENUTNA INFRASTRUKTURA
+===============================================================================
+
+2.1. Aktivni repozitorijum
+
+Repozitorijum: igorsystemnet79/lovable-search-browse
+Vidljivost: public
+GitHub podrazumevana grana: main
+
+Na dan provere postoje DVE aktivne razvojno-deployment grane:
+
+A) FRONTEND
+Grana: main
+Poslednji commit: 17b0f5255b9d4a8d376d17b9bfcc3246b1cd6daf
+Datum poslednjeg commita: 08.11.2026. 18:00:31 UTC
+Render servis: PonudiMi-Novo
+Render servis ID: srv-db15aobncjis73b8mdrg
+URL: https://ponudimi-novo.onrender.com
+Render grana: main
+Automatski deploy na commit: uključen
+Build komanda: NITRO_PRESET=node-server npm install && npm run build
+Start komanda: node .output/server/index.mjs
+Region: Frankfurt
+Plan: Free
+Runtime: Node.js
+Poslednji pregledani deploy: dep-dbon0sm417fc738pjdrg
+Commit deploy-a: 17b0f5255b9d4a8d376d17b9bfcc3246b1cd6daf
+Status deploy-a: live
+Završetak: 09.11.2026. 07:11:33 UTC
+
+B) API / BACKEND
+Grana: deploy/ponudimi-standalone
+Poslednji commit: 2ed09a7cf3a02be59d3da00313a793caef65eb61
+Datum poslednjeg commita: 08.11.2026. 17:57:03 UTC
+Render servis: PonudiMi-Test-API
+Render servis ID: srv-dbl2phdg1s2s73e447bg
+URL: https://ponudimi-test-api.onrender.com
+Render grana: deploy/ponudimi-standalone
+Automatski deploy na commit: uključen
+Build komanda: cd standalone/api && npm install
+Start komanda: cd standalone/api && npm start
+Region: Frankfurt
+Plan: Free
+Runtime: Node.js
+Poslednji pregledani deploy: dep-dbobfs8ae00c739hdelg
+Commit deploy-a: 2ed09a7cf3a02be59d3da00313a793caef65eb61
+Status deploy-a: live
+Završetak: 08.11.2026. 17:57:46 UTC
+
+ZAKLJUČAK O GRANAMA
+Ne postoji samo jedna aktivna grana za celu aplikaciju. Frontend se objavljuje iz main, a API iz deploy/ponudimi-standalone. Pri dokumentovanju promena mora se navesti na koji deo platforme se promena odnosi.
+
+Dokumentaciona grana docs/ponudimi-prirucnik napravljena je od commit-a 17b0f5255b9d4a8d376d17b9bfcc3246b1cd6daf. Nijedan Render servis ne prati tu granu. Ona služi samo za čuvanje ovog dokumenta i ne treba da pokreće deploy.
+
+U Render nalogu postoje i stariji servisi PonudiMi1 i PonudiMi iz ranijih projekata/repozitorijuma. PonudiMi1 je suspendovan, a PonudiMi je vezan za stari repo igorsystemnet79/PonudiMi. Ne koristiti ih kao izvor aktuelnog koda i ne menjati ih bez posebnog naloga.
+
+2.2. Šta je potvrđeno o Render infrastrukturi
+
+- Oba aktivna servisa koriste isti GitHub repozitorijum, ali različite grane.
+- Oba su u Frankfurt regionu i trenutno su na Free planu.
+- Automatsko objavljivanje na commit je uključeno.
+- U listi Render servisa nije pronađen Render PostgreSQL resurs. API koristi DATABASE_URL, ali konkretan provajder baze nije potvrđen ovom proverom.
+- Nisu proveravane niti prikazivane stvarne vrednosti promenljivih okruženja. One se ne smeju kopirati u dokument.
+- U konfiguraciji servisa nije prikazan zaseban trajni disk. Ne pretpostavljati da je lokalni disk Render servisa trajan.
+- Besplatni Render servisi mogu biti uspavani kada nisu aktivni; frontend klijent ima pokušaje buđenja API-ja i proveru /api/health.
+
+===============================================================================
+3. TRENUTNA TEHNIČKA ARHITEKTURA
+===============================================================================
+
+3.1. Frontend
+
+Glavne tehnologije:
+- React 19
+- TanStack Start / TanStack Router
+- Vite
+- Nitro, preset node-server
+- Tailwind CSS 4
+- TypeScript
+- Node.js najmanje 22.12 prema package.json
+
+Glavne putanje:
+- package.json — skripte, zavisnosti i Node zahtev
+- vite.config.ts — frontend build i Nitro proxy pravila
+- src/routes/ — stranice platforme
+- src/components/ — zajedničke komponente
+- src/styles.css — boje, raspored i responsive pravila
+- src/integrations/standalone/client.ts — veza browsera sa samostalnim API-jem
+- public/ — javni resursi, manifest i PWA elementi
+
+Skripte u glavnom package.json:
+- npm run dev — razvojni Vite server
+- npm run build — produkcioni build
+- npm run preview — lokalni pregled build-a
+- npm run lint — ESLint
+- npm start — pokretanje .output/server/index.mjs
+- prebuild — automatski pokreće npm audit pre build-a
+
+3.2. API
+
+Glavne putanje:
+- standalone/api/server.mjs — Express API
+- standalone/api/package.json — API zavisnosti i start skripta
+- standalone/db/init.sql — PostgreSQL šema i dopunska inicijalizacija
+- standalone/api/grant-admin.mjs — ručna dodela prve administratorske uloge
+- standalone/Dockerfile.api — Docker slika API-ja
+
+Tehnologije:
+- Express 5
+- PostgreSQL preko pg
+- bcryptjs za hash lozinki
+- jsonwebtoken za sesije
+- express-rate-limit za ograničenje zahteva
+- Helmet za HTTP bezbednosna zaglavlja
+- Multer za upload
+- Sharp za obradu fotografija
+- Nodemailer za SMTP
+- AWS SDK S3 klijent za S3-kompatibilno skladište
+- QRCode i kriptografske funkcije za postojeću, trenutno isključenu TOTP funkcionalnost
+
+API se pokreće komandom npm start iz standalone/api, odnosno node server.mjs.
+
+3.3. Samostalna Docker arhitektura — planirani raspored
+
+standalone/docker-compose.yml definiše četiri servisa:
+
+1. db
+   - PostgreSQL 17 Alpine
+   - baza: ponudimi
+   - korisnik baze: ponudimi
+   - lozinka iz POSTGRES_PASSWORD
+   - trajni Docker volumen: postgres_data
+   - inicijalna SQL datoteka: standalone/db/init.sql
+
+2. api
+   - Node.js 22 Alpine
+   - Express API
+   - interni port 4000
+   - DATABASE_URL prema db servisu
+   - JWT_SECRET
+   - UPLOAD_DIR=/data/uploads
+   - opcionalni SMTP, Twilio, APR i S3/R2 parametri
+   - Docker volumen uploads_data
+
+3. web
+   - Node.js 22 Alpine
+   - izgradnja frontend aplikacije iz korena repozitorijuma
+   - interni port 3000
+   - start: node .output/server/index.mjs
+
+4. caddy
+   - Caddy 2 Alpine
+   - javni portovi 80 i 443, uključujući UDP 443
+   - automatsko HTTPS za javni domen
+   - Docker volumeni caddy_data i caddy_config
+
+Caddyfile:
+- /api/* prosleđuje API servisu
+- /uploads/* prosleđuje API servisu
+- /sitemap.xml i /robots.txt prosleđuje API servisu
+- ostale putanje prosleđuje frontend servisu
+
+VAŽNO O STANJU DOCKER INSTALACIJE
+Ovo je deklarisana arhitektura u repozitorijumu, ali kompletna Docker instalacija nije potvrđena. Pregled koda je otkrio blokirajuće neslaganje u Dockerfile.api i neslaganje u načinu na koji browser bira API adresu. Detalji su u odeljku 12. Ne tretirati ZIP kao produkciono spreman dok se te stavke ne isprave i testiraju.
+
+3.4. Zavisnosti i ponovljivost build-a
+
+- Glavni package.json zahteva Node >=22.12.
+- Dockerfile.web koristi node:22-alpine.
+- Dockerfile.api koristi node:22-alpine.
+- Baza koristi postgres:17-alpine.
+- Caddy koristi caddy:2-alpine.
+- U repozitorijumu postoji bun.lock, ali pregledani build i Render procesi koriste npm.
+- Nije pronađen package-lock.json ni za frontend ni za API. Zbog toga npm install može vremenom razrešiti drugačije verzije paketa unutar dozvoljenih semver opsega. Ovo je otvorena stavka za potpuno ponovljive build-ove.
+- Glavni frontend ima prebuild skriptu koja pokreće npm audit.
+- API package.json na aktivnoj API grani ima postinstall proveru npm audit --omit=dev. Build/install može stati ako audit prijavi blokirajući problem.
+
+===============================================================================
+4. BAZA PODATAKA, INICIJALIZACIJA I MIGRACIJE
+===============================================================================
+
+4.1. Samostalna baza
+
+Izvor šeme za samostalni API:
+standalone/db/init.sql
+
+API server pri pokretanju pokušava da pročita SQL datoteku i izvrši šemu u transakciji. U slučaju da PostgreSQL još nije dostupan, pokušava ponovo do 12 puta uz rastuće čekanje.
+
+U samostalnoj šemi postoje, između ostalih, tabele:
+- users
+- profiles
+- user_roles
+- ponude
+- zahtevi
+- pracenja
+- slike_oglasa
+- storage_objects
+- izmene_oglasa
+- poruke_podrske
+- prijave_oglasa
+- moderation_actions
+- moderator_proposals
+- apr_firme
+- apr_sinhronizacije
+- password_resets
+- email_verification_tokens
+- platform_rules
+- platform_rules_versions
+- platform_settings
+- admin_2fa
+- admin_ai_audit
+- chatgpt_usage
+- app_migrations
+
+Baza sadrži podatke o korisnicima, profilima, ulogama, ponudama, zahtevima, praćenjima, fotografijama, prijavama, moderaciji, pravilima platforme, režimu održavanja i administratorskim evidencijama.
+
+4.2. Kako se trenutno primenjuje šema
+
+Potvrđeno u standalone/api/server.mjs:
+- pri pokretanju API čita standalone/db/init.sql relativno u odnosu na server.mjs;
+- SQL se izvršava u transakciji;
+- koristi se veliki broj CREATE TABLE IF NOT EXISTS i ALTER TABLE ... IF NOT EXISTS naredbi;
+- deo jednokratnih promena prati se preko tabele app_migrations.
+
+Jednokratna promena:
+- migration_key: 2026-11-account-verification-reset
+- pri prvom izvršavanju postavlja email_confirmed_at na NULL za postojeće naloge/profilе.
+- Trenutna prijava ipak ne zahteva potvrdu emaila i telefona; vidi odeljak 7. Ovo je evidencija šeme, a ne dokaz da je obavezna verifikacija trenutno uključena.
+
+4.3. Drizzle i Supabase migracije — ZASTARELO ZA SAMOSTALNU INSTALACIJU
+
+U repozitorijumu i dalje postoje:
+- drizzle.config.ts
+- drizzle/schema.ts
+- drizzle/migrations/0000...0009
+- supabase/config.toml
+- src/integrations/supabase/
+
+Za samostalnu instalaciju ne koristiti Drizzle/Supabase migracije kao postupak inicijalizacije baze. Trenutni standalone API koristi standalone/db/init.sql.
+
+Razlozi:
+- drizzle/schema.ts je trenutno prazan fajl sa komentarom da se ne uređuje;
+- drizzle/migrations/meta/_journal.json sadrži zapise do 0008, dok fajl 0009_listing_images.sql postoji, ali nije upisan u pregledani journal;
+- 0009_listing_images.sql je pisan za Supabase Storage i RLS, a ne za standalone skladište;
+- drizzle.config.ts koristi LOVABLE_DB_MIGRATION_URL, što pripada starijem/Lovable migracionom okruženju.
+
+POSEBNO OPASNA MIGRACIJA:
+drizzle/migrations/0008_clear_test_listings.sql briše redove iz:
+- public.pracenja
+- public.izmene_oglasa
+- public.ponude
+- public.zahtevi
+
+Ona je napravljena za čišćenje test oglasa pre ranijeg uvoza. Ne pokretati je nad aktivnom ili novom bazom sa stvarnim podacima. Nikada ne pokretati migraciju samo zato što se nalazi u folderu.
+
+4.4. Migracija stare baze
+
+Samostalna instalacija ne povezuje se automatski sa starim Supabase projektom. Ne postoji potvrđen, kompletan skript za prenos svih starih naloga, oglasa, fotografija, uloga i istorije.
+
+Pre eventualnog uvoza:
+1. napraviti backup izvornog sistema;
+2. napraviti mapu svih tabela i polja;
+3. proveriti UUID veze i vlasništvo oglasa;
+4. izvesti fotografije odvojeno;
+5. lozinke ne prenositi kao običan tekst;
+6. planirati ponovno postavljanje lozinki ako se stari hash ne može bezbedno koristiti;
+7. testirati migraciju na kopiji baze;
+8. potvrditi broj prenetih korisnika, ponuda, zahteva i fotografija.
+
+Ne brisati izvornu bazu dok se migracija i provera ne završe.
+
+===============================================================================
+5. PROMENLJIVE OKRUŽENJA I PODEŠAVANJA
+===============================================================================
+
+Opšte pravilo:
+- Docker Compose čita standalone/.env.
+- Render promenljive se unose u Render Dashboard > odgovarajući servis > Environment.
+- Stvarne vrednosti nikada ne upisivati u GitHub, ovaj dokument ili frontend kod.
+- .gitignore isključuje .env i .env.*; .env.example je dozvoljen kao šablon.
+- Pri instalaciji na novom serveru generisati nove tajne, osim kada se radi kontrolisana migracija postojećeg sistema.
+
+5.1. Obavezne za Docker samostalnu instalaciju
+
+POSTGRES_PASSWORD
+Gde: standalone/.env; Docker Compose prosleđuje PostgreSQL servisu i koristi je za DATABASE_URL API-ja.
+Obavezno: DA.
+Bezbedno generisanje: openssl rand -hex 32.
+Promena na novom serveru: generisati novu vrednost. Ne koristiti istu lozinku na više instalacija.
+
+JWT_SECRET
+Gde: standalone/.env; API kontejner. Na Renderu: Environment API servisa.
+Obavezno: DA.
+Uslov koda: najmanje 32 karaktera.
+Bezbedno generisanje: openssl rand -hex 48.
+Promena na novom serveru: generisati novu vrednost. Promena ključa poništava postojeće JWT sesije.
+
+ADMIN_EMAIL
+Gde: standalone/.env; API kontejner; koristi ga grant-admin.mjs.
+Obavezno: DA za planirani postupak prvog administratora.
+Vrednost: adresa koju vlasnik platforme kontroliše. Nije lozinka, ali ne objavljivati je nepotrebno.
+Promena na novom serveru: postaviti željenu administratorsku adresu pre registracije prvog admin naloga. Registracija i komanda grant-admin moraju koristiti istu adresu.
+
+DOMAIN
+Gde: standalone/.env; Caddy servis preko promenljive DOMAIN.
+Obavezno: DA za javni domen; za lokalni test skripta koristi :80 ili localhost.
+Primer oblika: ponudimi.example
+Promena na novom serveru: uneti stvarni domen bez https:// i bez putanje. DNS mora pokazivati na server.
+
+PUBLIC_APP_URL
+Gde: standalone/.env; API koristi je za reset lozinke, email linkove, sitemap i robots.
+Obavezno: DA za ispravne javne linkove; u produkciji koristiti HTTPS.
+Primer oblika: https://ponudimi.example
+Promena na novom serveru: uskladiti sa domenom i javnim HTTPS URL-om. Ne ostavljati http://localhost u produkciji.
+
+DATABASE_URL
+Gde: Render Environment API servisa ili okruženje Node procesa. U Docker Compose režimu sastavlja se iz POSTGRES_PASSWORD i naziva db servisa.
+Obavezno: DA za API.
+Tajna: DA; sadrži pristupne podatke baze.
+Bezbedno generisanje: ne generisati nasumično URL; preuzeti connection string iz pouzdanog PostgreSQL provajdera ili koristiti Compose vrednost.
+Promena na novom serveru: uneti adresu nove baze, korisnika, lozinku, port i naziv baze. Ne slati ovaj URL u chat ili dokument.
+
+5.2. SMTP — email
+
+SMTP_HOST
+SMTP_PORT
+SMTP_SECURE
+SMTP_USER
+SMTP_PASS
+SMTP_FROM
+
+Gde: standalone/.env i API kontejner; na Renderu Environment API servisa.
+Obavezno: SMTP_HOST, SMTP_USER i SMTP_PASS potrebni su za slanje email poruka i funkciju oporavka lozinke.
+Uobičajeni primer podešavanja: port 587 uz SMTP_SECURE=false ili port 465 uz SMTP_SECURE=true. Tačan režim potvrditi kod SMTP provajdera.
+SMTP_PASS je tajna i dobija se od email provajdera; ne generisati je lokalno.
+SMTP_FROM može biti verifikovana adresa pošiljaoca; ako nije uneta, kod koristi SMTP_USER.
+Promena na novom serveru: koristiti nalog/SMTP kredencijale koji pripadaju novom domenu i provajderu.
+
+Trenutna funkcionalnost:
+- SMTP je potreban za zahtev za promenu lozinke.
+- Email potvrda registracije postoji u API kodu kao pomoćna funkcija i endpoint, ali obavezni tok potvrde trenutno nije uključen u registraciju. Detalji u odeljku 7.
+- Ako se obavezna email potvrda ponovo uključi, SMTP postaje obavezan i za registraciju.
+
+5.3. Twilio Verify — SMS
+
+TWILIO_ACCOUNT_SID
+TWILIO_AUTH_TOKEN
+TWILIO_VERIFY_SERVICE_SID
+
+Gde: standalone/.env i API kontejner; API koristi ove vrednosti za Twilio Verify.
+Obavezno: NE za trenutno aktivnu prijavu i registraciju; DA ako se ponovo uključi obavezna SMS verifikacija.
+Tajne: TWILIO_AUTH_TOKEN je tajna. SID vrednosti su identifikatori naloga/servisa, ali ih takođe ne objavljivati.
+Bezbedno pribavljanje: iz sopstvenog Twilio naloga i Verify Service podešavanja.
+Promena na novom serveru: napraviti ili izabrati sopstveni Verify Service i uneti nove kredencijale.
+Broj telefona se normalizuje na međunarodni format za Srbiju, npr. +3816xxxxxxx.
+
+5.4. Skladištenje fotografija — lokalna baza ili S3/R2
+
+UPLOAD_DIR
+Gde: API okruženje. Docker Compose postavlja /data/uploads.
+Obavezno: preporučeno definisati u Docker instalaciji.
+Promena na novom serveru: koristiti putanju koja je vezana za trajni volumen, ne privremeni kontejnerski filesystem.
+
+S3_ENDPOINT
+S3_BUCKET
+S3_ACCESS_KEY_ID
+S3_SECRET_ACCESS_KEY
+S3_REGION
+
+Gde: standalone/.env i API kontejner; u Renderu Environment API servisa.
+Obavezno: NE, samo ako se koristi S3-kompatibilno skladište kao Cloudflare R2.
+Uslov koda: S3 režim se uključuje tek kada su postavljeni endpoint, bucket, access key ID i secret access key.
+S3_REGION ima podrazumevanu vrednost auto.
+Bezbedno pribavljanje: napraviti privatni bucket i namenski API token sa minimalnim pravima samo nad tim bucket-om.
+Promena na novom serveru: ako se koristi lokalni PostgreSQL režim, ostaviti S3 promenljive prazne; ako se koristi R2, uneti novi endpoint, bucket i namenski ključ.
+
+VAŽNO — stvarno ponašanje trenutnog API koda:
+- kada S3 nije konfigurisan, saveImage čuva binarni sadržaj fotografije u PostgreSQL tabeli storage_objects, u bytea polju;
+- kada je S3 kompletno konfigurisan, fotografija se čuva u S3/R2;
+- tabela slike_oglasa čuva vezu sa ponudom/zahtevom, putanju i redosled;
+- UPLOAD_DIR i uploads_data i dalje postoje za lokalne/legacy datoteke i statičko posluživanje;
+- opis u pojedinim README/.env komentarima da se sve nove fotografije podrazumevano čuvaju na lokalnom disku nije usklađen sa trenutnim saveImage kodom. Za novi API kod podrazumevano skladište je PostgreSQL storage_objects.
+
+5.5. Frontend/API adresa
+
+PONUDIMI_API_ORIGIN
+Gde: Vite build okruženje, koristi se u vite.config.ts za Nitro proxy pravila.
+Obavezno: nije posebno označeno kao obavezno jer postoji podrazumevana Render API adresa.
+Trenutna podrazumevana vrednost u vite.config.ts: https://ponudimi-test-api.onrender.com
+Promena na novom serveru: treba je uskladiti sa internim API adresiranjem, ali sama promena ove promenljive trenutno nije dovoljna za browser klijenta.
+
+API_INTERNAL_URL
+Gde: web servis u standalone/docker-compose.yml; koristi se u SSR putanji standalone klijenta.
+Primer u Compose konfiguraciji: http://api:4000
+Obavezno: za SSR pristup API-ju u Docker mreži.
+Promena na novom serveru: ako se ime API servisa ili interni port promene, promeniti i ovu vrednost.
+
+KRITIČNO:
+src/integrations/standalone/client.ts trenutno ima API_ORIGIN hardkodiran na https://ponudimi-test-api.onrender.com. Browser grana koda direktno koristi taj URL za API zahteve i javne URL-ove fotografija. Zato API_INTERNAL_URL i PONUDIMI_API_ORIGIN trenutno ne garantuju da će browser koristiti novi server. Ovo je blokirajuća stavka za potpuno samostalni deployment i mora se rešiti u kodu pre nego što se ZIP proglasi samostalnim.
+
+5.6. PostgreSQL opcione promenljive
+
+DATABASE_SSL
+Gde: API okruženje.
+Obavezno: NE za lokalni Compose PostgreSQL.
+Koristi se kada je potrebna TLS veza sa udaljenom bazom.
+Bezbednosna napomena: trenutni kod, kada je DATABASE_SSL=true, postavlja rejectUnauthorized=false. To znači da se ne proverava ispravnost sertifikata servera. Ovo nije idealno produkciono podešavanje; pre javne instalacije treba podržati proveru CA sertifikata.
+
+PG_POOL_MAX
+Gde: API okruženje.
+Obavezno: NE.
+Podrazumevano: 5 konekcija u pool-u.
+Promena na novom serveru: prilagoditi samo ako kapacitet baze i broj API instanci to zahtevaju.
+
+PORT
+API_PORT
+Gde: PORT obično dodeljuje hosting platforma; API_PORT je rezervni port za samostalno pokretanje.
+U Compose konfiguraciji API_PORT je 4000.
+Promena na novom serveru: ne izlagati API port javno kada Caddy treba da bude jedini javni ulaz.
+
+NODE_ENV
+Gde: Dockerfile i hosting okruženje.
+Obavezno: produkciono okruženje treba da koristi production.
+Promena na novom serveru: ne ostavljati razvojni režim na javnom serveru.
+
+5.7. Administratorski TOTP — trenutno privremeno isključen
+
+ADMIN_2FA_ENCRYPTION_KEY
+Gde: API okruženje, kada se ponovo aktivira Google Authenticator/TOTP.
+Obavezno: NE dok je dodatna potvrda isključena.
+Očekivani format: tačno 64 heksadecimalna znaka.
+Bezbedno generisanje: openssl rand -hex 32.
+Promena na novom serveru: generisati novi ključ i čuvati ga u password manager-u i sigurnom backup-u. Gubitak ključa može onemogućiti dešifrovanje postojećih TOTP tajni.
+
+Stanje:
+- TOTP tabela, šifrovanje tajne, QR kodovi i rezervni kodovi postoje u API kodu/bazi.
+- administratorski middleware trenutno ne zahteva TOTP;
+- frontend je uklonio neaktivne Authenticator kontrole;
+- dodatna potvrda je privremeno isključena po poslednjim commit-ovima od 08.11.2026.
+- Ne prikazivati TOTP kao aktivnu zaštitu dok se ponovo ne uključi i end-to-end proveri.
+
+5.8. APR integracija
+
+APR_API_URL
+APR_API_KEY
+
+Gde: API okruženje; Compose ih prosleđuje API kontejneru.
+Obavezno: NE.
+Koriste se samo za administratorsku ručnu sinhronizaciju preko /api/admin/apr-sync.
+Bezbedno pribavljanje: samo zvaničan pristup/ključ koji APR ili ovlašćeni provajder izda.
+Promena na novom serveru: uneti novi URL i ključ ako postoji zvanično odobren pristup.
+Status: pristup APR API-ju i stvarna sinhronizacija nisu potvrđeni.
+
+Napomena: install.sh upisuje prazne APR_API_URL i APR_API_KEY vrednosti u novi .env, iako ih .env.example ne prikazuje u svim pregledanim verzijama.
+
+5.9. Interni administratorski asistent
+
+OPENAI_API_KEY
+OPENAI_MODEL
+OPENAI_INPUT_PRICE_PER_MILLION
+OPENAI_CACHED_INPUT_PRICE_PER_MILLION
+OPENAI_OUTPUT_PRICE_PER_MILLION
+
+Gde: API okruženje.
+Obavezno: NE.
+OPENAI_API_KEY je tajna i dobija se iz sopstvenog OpenAI naloga.
+Kod ima podrazumevani model i podrazumevane iznose za internu evidenciju troškova. Te iznose ne tretirati kao zvaničan cenovnik; proveriti važeće cene provajdera pre korišćenja.
+Funkcija je namenjena samo administratorskom panelu i ima ograničene read-only alate za stanje platforme, statistiku i pretragu korisnika/oglasa.
+OTVORENO: pregledani standalone/docker-compose.yml ne prosleđuje OPENAI_* promenljive API kontejneru. Samo dodavanje u .env zato nije dovoljno za Docker instalaciju bez dodatnog povezivanja u Compose konfiguraciji.
+
+5.10. Šta trenutno nedostaje u .env.example ili Compose prenosu
+
+- .env.example ne prikazuje sve promenljive koje API kod poznaje.
+- APR_API_URL i APR_API_KEY postoje u install.sh/Compose konfiguraciji, ali nisu dosledno prikazani u svim .env.example verzijama.
+- DATABASE_SSL i PG_POOL_MAX postoje u API kodu, ali nisu izloženi u standardnom Compose šablonu.
+- ADMIN_2FA_ENCRYPTION_KEY postoji u kodu za buduće ponovno uključivanje TOTP-a, ali nije u standardnom .env.example.
+- OPENAI_* postoje u API kodu, ali nisu prosleđeni kroz pregledani Compose fajl.
+- PONUDIMI_API_ORIGIN je build-time promenljiva frontend konfiguracije; API_INTERNAL_URL je runtime promenljiva web servisa. Ne zamenjuju jedna drugu.
+
+===============================================================================
+6. FOTOGRAFIJE I FAJLOVI
+===============================================================================
+
+Potvrđeno u standalone/api/server.mjs i standalone/db/init.sql:
+
+- Najviše 7 fotografija po oglasu/zahtevu.
+- Baza ima trigger koji sprovodi ograničenje od 7 fotografija.
+- Prihvaćeni MIME tipovi: image/jpeg, image/png, image/webp.
+- Maksimalna veličina ulaznog fajla: 20 MB po fotografiji.
+- Sharp automatski primenjuje rotaciju prema EXIF-u, menja dimenzije na 800 x 600, koristi fit contain i belu pozadinu, a izlaz čuva kao JPEG uz kvalitet 82.
+- Fotografije se povezuju sa ponudom ili zahtevom kroz slike_oglasa.
+- API proverava vlasništvo oglasa i putanju fotografije.
+- Administratorski API ima posebnu rutu za dodavanje fotografija na oglase.
+
+Režimi skladištenja:
+A) Bez S3/R2: sadržaj fotografije se čuva u PostgreSQL storage_objects.body (bytea). SQL backup zato obuhvata i nove fotografije.
+B) Sa S3/R2: sadržaj fotografije se čuva u bucket-u, a PostgreSQL čuva vezu i putanju. Backup baze sam po sebi nije dovoljan; bucket mora posebno da se kopira.
+
+Docker volumen uploads_data postoji i montira se na /data/uploads. U trenutnom kodu to nije jedino niti podrazumevano mesto za nove slike kada S3 nije podešen; nove slike idu u storage_objects. Volumen može biti potreban za legacy fajlove i statičke putanje.
+
+Ne menjati putanju ili režim skladištenja na produkcionoj bazi bez plana za kopiranje fotografija i ažuriranje storage_path vrednosti.
+
+===============================================================================
+7. REGISTRACIJA, PRIJAVA, LOZINKE I ADMINISTRATOR
+===============================================================================
+
+7.1. Registracija
+
+Trenutna registraciona forma src/routes/registracija.tsx traži:
+- ime
+- prezime
+- telefon
+- mesto stanovanja
+- email
+- lozinku od najmanje 8 karaktera
+- tip naloga: fizičko ili pravno lice
+- za pravno lice: naziv firme i PIB
+- adresa je opciona
+
+API na aktivnoj grani takođe proverava ime, prezime, telefon, mesto, tip lica, PIB za pravna lica i lozinku od najmanje 8 karaktera, uz najviše 72 bajta.
+
+7.2. Email i SMS verifikacija — IMPLEMENTACIJA POSTOJI, OBAVEZNA PROVERA JE ISKLJUČENA
+
+U bazi i API kodu postoje:
+- email_verification_tokens
+- endpoint za potvrdu email linka
+- Twilio Verify endpointi za početak i proveru SMS koda
+- polja email_confirmed_at i telefon_verifikovan_at
+- provera dupliranog verifikovanog telefona
+- oznaka verifikovanog korisnika u podacima oglasa
+
+Međutim, poslednji pregledani kod aktivne API grane pokazuje:
+- /api/auth/register kreira nalog i odmah vraća sesiju;
+- /api/auth/login ne odbija nalog zbog nepotvrđenog emaila ili telefona;
+- frontend nakon registracije prikazuje da potvrda emaila i telefona trenutno nije potrebna;
+- email/SMS tok nije obavezni deo trenutne registracije.
+
+Zato je README-SR tvrdnja da svaki novi nalog mora potvrditi email i SMS pre prijave zastarela u odnosu na trenutni kod.
+
+SMTP je i dalje potreban za oporavak lozinke. Twilio je potreban samo ako se ponovo aktivira obavezna SMS verifikacija. Ako se verifikacija vrati, mora se ponovo uskladiti frontend, API, README, .env.example i testovi.
+
+7.3. Prijava i lozinke
+
+- Lozinke se hash-uju pomoću bcryptjs sa cost 12.
+- JWT sesije koriste HS256 i traju 7 dana.
+- Promena lozinke povećava session_version i time poništava stare sesije.
+- API ograničava broj pokušaja prijave i drugih osetljivih zahteva.
+- Prijava ima dugme za prikaz/sakrivanje lozinke.
+- Registracija ima dugme za prikaz/sakrivanje lozinke.
+- Zaboravljena lozinka šalje link emailom, ako je SMTP podešen.
+- Link za reset lozinke važi 1 sat i koristi jednokratni hash token u password_resets.
+- Backend za novu/reset lozinku zahteva najmanje 8 karaktera i najviše 72 bajta.
+
+OTVORENO NESLAGANJE:
+src/routes/reset-lozinke.tsx u pregledanoj verziji prikazuje minimum 6 karaktera, dok API reset-complete zahteva minimum 8. UI i API treba uskladiti pre produkcije.
+
+Google prijava:
+- Dugme Google postoji na stranici prijave, ali trenutni samostalni frontend prikazuje poruku da Google prijava nije podešena.
+- Google OAuth nije potvrđen kao funkcionalan deo standalone instalacije.
+
+7.4. Prvi administrator
+
+Aktivna API grana sadrži:
+standalone/api/grant-admin.mjs
+
+Trenutni postupak:
+1. U standalone/.env postaviti ADMIN_EMAIL na adresu vlasnika.
+2. Pokrenuti platformu nakon što se otklone Docker blokade opisane u odeljku 12.
+3. Registrovati običan nalog sa istom email adresom.
+4. Potvrditi da nalog postoji u bazi.
+5. Iz direktorijuma standalone pokrenuti:
+   docker compose exec api node grant-admin.mjs admin@example.com
+6. Umesto admin@example.com upisati tačnu vrednost koja je postavljena u ADMIN_EMAIL.
+7. Skripta proverava da je prosleđena adresa identična ADMIN_EMAIL i dodaje ulogu admin u user_roles.
+8. Proveriti pristup administratorskoj ruti i funkcijama.
+
+Komanda ne kreira korisnika; nalog mora prethodno biti registrovan.
+
+VAŽNO BEZBEDNOSNO NESLAGANJE:
+U standalone/api/server.mjs postoji i hardkodirana administratorska email adresa igorsystemnet@gmail.com u funkciji isPlatformAdmin. To je nezavisno od ADMIN_EMAIL. Pre javne produkcije potrebno je uskladiti jedinstven izvor administratorskog identiteta i ukloniti neželjeno hardkodiranje. Ne oslanjati se samo na tajnu adresu kao zaštitu.
+
+7.5. Dodatna administratorska potvrda
+
+Google Authenticator/TOTP je ranije uveden:
+- serversko generisanje tajne
+- AES-256-GCM šifrovanje
+- QR kod
+- zasebna administratorska lozinka
+- jednokratni rezervni kodovi
+- zaštita od ponovne upotrebe TOTP koraka
+
+Poslednji aktivni API commit 2ed09a7cf3a02be59d3da00313a793caef65eb61 privremeno isključuje enforcement. Frontend commit f0a08a1a5f uklanja neaktivne kontrole, a 17b0f5255b popravlja pokretanje frontenda posle tog isključenja.
+
+Trenutno: dodatna TOTP potvrda NIJE obavezna pri administratorskom pristupu. Vratiti je tek nakon zasebnog plana, generisanja ADMIN_2FA_ENCRYPTION_KEY, testiranja rezervnih kodova i provere oporavka pristupa.
+
+===============================================================================
+8. FUNKCIONALNOSTI PLATFORME — STANJE PO PREGLEDU KODA
+===============================================================================
+
+8.1. Ponude, zahtevi i praćenje
+
+- Tabele ponude i zahtevi postoje.
+- Korisnik može da kreira i uređuje sopstvene oglase.
+- API proverava vlasništvo pri izmeni i brisanju.
+- Tabela pracenja podržava praćenje ponude ili zahteva.
+- Oglasi mogu biti pauzirani ili završeni.
+- Javni feed i pretraga isključuju pauzirane oglase i oglase sa moderation_status='hidden'.
+- Administratorski ekran eksplicitno traži includePausedListings() da bi video i pauzirane oglase.
+- Vlasnički prikaz sopstvenih oglasa koristi vlasnički filter, tako da pauzirani oglasi ostaju dostupni vlasniku.
+
+Relevantne putanje:
+- standalone/api/server.mjs
+- standalone/db/init.sql
+- src/integrations/standalone/client.ts
+- src/routes/admin.tsx
+- src/routes/moji-oglasi.tsx
+
+8.2. Moderacija
+
+Postoje:
+- moderation_actions
+- moderator_proposals
+- moderatorska i administratorska prava
+- prijava oglasa
+- sakrivanje i vraćanje sadržaja
+- administratorski pregled prijava
+
+Trenutni tok predloga moderatora:
+- moderator šalje predlog izmene;
+- administrator odlučuje da li ga odobrava ili odbija;
+- API proverava da se oglas nije promenio u međuvremenu.
+
+OTVORENO ODSTUPANJE OD RANIJEG ZAHTEVA:
+Raniji zahtev je bio da moderator može menjati tuđi nacrt, ali da objava/čuvanje čeka odobrenje vlasnika ili administratora. U istoriji commit-a postoji uklanjanje veta vlasnika (fc8fc2ed42). Trenutni pregledani API tok završava se odlukom administratora. Vlasničko odobrenje nije potvrđeno kao aktivni korak.
+
+8.3. Pravila platforme
+
+Postoje:
+- javna stranica src/routes/pravila-platforme.tsx
+- administratorski editor u src/routes/admin.tsx
+- tabela platform_rules
+- istorija platform_rules_versions
+- javni API /api/platform-rules
+- administratorski API za objavu i vraćanje verzije
+
+Promena pravila u admin panelu postaje javna tek kada se izabere „Sačuvaj i objavi pravila“. API kreira novu verziju i ažurira trenutno važeći tekst. Frontend prikazuje potvrdu o objavi, a javno učitavanje koristi no-store i osvežavanje da izbegne stari keš.
+
+Relevantni frontend commit-i:
+- e077b538d3 — administratorski editor i istorija verzija
+- 55e229b444 — kompletan tekst pravila za uređivanje
+- 5d050b5276 — usklađivanje javnog učitavanja sa API klijentom
+- a0cf12824a — ispravka starog keširanog teksta
+- 0576af0fec — potvrda objave i provera rezultata servera
+
+Pravila su radni tekst i zahtevaju pravnu proveru. Ne predstavljati ih kao konačno pravno mišljenje.
+
+8.4. Režim održavanja
+
+Postoje platform_settings, javni status i administratorski API za uključivanje/isključivanje režima održavanja i tekst poruke.
+Frontend prikazuje obaveštenje posetiocima i osvežava status.
+Administratorski pristup treba da ostane dostupan za upravljanje održavanjem.
+
+Proveriti pre produkcije da li se registracija i svi javni API pozivi zaista blokiraju u režimu održavanja. Pregledani API middleware izuzima određene /api/auth/ i administratorske putanje, pa je potreban end-to-end test.
+
+8.5. Prijave i statistika
+
+Postoje:
+- prijava oglasa sa razloga
+- administratorski inbox prijava
+- odluka administratora o prijavi
+- statistika korisnika, ponuda i zahteva
+- evidencija poslednje aktivnosti korisnika
+
+8.6. APR
+
+Postoje tabele apr_firme i apr_sinhronizacije i administratorska ruta /api/admin/apr-sync.
+Sinhronizacija je ručna i zahteva APR_API_URL i APR_API_KEY.
+Nije potvrđen zvaničan APR pristup niti automatski raspored sinhronizacije.
+
+8.7. Interni AI asistent
+
+API sadrži administratorsku funkciju sa ograničenim read-only alatima:
+- stanje API-ja i baze
+- zbirna statistika
+- pretraga oglasa
+- pretraga korisnika
+
+Potrebna je OPENAI_API_KEY promenljiva. Funkcija ne treba da se predstavlja kao javni AI proizvod; namenjena je internoj administraciji. Compose prenos OPENAI promenljivih nije potvrđen.
+
+8.8. Funkcionalnosti koje nisu potvrđene kao implementirane
+
+U trenutnoj standalone šemi nisu pronađene tabele za:
+- plaćene pakete firmi i pretplate
+- evidenciju uplata
+- automatski obračun i naplatu
+- rokove trajanja paketa
+- automatske email/SMS podsetnike 10 dana pre isteka
+- stvarni payment gateway
+
+Poslovni paketi koji su ranije definisani kao zahtev — 10 EUR mesečno, 20 EUR za 3 meseca, 50 EUR za 6 meseci i Premium 100 EUR za 12 meseci — moraju se tretirati kao poslovni zahtev, a ne kao potvrđena aktivna naplatna funkcija. U trenutnoj šemi nema potvrđenog sistema naplate ili evidencije pretplata.
+
+8.9. Pretraga i prijava
+
+Javni API endpointi za ponude/zahteve koriste optionalAuth, a /api/db/query takođe prihvata opcioni identitet za čitanje. Ako zahtev ostaje da pretraga bude dostupna samo prijavljenim korisnicima, potrebno je potvrditi da frontend dosledno sprovodi tu zabranu. Ne oslanjati se samo na skriveno dugme u interfejsu.
+
+8.10. Online korisnici
+
+API i standalone klijent još sadrže heartbeat i online presence metode. Međutim, aktuelni site-header.tsx više ne prikazuje listu online korisnika. U commit istoriji lista je uklonjena, a kasnije je uklonjen i indikator statusa. Ne pretpostavljati da je online prikaz aktivna korisnička funkcija samo zato što API endpoint postoji.
+
+===============================================================================
+9. VIZUELNI IDENTITET I PRIKAZ NA UREĐAJIMA
+===============================================================================
+
+Potvrđene putanje i odluke:
+
+- src/styles.css — responsive zaštite, prilagođavanje širine elemenata, tabela i dijaloga, mobilna navigacija, očuvanje postojećih margina i fallback boje za pregledače koji ne podržavaju OKLCH.
+- src/components/site-header.tsx — klase site-header-inner i site-header-nav; mobilna navigacija je prilagođena skrolovanju.
+- src/components/listing-items.tsx — fiksne visine kartica zamenjene min-height vrednostima da tekst i sadržaj ne budu odsečeni.
+- src/routes/__root.tsx — viewport meta tag već postoji; ne dodavati duplikat.
+- src/routes/index.tsx — koristi src/assets/hero-home.jpg.
+
+Relevantni commit-i na main:
+- 235ddce01e — responsive zaštite
+- f87f02a403 — raspored mobilne navigacije
+- 7e316eb668 — sprečavanje odsecanja kartica
+- 56698b821f — navigacija prilagođena horizontalnom skrolovanju
+- 064f86eba0 — očuvanje postojećih margina
+- f3c7fcaf74 — fallback boje za pregledače bez OKLCH podrške
+- ea2703d615 — uklanjanje teškog gradijenta preko hero fotografije
+- 994f3e190b — kasnije vraćanje originalnog hero gradijenta
+
+TRENUTNO STANJE HERO SLIKE:
+Pregled trenutnog main fajla src/routes/index.tsx potvrđuje da je preko hero fotografije ponovo prisutan:
+bg-gradient-to-r from-brand/90 via-brand/60 to-transparent
+Dakle, ranije uklanjanje teškog gradijenta nije konačno stanje. Hero fotografija je JPG, ali se preko nje ponovo prikazuje tamni gradijent. Ovo treba uzeti u obzir pri proveri Android prikaza i uskladiti sa zaključanim dizajnerskim zahtevom da se fotografija ne zatamnjuje neodobrenim CSS slojem.
+
+Nije izvršena fizička provera na Android telefonu, iPhone uređaju ili laptopu tokom ove dokumentacione provere. CSS postojanje nije isto što i potvrđen prikaz na stvarnom uređaju.
+
+===============================================================================
+10. DODATNE FUNKCIONALNOSTI I COMMIT DNEVNIK
+===============================================================================
+
+10.1. Frontend main — važne promene od 06. do 08.11.2026.
+
+Pravila i pravne informacije:
+- 123cddd575 — link ka pravilima pored logoa
+- c126b46c95 — javna stranica pravila
+- e077b538d3 — admin editor i istorija verzija
+- 449018a38a — proširenje teksta pravila u skladu sa propisima Srbije; pravna provera i dalje potrebna
+
+Administracija:
+- 406b1e2eff — administratorska statistika
+- 98c609f53e — inbox prijava oglasa
+- fee8928373 — sortiranje korisnika po prezimenu
+- 48f439db0c — pretraga u administraciji
+- 4b5552dd73 — filteri i sortiranje oglasa/zahteva
+- b5670a913a — direktan link do oglasa iz pregleda prijave
+
+Unos oglasa:
+- ed29c2dbe9 — pretraga kategorija i podkategorija
+- f44650f81e — dijalozi za izbor kategorije/podkategorije
+- 41b5b5127b — obavezno ime i prezime za oglas/zahtev
+- de8ac400e7 — označavanje obaveznih kontakt polja
+
+Održavanje:
+- 91b79f4817 — trajno podešavanje režima održavanja
+- b8248c969c — administratorsko dugme održavanja
+- 092531f329 — ekran održavanja za posetioce
+- e953bc1fdb i 130fa06395 — pristup administratora tokom održavanja
+- 17b0f5255b — popravka pokretanja frontenda posle privremenog isključenja Authenticator zaštite
+
+Lozinke i sigurnost:
+- fdbed086c2 — dimenzije kontrola za brisanje teksta na različitim uređajima
+- f7121963ee — privremeno isključivanje dodatne admin potvrde na frontendu
+- f0a08a1a5f — uklanjanje neaktivnih Authenticator kontrola
+
+Online status:
+- e23163864e — uklanjanje liste korisnika na mreži
+- 2d6d9a0495 — uklanjanje zelenog indikatora statusa iz zaglavlja
+
+10.2. API deploy/ponudimi-standalone — važne promene od 06. do 08.11.2026.
+
+Verifikacija naloga:
+- f12b2b4769 i ee2779c0d5 — implementacija email/SMS verifikacije i stranice
+- beab247e15 — stvarna email potvrda i obrada starih naloga
+- kasniji commit-i ecc8fdaa6d, c4fd711c5e i f645129b59 — privremeno isključivanje obavezne verifikacije pri registraciji/prijavi
+- trenutni API kod vraća sesiju odmah; obavezna potvrda nije uključena
+
+Moderacija:
+- 5092837089 — dopunska šema moderacije
+- d92107ea17 — primena vidljivosti moderacije u javnim feed-ovima
+- b6c17f8adc — predlozi moderatora
+- fc8fc2ed42 — uklanjanje veta vlasnika; trenutni tok traži odluku administratora
+
+Bezbednost i sesije:
+- 0a2e47810f — jačanje autorizacije profila i JWT provere
+- fbca5a26f1 — session_version za opoziv JWT sesija
+- ca53896ee6 — ograničenje javne pretrage i upload zahteva
+- 86e87fc4c2 — jačanje auth, lozinki i upload obrade
+- 4465bbef19 i 38bd7ba5a3 — zakrpe zavisnosti i blokiranje ozbiljnih audit problema
+- 9da37e1ba1 i 8eafc71f72 — bezbednosna ažuriranja Nodemailer/Sharp zavisnosti
+
+Administracija:
+- 55c0d4d980 — prijave i statistika
+- 4ce8129a7d — TOTP zaštita administratora
+- 2ed09a7cf3 — privremeno isključivanje TOTP enforcement-a
+- c3dc78f47b — prikaz lozinke na prijavi
+- 84e43608aa — prikaz lozinke na registraciji
+
+10.3. Pauzirani oglasi
+
+- 76742260d5 — admin ekran dobija eksplicitan zahtev za uključivanje pauziranih oglasa
+- bb7c37676d — prikaz pauziranih oglasa u administratorskom upravljanju
+- aktivni API javne feed-ove filtrira sa pauziran=false i moderation_status='visible'
+- admin ekran poziva includePausedListings()
+
+Potvrđeno u trenutnom kodu:
+- javni feed ne treba da prikazuje pauzirane oglase;
+- admin može eksplicitno da ih učita;
+- vlasnički prikaz treba da ih zadrži u sopstvenoj evidenciji.
+
+===============================================================================
+11. BEZBEDNOST, DOMEN, HTTPS I ODRŽAVANJE
+===============================================================================
+
+11.1. Domen i DNS
+
+Za novi server:
+1. Izabrati domen.
+2. Kod DNS provajdera napraviti A zapis ka javnoj IPv4 adresi servera.
+3. Ako se koristi IPv6, podesiti i odgovarajući AAAA zapis.
+4. Proveriti da domen pokazuje na pravi server.
+5. U standalone/.env postaviti DOMAIN na domen bez protokola.
+6. PUBLIC_APP_URL postaviti na https:// i isti domen.
+7. Omogućiti dolazni TCP 80 i 443; Caddy ih koristi za HTTP izazov i HTTPS.
+8. Obezbediti da drugi servis ne zauzima portove 80/443.
+9. Caddy automatski pribavlja i obnavlja sertifikat za javni domen.
+
+Za lokalni test install.sh može koristiti :80 ili localhost; to nije javna HTTPS instalacija.
+
+11.2. Firewall i pristup
+
+- Javno izložiti samo 80/443.
+- PostgreSQL port 5432 ne izlagati internetu.
+- API interni port 4000 i frontend interni port 3000 ne izlagati ako Caddy služi kao jedini javni ulaz.
+- SSH ograničiti na administratorske IP adrese gde je moguće.
+- Redovno ažurirati Linux, Docker Engine i image verzije.
+- Ne deliti Render SSH adresu, privatne ključeve ili .env.
+- Obezbediti jaku jedinstvenu administratorsku lozinku.
+- TOTP je trenutno isključen; to je privremeno slabija zaštita nego planirani konačni režim.
+
+11.3. Zaštite u API kodu
+
+Potvrđeno:
+- Helmet zaglavlja
+- bcrypt hash lozinki
+- JWT HS256
+- session_version za opoziv sesija posle promene lozinke
+- rate limiting za prijavu, registraciju, reset lozinke, SMS i upload
+- validacija ulaznih podataka
+- provera vlasništva oglasa i fotografija
+- ograničenje veličine i tipa upload fajlova
+- javni kontakti se anonimizuju za neulogovane posetioce u odgovarajućim feed-ovima
+- administratorske rute proveravaju administratorski identitet/ulogu
+
+Ograničenja:
+- TOTP enforcement je isključen.
+- administratorska email adresa je delom hardkodirana u API kodu.
+- CORS dozvoljene adrese su hardkodirane, ne čitaju se iz promenljive okruženja.
+- DATABASE_SSL=true trenutno isključuje proveru sertifikata.
+- browser API adresa je hardkodirana na Render API.
+Sve ove stavke moraju biti razmotrene pre javne samostalne produkcije.
+
+11.4. Režim održavanja
+
+Administratorsko podešavanje se čuva u bazi. Tekst obaveštenja može se menjati. Pre javnog rada proveriti:
+- da li se novi oglasi i registracije zaustavljaju;
+- da li admin i dalje može da pristupi panelu;
+- da li javni feed i detalji oglasa prikazuju odgovarajuću poruku;
+- da li se stanje ispravno vraća nakon restarta API-ja.
+
+11.5. Logovi i nadzor
+
+Docker:
+- docker compose ps
+- docker compose logs -f api
+- docker compose logs -f db
+- docker compose logs -f web
+- docker compose logs -f caddy
+
+API provera:
+- GET /api/health
+
+Očekivani odgovor sadrži ok=true, database=connected i naziv baze. Ne smatrati samo HTTP 200 dovoljnim ako odgovor ne potvrđuje vezu sa bazom.
+
+===============================================================================
+12. BLOKIRAJUĆA OTVORENA PITANJA ZA SAMOSTALNI ZIP
+===============================================================================
+
+Ovo su nalazi pregleda koda, ne izmena. Tokom ove provere nije menjan aplikacioni kod niti pokrenut deploy.
+
+12.1. BLOKER 1 — Dockerfile.api ne kopira init.sql
+
+Server:
+standalone/api/server.mjs
+
+Na kraju pokretanja servera API pokušava da učita:
+path.resolve(__dirname, '../db/init.sql')
+
+U Docker slici je server kopiran u /app/server.mjs, pa ta putanja odgovara /db/init.sql.
+
+Aktuelni standalone/Dockerfile.api kopira:
+- standalone/api/package.json
+- standalone/api/server.mjs
+- standalone/api/grant-admin.mjs
+
+Ne kopira standalone/db/init.sql u /db/init.sql.
+
+docker-compose.yml montira init.sql samo u PostgreSQL kontejner na /docker-entrypoint-initdb.d/001-init.sql, ne u API kontejner.
+
+Zaključak:
+Po statičkom pregledu, API Docker kontejner nema datoteku koju server pokušava da pročita i može da se ugasi pri pokretanju. Kompletan Docker build/run nije izvršen, pa se ovo označava kao vrlo verovatan blokirajući problem koji treba potvrditi testom i ispraviti pre ZIP isporuke.
+
+12.2. BLOKER 2 — browser klijent koristi hardkodiranu Render API adresu
+
+Putanja:
+src/integrations/standalone/client.ts
+
+Konstanta API_ORIGIN je hardkodirana na:
+https://ponudimi-test-api.onrender.com
+
+Browser deo api(), ensureApiReady() i storage.getPublicUrl() koristi tu adresu. API CORS trenutno dozvoljava:
+- https://ponudimi-novo.onrender.com
+- http://localhost:5173
+- http://127.0.0.1:5173
+
+Za novi domen browser bi i dalje pokušavao da poziva stari Render API, a novi domen nije u dozvoljenom CORS skupu.
+
+Caddy već ima pravila da /api i /uploads prosleđuje lokalnom API servisu, ali browser klijent u trenutnom kodu koristi apsolutni Render URL i zato ne koristi nužno Caddy istog domena.
+
+Zaključak:
+Samostalna instalacija na drugom domenu nije potvrđena kao nezavisna od Render API-ja. Potrebna je promena API klijenta na bezbedno same-origin adresiranje ili potpuno konfigurabilan browser API URL, uz usklađivanje CORS pravila. Ne pokušavati produkcionu migraciju pre ove ispravke.
+
+12.3. BLOKER 3 — promenljive za API adresu nisu usklađene
+
+vite.config.ts čita PONUDIMI_API_ORIGIN i postavlja Nitro proxy pravila.
+docker-compose.yml prosleđuje API_INTERNAL_URL web servisu.
+standalone/client.ts koristi API_INTERNAL_URL samo u SSR putanji, dok browser putanja ostaje hardkodirana.
+
+Zato promena samo PONUDIMI_API_ORIGIN ili API_INTERNAL_URL ne rešava browser pozive u trenutnom kodu. Potrebno je jedinstveno rešenje i test i u browser-u i u SSR-u.
+
+12.4. NESLAGANJE DOKUMENTACIJE — email/SMS verifikacija
+
+README-SR na API grani tvrdi da se novi nalog ne može koristiti dok se ne potvrde email i SMS.
+Trenutni register/login kod vraća sesiju odmah i ne zahteva potvrdu.
+Uskladiti README sa stvarnim stanjem ili ponovo uključiti verifikaciju kroz kontrolisanu promenu koda. Ne podešavati SMTP/Twilio kao navodno obavezne za prijavu dok je ovaj tok isključen.
+
+12.5. NESLAGANJE DOKUMENTACIJE — fotografije
+
+Neki README/.env opisi navode lokalni disk kao podrazumevano skladište.
+Aktuelni API saveImage bez S3 konfiguracije upisuje binarne podatke u PostgreSQL storage_objects.
+Glavni dokument prati ponašanje koda; README treba kasnije uskladiti.
+
+12.6. NESLAGANJE DOKUMENTACIJE — prvi admin
+
+README na main grani opisuje automatsko dodeljivanje admin uloge pri registraciji.
+Aktivna API grana ima grant-admin.mjs i poruku da se uloga dodeljuje ručno na serveru.
+Za trenutni API koristiti ručnu komandu grant-admin. README na main grani je zastareo za ovu proceduru.
+
+12.7. Administratorski identitet
+
+API sadrži hardkodiranu adresu igorsystemnet@gmail.com, dok se grant-admin.mjs oslanja na ADMIN_EMAIL. Potrebno je odrediti jedan pouzdan izvor konfiguracije i ukloniti dvosmislenost pre produkcije.
+
+12.8. Reset lozinke
+
+Frontend reset forma prihvata minimum 6 karaktera, backend traži 8. Uskladiti pre javnog rada.
+
+12.9. TOTP i account verification
+
+Dodatni Google Authenticator je trenutno isključen.
+Obavezna email/SMS verifikacija naloga je takođe trenutno isključena, iako deo API infrastrukture postoji.
+Ove dve stvari su različite funkcionalnosti i ne smeju se u dokumentaciji mešati pod jednim nazivom „autentifikacija“.
+
+12.10. Paket i ZIP
+
+U repozitorijumu postoje ZIP fajlovi:
+- PonudiMi-samostalna-instalacija.zip
+- PonudiMi-admin-email.zip
+
+Njihov binarni sadržaj nije upoređen sa poslednjim commit-ovima obe aktivne grane. Ne tvrditi da ZIP sadrži najnoviji frontend i API kod dok se ne napravi checksum i ne proveri sadržaj arhive. Za konačni ZIP mora se spojiti tačan frontend snapshot sa main i API snapshot sa deploy/ponudimi-standalone, uz uklanjanje svih tajni i test podataka.
+
+===============================================================================
+13. DETALJNO UPUTSTVO ZA BUDUĆU INSTALACIJU NA NOVOM SERVERU
+===============================================================================
+
+Ovaj postupak je ciljna procedura. Zbog blokera iz odeljka 12, ne smatrati je spremnom za javnu produkciju dok se blokade ne isprave.
+
+13.1. Priprema servera
+
+Preporuka iz postojećeg standalone README-a:
+- Linux VPS ili odgovarajući Docker server
+- najmanje preporučeno 2 CPU jezgra
+- preporučeno 4 GB RAM
+- dovoljno trajnog diska za bazu i fotografije
+- Docker Engine
+- Docker Compose v2
+- OpenSSL
+- javna IPv4 adresa i domen za HTTPS
+
+Ovo su preporuke iz README-a, ne rezultat testa opterećenja.
+
+Proveriti:
+docker --version
+docker compose version
+openssl version
+
+13.2. Raspakivanje ZIP paketa
+
+Kada bude potvrđen konačni ZIP:
+1. Kopirati arhivu na server.
+2. Napraviti direktorijum instalacije, npr. /opt/ponudimi.
+3. Raspakovati arhivu u taj direktorijum.
+4. Proveriti da su prisutni:
+   - package.json
+   - src/
+   - standalone/docker-compose.yml
+   - standalone/Dockerfile.web
+   - standalone/Dockerfile.api
+   - standalone/db/init.sql
+   - standalone/api/server.mjs
+   - standalone/api/grant-admin.mjs
+   - standalone/scripts/
+5. Proveriti da u arhivi nema .env sa stvarnim tajnama.
+6. Proveriti da frontend i API odgovaraju dogovorenim commit-ovima.
+
+Primer komande, uz prilagođavanje stvarnoj lokaciji arhive:
+unzip PonudiMi-samostalna-instalacija.zip -d /opt/ponudimi
+
+13.3. Konfiguracija .env
+
+Ući u standalone direktorijum:
+cd /opt/ponudimi/standalone
+
+Napraviti konfiguraciju iz šablona:
+cp .env.example .env
+
+Ako se koristi install.sh bez prethodnog .env, skripta traži domen i email administratora i generiše POSTGRES_PASSWORD i JWT_SECRET. Ona ostavlja SMTP/Twilio vrednosti prazne. Ako .env već postoji, skripta ga ne prepisuje; poruka kaže da proverava obavezne vrednosti, ali skripta ne sprovodi potpunu validaciju svih promenljivih. Zato ručno proveriti .env.
+
+Generisanje tajni:
+- POSTGRES_PASSWORD: openssl rand -hex 32
+- JWT_SECRET: openssl rand -hex 48
+- ADMIN_2FA_ENCRYPTION_KEY, samo kada TOTP ponovo bude aktivan: openssl rand -hex 32
+
+Posle unosa:
+chmod 600 .env
+
+Ne slati .env nikome i ne postavljati ga u GitHub.
+
+13.4. Podesiti domen i HTTPS
+
+- DNS A zapis treba da pokazuje na IP servera.
+- DOMAIN treba da sadrži samo naziv domena.
+- PUBLIC_APP_URL treba da bude https:// i isti domen.
+- Dozvoliti TCP portove 80 i 443.
+- Ne izlagati PostgreSQL port.
+- Proveriti Caddy logove nakon pokretanja.
+
+13.5. Podesiti email i druge integracije
+
+Pre uključivanja funkcije reset lozinke:
+- podesiti SMTP_HOST, SMTP_PORT, SMTP_SECURE, SMTP_USER, SMTP_PASS i SMTP_FROM;
+- proveriti slanje i prijem poruke;
+- proveriti da reset link vodi na tačan PUBLIC_APP_URL.
+
+Ako se kasnije vrati obavezna SMS verifikacija:
+- podesiti tri TWILIO promenljive;
+- napraviti Verify Service;
+- testirati slanje i potvrdu SMS koda.
+
+APR i OpenAI su opcione integracije. Ne unositi njihove ključeve dok funkcija nije odobrena i dok Compose prenos promenljivih nije rešen.
+
+13.6. Provera konfiguracije i pokretanje
+
+Pre pokretanja:
+docker compose config
+
+Ova komanda proverava Compose konfiguraciju i interpolaciju promenljivih. Ne potvrđuje da je sama aplikacija ispravna.
+
+Nakon otklanjanja blokera:
+docker compose up -d --build
+
+Proveriti:
+docker compose ps
+docker compose logs -f db api web caddy
+
+API health:
+curl http://localhost/api/health
+
+Javni health:
+curl https://TVOJ-DOMEN/api/health
+
+Očekuje se JSON koji potvrđuje:
+- ok: true
+- database: connected
+- database_name: naziv baze
+
+13.7. Prvi administrator
+
+1. Otvoriti stranicu registracije na novom domenu.
+2. Registrovati nalog sa adresom koja je postavljena u ADMIN_EMAIL.
+3. Prijaviti se i proveriti da nalog radi.
+4. Iz direktorijuma standalone izvršiti:
+   docker compose exec api node grant-admin.mjs ADMIN_EMAIL_VREDNOST
+5. Zameniti ADMIN_EMAIL_VREDNOST stvarnom adresom iz .env.
+6. Odjaviti se i ponovo prijaviti.
+7. Proveriti administratorski panel i osnovne funkcije.
+
+Ova komanda je dostupna na aktivnoj API grani. Ako ZIP nema grant-admin.mjs ili Dockerfile ne kopira tu datoteku, instalacija nije spremna.
+
+13.8. Test funkcionalnosti
+
+Pre javnog otvaranja proveriti:
+- početnu stranicu i hero fotografiju
+- boje, margine i kontrast
+- registraciju fizičkog i pravnog lica
+- prijavu i odjavu
+- prikaz/sakrivanje lozinke
+- reset lozinke i SMTP link
+- kreiranje ponude i zahteva
+- izmenu i brisanje sopstvenog oglasa
+- pauziranje i ponovno aktiviranje oglasa
+- da pauzirani oglasi nisu javno prikazani
+- da vlasnik vidi svoje pauzirane oglase
+- da admin vidi sve oglase, uključujući pauzirane
+- upload do 7 fotografija, formatiranje 800 x 600 i prikaz fotografija posle restarta
+- dodavanje fotografije iz admin panela
+- pretragu i filtere
+- praćenje ponude i zahteva
+- prijavu spornog oglasa
+- moderaciju i odluku administratora
+- objavu pravila i trenutno javno učitavanje nove verzije
+- režim održavanja i admin pristup tokom održavanja
+- rad na Android telefonu, iPhone uređaju, laptopu i desktopu
+
+Ne označiti test kao uspešan dok se svaki slučaj stvarno ne izvrši.
+
+===============================================================================
+14. BACKUP, OBNOVA I ODRŽAVANJE PODATAKA
+===============================================================================
+
+14.1. Postojeće skripte
+
+standalone/scripts/backup.sh
+- pravi SQL dump PostgreSQL baze u standalone/backups;
+- pravi tar.gz arhivu sadržaja /data/uploads;
+- traži da se oba fajla kopiraju na drugu lokaciju.
+
+standalone/scripts/restore.sh
+- prima SQL backup i arhivu fotografija;
+- traži potvrdu;
+- vraća SQL u postojeću bazu;
+- raspakuje fotografije u /data/uploads.
+
+Primer:
+./scripts/backup.sh
+
+Primer obnove:
+./scripts/restore.sh backups/ponudimi-db-DATUM.sql backups/ponudimi-fotografije-DATUM.tar.gz
+
+14.2. Šta postojeći backup ne obuhvata
+
+- S3/R2 bucket: mora se posebno kopirati.
+- .env: ne kopirati u javni backup; sačuvati odvojeno u šifrovanom password manager-u ili sigurnom vault-u.
+- caddy_data i caddy_config: nisu uključeni u postojeći backup; Caddy može ponovo pribaviti sertifikat, ali ovo nije potpuna kopija konfiguracije.
+- Compose fajlovi i sam kod: čuvati u Git-u i u verzionisanoj ZIP arhivi.
+- nema potvrđenog automatskog rasporeda backup-a.
+
+14.3. Preporučena politika
+
+- dnevni backup baze;
+- dnevni backup fotografija ili S3 bucket-a;
+- kopija van servera;
+- šifrovanje backup arhiva;
+- zadržavanje više dnevnih i nedeljnih verzija;
+- periodični probni restore na zasebnu test bazu;
+- pre svake migracije ili nadogradnje napraviti dodatni backup;
+- nikada ne koristiti docker compose down -v kao rutinsku komandu, jer briše volumene.
+
+14.4. Primer rasporeda
+
+Kada je poznata stvarna putanja instalacije, cron može pokretati backup npr. svakog dana u 02:00:
+0 2 * * * cd /ABSOLUTNA/PATH/DO/ponudimi/standalone && ./scripts/backup.sh
+
+Ovo je primer, nije trenutno podešen cron. Putanju i korisnika treba prilagoditi stvarnom serveru. Cron rezultat treba slati u log i proveravati.
+
+===============================================================================
+15. PRAVNI I LICENCNI MATERIJALI
+===============================================================================
+
+Postojeći fajl:
+PRAVILA-KORISCENJA-FOTOGRAFIJA-I-SADRZAJA.md
+
+Status fajla: radni nacrt za pravnu proveru. Ne zamenjuje kompletne Uslove korišćenja ni Politiku privatnosti.
+
+Postojeći fajl:
+docs/pexels-category-image-credits.md
+
+Evidencija fotografija kategorija sa Pexels izvorima, autorima i napomenama o licenci. Datum provere u tom fajlu je 02.11.2026. Licencu treba ponovo proveriti ako se fotografije zamene ili se promeni način upotrebe.
+
+Pravila platforme u src/routes/pravila-platforme.tsx takođe imaju napomenu da su radna verzija i da zahtevaju pravno usklađivanje.
+
+Pre javne komercijalne upotrebe proveriti:
+- konačne Uslove korišćenja
+- Politiku privatnosti i obradu podataka o ličnosti
+- obaveštenja o trgovcu i identitetu pružaoca usluge
+- pravila plaćenih paketa i promocija
+- proceduru prijave i uklanjanja nezakonitog sadržaja
+- zakonske obaveze elektronske trgovine i zaštite potrošača
+- poreski i računovodstveni tretman budućih naplata
+
+Ne tvrditi da je platforma pravno potpuno usklađena samo na osnovu radnog teksta pravila.
+
+===============================================================================
+16. POTVRĐENE ČINJENICE I NEPROVERENE STAVKE
+===============================================================================
+
+POTVRĐENO PREGLEDOM REPOZITORIJUMA I RENDER PODEŠAVANJA:
+- aktivni frontend branch je main;
+- aktivni API branch je deploy/ponudimi-standalone;
+- Render servisi koriste različite grane;
+- poslednji pregledani deploy oba aktivna servisa je live;
+- Node zahtev je >=22.12;
+- standalone Compose definiše PostgreSQL, API, web i Caddy;
+- API koristi standalone/db/init.sql pri pokretanju;
+- API podržava do 7 fotografija i obradu na 800 x 600;
+- podrazumevani kodni režim skladištenja novih slika bez S3 je PostgreSQL storage_objects;
+- postoje registracija, prijava, reset lozinke, pravila platforme, režim održavanja, moderacija, prijave i statistika;
+- TOTP enforcement je trenutno isključen;
+- obavezna email/SMS verifikacija registracije je trenutno isključena;
+- Google OAuth nije podešen u samostalnom frontend-u;
+- javni feed filtrira pauzirane i skrivene oglase;
+- admin može eksplicitno da učita pauzirane oglase;
+- ZIP arhive postoje u repozitorijumu, ali njihova aktuelnost nije potvrđena.
+
+NIJE PROVERENO / NE SME SE TVRDITI KAO ZAVRŠENO:
+- kompletan Docker build i pokretanje na čistom VPS-u;
+- uspešna samostalna instalacija na drugom domenu;
+- ispravno browser povezivanje sa lokalnim API-jem na drugom domenu;
+- stvarni SMTP prijem i isporuka;
+- stvarni Twilio SMS;
+- stvarna R2/S3 konfiguracija i backup;
+- zvanični APR API pristup i sinhronizacija;
+- OpenAI admin asistent na samostalnom Compose serveru;
+- izvoz i uvoz stvarnih podataka iz starog Supabase sistema;
+- automatski backup raspored;
+- restore test;
+- fizička provera Android/iPhone/laptop/desktop prikaza;
+- kompletna pravna revizija;
+- naplata paketa, evidencija pretplata i podsetnici za istek;
+- ZIP sadržaj identičan poslednjim commit-ovima aktivnih grana.
+
+===============================================================================
+17. PRIORITETNI SLEDEĆI KORACI
+===============================================================================
+
+PRIORITET 1 — omogućiti stvarno samostalno pokretanje
+1. Uskladiti Dockerfile.api sa putanjom standalone/db/init.sql koju server.mjs čita.
+2. Prebaciti browser API klijent sa hardkodirane Render adrese na pravilno same-origin ili konfigurabilno adresiranje.
+3. Uskladiti CORS i Caddy tako da novi domen koristi lokalni API.
+4. Testirati frontend i API u jednoj Docker mreži, bez zavisnosti od Render API-ja.
+5. Napraviti čist Docker build i end-to-end test na praznom VPS-u.
+
+PRIORITET 2 — uskladiti dokumentaciju i konfiguraciju
+1. Ispraviti standalone/README-SR.md da odgovara stvarnom stanju verifikacije naloga.
+2. Uskladiti opis skladištenja fotografija sa storage_objects i S3/R2 kodom.
+3. Uskladiti proceduru prvog administratora sa grant-admin.mjs.
+4. Dopuniti .env.example svim podržanim i potrebnim promenljivama.
+5. Uskladiti reset lozinke na minimum 8 karaktera.
+6. Razrešiti hardkodiranu administratorsku adresu.
+7. Razrešiti nedostajuće OPENAI promenljive u Compose-u ako se funkcija želi u samostalnoj instalaciji.
+
+PRIORITET 3 — bezbednost i podaci
+1. Planirati ponovno uključivanje TOTP-a.
+2. Uvesti proveru TLS sertifikata baze umesto rejectUnauthorized=false.
+3. Definisati backup raspored i off-site kopiju.
+4. Izvršiti probni restore.
+5. Napraviti kontrolisan plan migracije starih naloga i oglasa.
+
+PRIORITET 4 — funkcionalnosti i završna provera
+1. Proveriti da li pretraga mora zahtevati prijavu i uskladiti frontend/API.
+2. Uskladiti moderatorski tok sa zahtevom za odobrenje vlasnika ili administratora.
+3. Definisati i implementirati sistem paketa, naplate i podsetnika ako ostaje poslovni zahtev.
+4. Testirati prikaz hero fotografije, boja, margina i kartica na stvarnim uređajima.
+5. Završiti pravnu proveru pravila, privatnosti i informacija o pružaocu usluge.
+6. Tek nakon svih testova napraviti konačni ZIP sa tačno evidentiranim commit-ovima.
+
+===============================================================================
+18. DNEVNIK OVE DOPUNE
+===============================================================================
+
+09.11.2026. — verzija 1.0
+- Proveren GitHub repozitorijum igorsystemnet79/lovable-search-browse.
+- Proverena podrazumevana grana main i lista postojećih grana.
+- Potvrđeno da Render frontend koristi main, a API koristi deploy/ponudimi-standalone.
+- Provereni poslednji commit-i i status poslednjih Render deploy-a.
+- Pregledani README, AGENTS.md, package.json, vite.config.ts, standalone Docker fajlovi, .env.example, install/backup/restore skripte, API server, admin grant skripta i SQL šema.
+- Pregledane relevantne frontend rute, standalone klijent, responsive CSS i hero komponenta.
+- Evidentirano da je obavezna email/SMS verifikacija trenutno isključena i da je TOTP enforcement privremeno isključen.
+- Evidentirano stvarno podrazumevano skladištenje novih fotografija u PostgreSQL storage_objects kada S3 nije konfigurisan.
+- Pronađeni blokirajući nesklad Dockerfile.api / init.sql i hardkodirana browser API adresa.
+- Pronađeno neslaganje između reset UI minimuma 6 i API minimuma 8 karaktera.
+- Pronađeno neslaganje između README-a i trenutnog načina dodele admin uloge.
+- Dokument je sačuvan na dokumentacionoj grani docs/ponudimi-prirucnik, odvojenoj od Render deployment grana.
+- Nije menjan aplikacioni kod, baza, korisnički nalozi, oglasi, produkciona podešavanja niti je pokrenut deploy.
+
+KRAJ DOKUMENTA
