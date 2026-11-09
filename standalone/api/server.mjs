@@ -106,131 +106,6 @@ const zastitiJavneKontakte = (rows, authenticated) => authenticated ? rows : row
 const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JWT_SECRET, { expiresIn:'7d' });
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
 
-const messageName = async id => {
- const r=await pool.query("SELECT u.email,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.ime,p.prezime)),''),NULLIF(p.korisnicko_ime,''),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1",[id]);
- return r.rows[0]||{email:null,display_name:'Korisnik'};
-};
-const messageDate = value => value ? new Intl.DateTimeFormat('sr-RS',{dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Belgrade'}).format(new Date(value)) : 'Nije evidentirano';
-const messageReason = req => String(req.body?.reason||req.query?.reason||'').trim();
-const logMessageAdminAction = async (client,req,conversationId,action,reason,details={}) => {
- await client.query('INSERT INTO message_admin_audit(conversation_id,admin_id,action,reason,details) VALUES($1,$2,$3,$4,$5::jsonb)',[conversationId||null,req.user.sub,action,reason,JSON.stringify(details)]);
-};
-const getConversationForAdmin = async (id,client=pool) => {
- const r=await client.query("SELECT c.*,COALESCE(o.naslov,z.naslov) AS listing_title,COALESCE(o.user_id,z.user_id) AS listing_owner_id FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id WHERE c.id=$1",[id]);
- return r.rows[0]||null;
-};
-app.post('/api/messages/start',auth,asyncRoute(async(req,res)=>{
- const listingType=String(req.body?.listing_type||'');
- const listingId=String(req.body?.listing_id||'');
- const body=String(req.body?.message||'').trim();
- if(!['ponude','zahtevi'].includes(listingType)||! /^[0-9a-f-]{36}$/i.test(listingId)||!body||body.length>2000)return res.status(400).json({error:'Podaci poruke nisu ispravni.'});
- const listing=await pool.query('SELECT id,user_id,naslov FROM '+(listingType==='ponude'?'ponude':'zahtevi')+' WHERE id=$1 AND NOT pauziran AND NOT moderacija_blokirana',[listingId]);
- if(!listing.rows[0]||!listing.rows[0].user_id)return res.status(404).json({error:'Oglas nije pronađen ili nije dostupan.'});
- const buyerId=req.user.sub,sellerId=listing.rows[0].user_id;
- const client=await pool.connect();
- try{
-  await client.query('BEGIN');
-  let c=await client.query('SELECT id FROM message_conversations WHERE listing_type=$1 AND listing_id=$2 AND buyer_id=$3 AND seller_id=$4 FOR UPDATE',[listingType,listingId,buyerId,sellerId]);
-  if(!c.rows[0])c=await client.query('INSERT INTO message_conversations(listing_type,listing_id,buyer_id,seller_id) VALUES($1,$2,$3,$4) ON CONFLICT(listing_type,listing_id,buyer_id,seller_id) DO UPDATE SET updated_at=now() RETURNING id',[listingType,listingId,buyerId,sellerId]);
-  const conversationId=c.rows[0].id;
-  await client.query('INSERT INTO message_messages(conversation_id,sender_id,body) VALUES($1,$2,$3)',[conversationId,buyerId,body]);
-  await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[conversationId]);
-  await client.query('COMMIT');
-  res.status(201).json({ok:true,conversation_id:conversationId});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.get('/api/messages',auth,asyncRoute(async(req,res)=>{
- const r=await pool.query("SELECT c.id,c.listing_type,c.listing_id,COALESCE(o.naslov,z.naslov) AS listing_title,CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END AS other_user_id,COALESCE(NULLIF(BTRIM(concat_ws(' ',op.ime,op.prezime)),''),NULLIF(op.korisnicko_ime,''),ou.email) AS other_user_name,lm.body AS last_message,lm.created_at AS last_message_at,(SELECT count(*)::int FROM message_messages m WHERE m.conversation_id=c.id AND m.sender_id<>$1 AND m.read_at IS NULL) AS unread_count FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id LEFT JOIN users ou ON ou.id=CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END LEFT JOIN profiles op ON op.id=ou.id LEFT JOIN LATERAL (SELECT body,created_at FROM message_messages WHERE conversation_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) lm ON true WHERE c.buyer_id=$1 OR c.seller_id=$1 ORDER BY c.updated_at DESC LIMIT 300",[req.user.sub]);
- res.set('Cache-Control','private, no-store');res.json({data:r.rows});
-}));
-app.get('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
- const c=await pool.query('SELECT id FROM message_conversations WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.sub]);
- if(!c.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
- const client=await pool.connect();
- try{
-  await client.query('BEGIN');
-  await client.query('UPDATE message_messages SET read_at=now() WHERE conversation_id=$1 AND sender_id<>$2 AND read_at IS NULL',[req.params.id,req.user.sub]);
-  const r=await client.query('SELECT id,sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[req.params.id]);
-  await client.query('COMMIT');res.set('Cache-Control','private, no-store');res.json({messages:r.rows});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.post('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
- const body=String(req.body?.message||'').trim();
- if(!body||body.length>2000)return res.status(400).json({error:'Poruka mora imati između 1 i 2.000 karaktera.'});
- const c=await pool.query('SELECT id FROM message_conversations WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.sub]);
- if(!c.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
- const client=await pool.connect();
- try{await client.query('BEGIN');const m=await client.query('INSERT INTO message_messages(conversation_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,sender_id,body,created_at,read_at',[req.params.id,req.user.sub,body]);await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[req.params.id]);await client.query('COMMIT');res.status(201).json({data:m.rows[0]});}
- catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
- const q=String(req.query.q||'').trim();
- const r=await pool.query("SELECT c.id,c.listing_type,c.listing_id,c.created_at,c.updated_at,c.buyer_id,c.seller_id,COALESCE(o.naslov,z.naslov) AS listing_title,bu.email AS buyer_email,COALESCE(NULLIF(BTRIM(concat_ws(' ',bp.ime,bp.prezime)),''),NULLIF(bp.korisnicko_ime,''),bu.email) AS buyer_name,su.email AS seller_email,COALESCE(NULLIF(BTRIM(concat_ws(' ',sp.ime,sp.prezime)),''),NULLIF(sp.korisnicko_ime,''),su.email) AS seller_name,(SELECT count(*)::int FROM message_messages m WHERE m.conversation_id=c.id) AS message_count,(SELECT max(created_at) FROM message_messages m WHERE m.conversation_id=c.id) AS last_message_at FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id JOIN users bu ON bu.id=c.buyer_id LEFT JOIN profiles bp ON bp.id=bu.id JOIN users su ON su.id=c.seller_id LEFT JOIN profiles sp ON sp.id=su.id WHERE ($1='' OR concat_ws(' ',bu.email,su.email,bp.ime,bp.prezime,sp.ime,sp.prezime,o.naslov,z.naslov) ILIKE '%'||$1||'%') ORDER BY c.updated_at DESC LIMIT 500",[q]);
- res.set('Cache-Control','no-store');res.json({data:r.rows});
-}));
-app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
- const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi opravdan razlog od najmanje 10 karaktera.'});
- const client=await pool.connect();
- try{
-  await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
-  await logMessageAdminAction(client,req,c.id,'view',reason);
-  const m=await client.query('SELECT id,sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[c.id]);
-  await client.query('COMMIT');res.set('Cache-Control','no-store');res.json({messages:m.rows});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
- const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi opravdan razlog od najmanje 10 karaktera.'});
- const client=await pool.connect();
- try{
-  await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
-  const m=await client.query('SELECT sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[c.id]);
-  const buyer=await messageName(c.buyer_id),seller=await messageName(c.seller_id);
-  const blocks=[];
-  for(const row of m.rows){const sender=row.sender_id===c.buyer_id?buyer:seller;const recipient=row.sender_id===c.buyer_id?seller:buyer;blocks.push('Datum i vreme: '+messageDate(row.created_at)+'\nKo šalje: '+sender.display_name+'\n\n'+row.body+'\n\nKome se šalje: '+recipient.display_name+'\nVreme primljene poruke: '+messageDate(row.read_at));}
-  const content=blocks.join('\n\n')+(blocks.length?'\n':'');
-  const hash=createHash('sha256').update(content,'utf8').digest('hex');
-  const fileName='ponudimi-prepiska-'+c.id+'.txt';
-  const archive=await client.query("INSERT INTO message_archives(conversation_id,file_name,content,sha256,message_count,created_by,export_reason,listing_type,listing_title,buyer_name,seller_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id",[c.id,fileName,content,hash,m.rows.length,req.user.sub,reason,c.listing_type,c.listing_title,buyer.display_name,seller.display_name]);
-  await logMessageAdminAction(client,req,c.id,'export',reason,{archive_id:archive.rows[0].id,message_count:m.rows.length,sha256:hash});
-  await client.query('COMMIT');
-  res.set('Content-Type','text/plain; charset=utf-8');res.set('Content-Disposition','attachment; filename="'+fileName+'"');res.set('Cache-Control','no-store');res.send(content);
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.delete('/api/admin/messages/:conversationId/message/:messageId',auth,admin,asyncRoute(async(req,res)=>{
- const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
- const client=await pool.connect();
- try{await client.query('BEGIN');const c=await getConversationForAdmin(req.params.conversationId,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
- const d=await client.query('DELETE FROM message_messages WHERE id=$1 AND conversation_id=$2 RETURNING id',[req.params.messageId,c.id]);if(!d.rowCount){await client.query('ROLLBACK');return res.status(404).json({error:'Poruka nije pronađena.'});}
- await logMessageAdminAction(client,req,c.id,'delete_message',reason,{message_id:req.params.messageId});await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[c.id]);await client.query('COMMIT');res.json({ok:true});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.delete('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
- const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
- const client=await pool.connect();
- try{await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
- await logMessageAdminAction(client,req,c.id,'delete_conversation',reason,{listing_id:c.listing_id,listing_type:c.listing_type});
- await client.query('DELETE FROM message_conversations WHERE id=$1',[c.id]);await client.query('COMMIT');res.json({ok:true});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.get('/api/admin/message-archives',auth,admin,asyncRoute(async(_req,res)=>{
- const r=await pool.query("SELECT a.id,a.conversation_id,a.file_name,a.sha256,a.message_count,a.export_reason,a.created_at,a.listing_type,a.listing_title,a.buyer_name,a.seller_name,u.email AS created_by_email FROM message_archives a LEFT JOIN users u ON u.id=a.created_by ORDER BY a.created_at DESC LIMIT 500");
- res.set('Cache-Control','no-store');res.json({data:r.rows});
-}));
-app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(req,res)=>{
- const client=await pool.connect();
- try{await client.query('BEGIN');const a=await client.query('SELECT * FROM message_archives WHERE id=$1',[req.params.id]);if(!a.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Arhiva nije pronađena.'});}
- await logMessageAdminAction(client,req,a.rows[0].conversation_id,'download_archive','Preuzimanje ranije sačuvane arhive',{archive_id:a.rows[0].id});
- await client.query('COMMIT');res.set('Content-Type','text/plain; charset=utf-8');res.set('Content-Disposition','attachment; filename="'+String(a.rows[0].file_name).replace(/[^a-zA-Z0-9._-]/g,'_')+'"');res.set('Cache-Control','no-store');res.send(a.rows[0].content);
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-app.delete('/api/admin/message-archives/:id',auth,admin,asyncRoute(async(req,res)=>{
- const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
- const client=await pool.connect();
- try{await client.query('BEGIN');const a=await client.query('SELECT id,conversation_id FROM message_archives WHERE id=$1',[req.params.id]);if(!a.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Arhiva nije pronađena.'});}
- await logMessageAdminAction(client,req,a.rows[0].conversation_id,'delete_archive',reason,{archive_id:a.rows[0].id});await client.query('DELETE FROM message_archives WHERE id=$1',[a.rows[0].id]);await client.query('COMMIT');res.json({ok:true});
- }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
-}));
-
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
 app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{const r=await pool.query("SELECT id,sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");res.set('Cache-Control','no-store');res.json({data:r.rows[0]||null});}));
@@ -361,6 +236,133 @@ app.use('/api',asyncRoute(async(req,res,next)=>{
  if(token){try{const user=jwt.verify(token,JWT_SECRET);if(await isPlatformAdmin(user))return next();}catch{}}
  res.set('Cache-Control','no-store');return res.status(503).json({error:state.rows[0].message||'Platforma je privremeno na održavanju.',code:'MAINTENANCE_MODE',maintenance:true});
 }));
+
+const messageName = async id => {
+ const r=await pool.query("SELECT u.email,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.ime,p.prezime)),''),NULLIF(p.korisnicko_ime,''),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1",[id]);
+ return r.rows[0]||{email:null,display_name:'Korisnik'};
+};
+const messageDate = value => value ? new Intl.DateTimeFormat('sr-RS',{dateStyle:'short',timeStyle:'medium',timeZone:'Europe/Belgrade'}).format(new Date(value)) : 'Nije evidentirano';
+const messageReason = req => String(req.body?.reason||req.query?.reason||'').trim();
+const logMessageAdminAction = async (client,req,conversationId,action,reason,details={}) => {
+ await client.query('INSERT INTO message_admin_audit(conversation_id,admin_id,action,reason,details) VALUES($1,$2,$3,$4,$5::jsonb)',[conversationId||null,req.user.sub,action,reason,JSON.stringify(details)]);
+};
+const getConversationForAdmin = async (id,client=pool) => {
+ const r=await client.query("SELECT c.*,COALESCE(o.naslov,z.naslov) AS listing_title,COALESCE(o.user_id,z.user_id) AS listing_owner_id FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id WHERE c.id=$1",[id]);
+ return r.rows[0]||null;
+};
+app.post('/api/messages/start',auth,asyncRoute(async(req,res)=>{
+ const listingType=String(req.body?.listing_type||'');
+ const listingId=String(req.body?.listing_id||'');
+ const body=String(req.body?.message||'').trim();
+ if(!['ponude','zahtevi'].includes(listingType)||! /^[0-9a-f-]{36}$/i.test(listingId)||!body||body.length>2000)return res.status(400).json({error:'Podaci poruke nisu ispravni.'});
+ const listing=await pool.query('SELECT id,user_id,naslov FROM '+(listingType==='ponude'?'ponude':'zahtevi')+' WHERE id=$1 AND NOT pauziran AND NOT moderacija_blokirana',[listingId]);
+ if(!listing.rows[0]||!listing.rows[0].user_id)return res.status(404).json({error:'Oglas nije pronađen ili nije dostupan.'});
+ const buyerId=req.user.sub,sellerId=listing.rows[0].user_id;
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  let c=await client.query('SELECT id FROM message_conversations WHERE listing_type=$1 AND listing_id=$2 AND buyer_id=$3 AND seller_id=$4 FOR UPDATE',[listingType,listingId,buyerId,sellerId]);
+  if(!c.rows[0])c=await client.query('INSERT INTO message_conversations(listing_type,listing_id,buyer_id,seller_id) VALUES($1,$2,$3,$4) ON CONFLICT(listing_type,listing_id,buyer_id,seller_id) DO UPDATE SET updated_at=now() RETURNING id',[listingType,listingId,buyerId,sellerId]);
+  const conversationId=c.rows[0].id;
+  await client.query('INSERT INTO message_messages(conversation_id,sender_id,body) VALUES($1,$2,$3)',[conversationId,buyerId,body]);
+  await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[conversationId]);
+  await client.query('COMMIT');
+  res.status(201).json({ok:true,conversation_id:conversationId});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.get('/api/messages',auth,asyncRoute(async(req,res)=>{
+ const r=await pool.query("SELECT c.id,c.listing_type,c.listing_id,COALESCE(o.naslov,z.naslov) AS listing_title,CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END AS other_user_id,COALESCE(NULLIF(BTRIM(concat_ws(' ',op.ime,op.prezime)),''),NULLIF(op.korisnicko_ime,''),ou.email) AS other_user_name,lm.body AS last_message,lm.created_at AS last_message_at,(SELECT count(*)::int FROM message_messages m WHERE m.conversation_id=c.id AND m.sender_id<>$1 AND m.read_at IS NULL) AS unread_count FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id LEFT JOIN users ou ON ou.id=CASE WHEN c.buyer_id=$1 THEN c.seller_id ELSE c.buyer_id END LEFT JOIN profiles op ON op.id=ou.id LEFT JOIN LATERAL (SELECT body,created_at FROM message_messages WHERE conversation_id=c.id ORDER BY created_at DESC,id DESC LIMIT 1) lm ON true WHERE c.buyer_id=$1 OR c.seller_id=$1 ORDER BY c.updated_at DESC LIMIT 300",[req.user.sub]);
+ res.set('Cache-Control','private, no-store');res.json({data:r.rows});
+}));
+app.get('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
+ const c=await pool.query('SELECT id FROM message_conversations WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.sub]);
+ if(!c.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  await client.query('UPDATE message_messages SET read_at=now() WHERE conversation_id=$1 AND sender_id<>$2 AND read_at IS NULL',[req.params.id,req.user.sub]);
+  const r=await client.query('SELECT id,sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[req.params.id]);
+  await client.query('COMMIT');res.set('Cache-Control','private, no-store');res.json({messages:r.rows});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.post('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
+ const body=String(req.body?.message||'').trim();
+ if(!body||body.length>2000)return res.status(400).json({error:'Poruka mora imati između 1 i 2.000 karaktera.'});
+ const c=await pool.query('SELECT id FROM message_conversations WHERE id=$1 AND (buyer_id=$2 OR seller_id=$2)',[req.params.id,req.user.sub]);
+ if(!c.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
+ const client=await pool.connect();
+ try{await client.query('BEGIN');const m=await client.query('INSERT INTO message_messages(conversation_id,sender_id,body) VALUES($1,$2,$3) RETURNING id,sender_id,body,created_at,read_at',[req.params.id,req.user.sub,body]);await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[req.params.id]);await client.query('COMMIT');res.status(201).json({data:m.rows[0]});}
+ catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
+ const q=String(req.query.q||'').trim();
+ const r=await pool.query("SELECT c.id,c.listing_type,c.listing_id,c.created_at,c.updated_at,c.buyer_id,c.seller_id,COALESCE(o.naslov,z.naslov) AS listing_title,bu.email AS buyer_email,COALESCE(NULLIF(BTRIM(concat_ws(' ',bp.ime,bp.prezime)),''),NULLIF(bp.korisnicko_ime,''),bu.email) AS buyer_name,su.email AS seller_email,COALESCE(NULLIF(BTRIM(concat_ws(' ',sp.ime,sp.prezime)),''),NULLIF(sp.korisnicko_ime,''),su.email) AS seller_name,(SELECT count(*)::int FROM message_messages m WHERE m.conversation_id=c.id) AS message_count,(SELECT max(created_at) FROM message_messages m WHERE m.conversation_id=c.id) AS last_message_at FROM message_conversations c LEFT JOIN ponude o ON c.listing_type='ponude' AND o.id=c.listing_id LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id JOIN users bu ON bu.id=c.buyer_id LEFT JOIN profiles bp ON bp.id=bu.id JOIN users su ON su.id=c.seller_id LEFT JOIN profiles sp ON sp.id=su.id WHERE ($1='' OR concat_ws(' ',bu.email,su.email,bp.ime,bp.prezime,sp.ime,sp.prezime,o.naslov,z.naslov) ILIKE '%'||$1||'%') ORDER BY c.updated_at DESC LIMIT 500",[q]);
+ res.set('Cache-Control','no-store');res.json({data:r.rows});
+}));
+app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
+ const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi opravdan razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
+  await logMessageAdminAction(client,req,c.id,'view',reason);
+  const m=await client.query('SELECT id,sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[c.id]);
+  await client.query('COMMIT');res.set('Cache-Control','no-store');res.json({messages:m.rows});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
+ const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi opravdan razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
+  const m=await client.query('SELECT sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[c.id]);
+  const buyer=await messageName(c.buyer_id),seller=await messageName(c.seller_id);
+  const blocks=[];
+  for(const row of m.rows){const sender=row.sender_id===c.buyer_id?buyer:seller;const recipient=row.sender_id===c.buyer_id?seller:buyer;blocks.push('Datum i vreme: '+messageDate(row.created_at)+'\nKo šalje: '+sender.display_name+'\n\n'+row.body+'\n\nKome se šalje: '+recipient.display_name+'\nVreme primljene poruke: '+messageDate(row.read_at));}
+  const content=blocks.join('\n\n')+(blocks.length?'\n':'');
+  const hash=createHash('sha256').update(content,'utf8').digest('hex');
+  const fileName='ponudimi-prepiska-'+c.id+'.txt';
+  const archive=await client.query("INSERT INTO message_archives(conversation_id,file_name,content,sha256,message_count,created_by,export_reason,listing_type,listing_title,buyer_name,seller_name) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id",[c.id,fileName,content,hash,m.rows.length,req.user.sub,reason,c.listing_type,c.listing_title,buyer.display_name,seller.display_name]);
+  await logMessageAdminAction(client,req,c.id,'export',reason,{archive_id:archive.rows[0].id,message_count:m.rows.length,sha256:hash});
+  await client.query('COMMIT');
+  res.set('Content-Type','text/plain; charset=utf-8');res.set('Content-Disposition','attachment; filename="'+fileName+'"');res.set('Cache-Control','no-store');res.send(content);
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.delete('/api/admin/messages/:conversationId/message/:messageId',auth,admin,asyncRoute(async(req,res)=>{
+ const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{await client.query('BEGIN');const c=await getConversationForAdmin(req.params.conversationId,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
+ const d=await client.query('DELETE FROM message_messages WHERE id=$1 AND conversation_id=$2 RETURNING id',[req.params.messageId,c.id]);if(!d.rowCount){await client.query('ROLLBACK');return res.status(404).json({error:'Poruka nije pronađena.'});}
+ await logMessageAdminAction(client,req,c.id,'delete_message',reason,{message_id:req.params.messageId});await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[c.id]);await client.query('COMMIT');res.json({ok:true});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.delete('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
+ const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{await client.query('BEGIN');const c=await getConversationForAdmin(req.params.id,client);if(!c){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
+ await logMessageAdminAction(client,req,c.id,'delete_conversation',reason,{listing_id:c.listing_id,listing_type:c.listing_type});
+ await client.query('DELETE FROM message_conversations WHERE id=$1',[c.id]);await client.query('COMMIT');res.json({ok:true});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.get('/api/admin/message-archives',auth,admin,asyncRoute(async(_req,res)=>{
+ const r=await pool.query("SELECT a.id,a.conversation_id,a.file_name,a.sha256,a.message_count,a.export_reason,a.created_at,a.listing_type,a.listing_title,a.buyer_name,a.seller_name,u.email AS created_by_email FROM message_archives a LEFT JOIN users u ON u.id=a.created_by ORDER BY a.created_at DESC LIMIT 500");
+ res.set('Cache-Control','no-store');res.json({data:r.rows});
+}));
+app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(req,res)=>{
+ const client=await pool.connect();
+ try{await client.query('BEGIN');const a=await client.query('SELECT * FROM message_archives WHERE id=$1',[req.params.id]);if(!a.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Arhiva nije pronađena.'});}
+ await logMessageAdminAction(client,req,a.rows[0].conversation_id,'download_archive','Preuzimanje ranije sačuvane arhive',{archive_id:a.rows[0].id});
+ await client.query('COMMIT');res.set('Content-Type','text/plain; charset=utf-8');res.set('Content-Disposition','attachment; filename="'+String(a.rows[0].file_name).replace(/[^a-zA-Z0-9._-]/g,'_')+'"');res.set('Cache-Control','no-store');res.send(a.rows[0].content);
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.delete('/api/admin/message-archives/:id',auth,admin,asyncRoute(async(req,res)=>{
+ const reason=messageReason(req);if(reason.length<10)return res.status(400).json({error:'Unesi razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{await client.query('BEGIN');const a=await client.query('SELECT id,conversation_id FROM message_archives WHERE id=$1',[req.params.id]);if(!a.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Arhiva nije pronađena.'});}
+ await logMessageAdminAction(client,req,a.rows[0].conversation_id,'delete_archive',reason,{archive_id:a.rows[0].id});await client.query('DELETE FROM message_archives WHERE id=$1',[a.rows[0].id]);await client.query('COMMIT');res.json({ok:true});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+
+
 
 app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const cat=String(req.query.kategorija||'').trim();const {rows}=await pool.query(`SELECT p.*, COALESCE((SELECT json_agg(s ORDER BY s.pozicija) FROM (SELECT id,storage_path,external_url,pozicija FROM slike_oglasa WHERE ponuda_id=p.id) s),'[]') slike FROM ponude p WHERE NOT p.pauziran AND NOT p.moderacija_blokirana AND ($1='' OR unaccent(lower(concat_ws(' ',p.naslov,p.opis,p.kategorija,p.lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(p.lokacija) LIKE '%'||lower($2)||'%') AND ($3='' OR lower(p.kategorija) LIKE '%'||lower($3)||'%') ORDER BY p.created_at DESC LIMIT 200`,[q,loc,cat]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
 app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{res.set('Cache-Control','private, no-store');const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND NOT moderacija_blokirana AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(zastitiJavneKontakte(rows,Boolean(req.user)));}));
