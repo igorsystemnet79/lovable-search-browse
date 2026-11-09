@@ -16,7 +16,7 @@ export const Route = createFileRoute("/oglas/$kind/$id")({
 });
 
 
-function SendMessageButton({ listingType, listingId }: { listingType: "ponude" | "zahtevi"; listingId: string }) {
+function SendMessageButton({ listingType, listingId, ownListing = false }: { listingType: "ponude" | "zahtevi"; listingId: string; ownListing?: boolean }) {
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,12 +38,12 @@ function SendMessageButton({ listingType, listingId }: { listingType: "ponude" |
     finally { setBusy(false); }
   }
   return <>
-    <button type="button" onClick={() => setOpen(true)} className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground">Pošalji privatnu poruku</button>
+    <button type="button" onClick={() => setOpen(true)} className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground">{ownListing ? "Pošalji sebi test poruku" : "Pošalji privatnu poruku"}</button>
     {open && <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true" aria-label="Pošalji privatnu poruku">
       <div className="w-full max-w-lg rounded-2xl bg-surface p-5 text-foreground shadow-xl">
         <h2 className="text-lg font-semibold">Pošalji privatnu poruku</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Poruku vide samo učesnici razgovora i ovlašćeni administrator uz evidentiran razlog.</p>
-        <textarea value={message} onChange={e => setMessage(e.target.value)} maxLength={2000} rows={5} className="mt-4 w-full rounded-xl border border-input bg-background p-3 text-sm" placeholder="Napiši poruku oglašivaču…"/>
+        <p className="mt-1 text-sm text-muted-foreground">{ownListing ? "Ovo je probna poruka na sopstveni oglas. Proverićeš da li stiže u odeljak Poruke i obaveštenja." : "Poruku vide samo učesnici razgovora i ovlašćeni administrator uz evidentiran razlog."}</p>
+        <textarea value={message} onChange={e => setMessage(e.target.value)} maxLength={2000} rows={5} className="mt-4 w-full rounded-xl border border-input bg-background p-3 text-sm" placeholder={ownListing ? "Napiši test poruku sebi…" : "Napiši poruku oglašivaču…"}/>
         {error && <p role="alert" className="mt-2 text-sm text-destructive">{error}</p>}
         <div className="mt-4 flex justify-end gap-2">
           <button type="button" onClick={() => setOpen(false)} className="rounded-full border border-input px-4 py-2 text-sm">Odustani</button>
@@ -85,7 +85,7 @@ function OglasPage() {
             <section><h2 className="mb-3 text-lg font-semibold">Opis oglasa</h2><p className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground/85">{data.opis?.trim() || "Opis nije dodat."}</p></section>
             {(data.kontakt_zasticen || data.ime_prezime || data.kontakt_ime || data.telefon || data.adresa) && <section className="rounded-xl bg-secondary/60 p-4"><h2 className="mb-2 font-semibold">Podaci o oglašivaču</h2><p className="text-sm"><span className="text-muted-foreground">Ime i prezime: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.ime_prezime || data.kontakt_ime || "••••••••"}</span></p><p className="mt-1 text-sm"><span className="text-muted-foreground">Telefon: </span>{data.kontakt_zasticen ? <span className="blur-[5px] select-none">••••••••</span> : data.telefon ? <a className="font-semibold text-brand hover:underline" href={"tel:" + data.telefon.replace(/[^+0-9]/g, "")}>{data.telefon}</a> : "Nije naveden"}</p><p className="mt-1 text-sm"><span className="text-muted-foreground">Adresa: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.adresa || (data.kontakt_zasticen ? "••••••••" : "Nije navedena")}</span></p>{data.kontakt_zasticen && <><p className="mt-3 text-xs text-muted-foreground">Registruj se ili se prijavi da vidiš pune kontakt podatke oglašivača.</p><div className="mt-3 flex flex-wrap gap-2"><Link to="/registracija" className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground">Registruj se</Link><Link to="/prijava" className="rounded-full border border-input px-4 py-2 text-xs font-semibold">Prijavi se</Link></div></>}</section>}
             {user && <div className="border-t border-border pt-4">{isOffer ? <FollowButton ponuda={data as Ponuda} /> : <FollowButton zahtev={data as Zahtev} />}</div>}
-            {user && (data as any).user_id !== user.id && <div className="border-t border-border pt-4"><SendMessageButton listingType={isOffer ? "ponude" : "zahtevi"} listingId={id} /></div>}
+            {user && <div className="border-t border-border pt-4"><SendMessageButton listingType={isOffer ? "ponude" : "zahtevi"} listingId={id} ownListing={(data as any).user_id === user.id} /></div>}
             {!user && <div className="border-t border-border pt-4"><Link to="/prijava" className="font-semibold text-brand hover:underline">Prijavi se da pošalješ privatnu poruku</Link></div>}
             {(!user || (data as any).user_id !== user.id) && <ReportListingButton tabela={isOffer ? "ponude" : "zahtevi"} oglasId={id} />}
           </div>
