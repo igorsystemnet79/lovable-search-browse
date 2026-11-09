@@ -378,6 +378,52 @@ app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'AP
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
+// Google OAuth 2.0: links only to an existing PonudiMi account with the same verified email.
+const googleOAuthConfig = () => {
+ const { GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REDIRECT_URI } = process.env;
+ if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET || !GOOGLE_REDIRECT_URI) throw Object.assign(new Error('Google prijava još nije podešena.'), { status: 503 });
+ return { clientId: GOOGLE_CLIENT_ID, clientSecret: GOOGLE_CLIENT_SECRET, redirectUri: GOOGLE_REDIRECT_URI };
+};
+app.get('/api/auth/google', asyncRoute(async (_req,res) => {
+ const cfg=googleOAuthConfig();
+ const state=jwt.sign({ purpose:'google-oauth-state', nonce:randomBytes(24).toString('hex') },JWT_SECRET,{ expiresIn:'10m', algorithm:'HS256' });
+ const url=new URL('https://accounts.google.com/o/oauth2/v2/auth');
+ url.searchParams.set('client_id',cfg.clientId);
+ url.searchParams.set('redirect_uri',cfg.redirectUri);
+ url.searchParams.set('response_type','code');
+ url.searchParams.set('scope','openid email profile');
+ url.searchParams.set('state',state);
+ url.searchParams.set('prompt','select_account');
+ res.redirect(url.toString());
+}));
+app.get('/api/auth/google/callback', asyncRoute(async (req,res) => {
+ const appUrl=String(process.env.PUBLIC_APP_URL||'https://ponudimi-novo.onrender.com').replace(/\/$/,'');
+ const fail=(reason)=>res.redirect(appUrl+'/prijava?google_error='+encodeURIComponent(reason));
+ if(req.query.error) return fail('Google prijava je otkazana. Pokušaj ponovo.');
+ const code=String(req.query.code||''),state=String(req.query.state||'');
+ let stateData;
+ try { stateData=jwt.verify(state,JWT_SECRET,{ algorithms:['HS256'] }); } catch { return fail('Google prijava nije prošla bezbednosnu proveru. Pokušaj ponovo.'); }
+ if(stateData.purpose!=='google-oauth-state'||!stateData.nonce||!code) return fail('Google prijava nije ispravna. Pokušaj ponovo.');
+ const cfg=googleOAuthConfig();
+ const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{ method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:new URLSearchParams({ code, client_id:cfg.clientId, client_secret:cfg.clientSecret, redirect_uri:cfg.redirectUri, grant_type:'authorization_code' }) });
+ const tokenData=await tokenResponse.json().catch(()=>({}));
+ if(!tokenResponse.ok||!tokenData.access_token) return fail('Google nije potvrdio prijavu. Pokušaj ponovo.');
+ const profileResponse=await fetch('https://openidconnect.googleapis.com/v1/userinfo',{ headers:{Authorization:'Bearer '+tokenData.access_token} });
+ const profile=await profileResponse.json().catch(()=>({}));
+ if(!profileResponse.ok||!profile.email||profile.email_verified!==true) return fail('Google nalog nema potvrđenu e-mail adresu.');
+ const email=String(profile.email).trim().toLowerCase();
+ const found=await pool.query('SELECT * FROM users WHERE email=$1',[email]);
+ if(!found.rows[0]) return fail('Ova Google adresa još nije registrovana na PonudiMi. Prvo napravi nalog, pa zatim koristi Google prijavu.');
+ const user=found.rows[0];
+ const status=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[user.id]);
+ if(status.rows[0]?.blokiran) return fail('Ovaj PonudiMi nalog je privremeno blokiran.');
+ await pool.query('UPDATE users SET email_confirmed_at=coalesce(email_confirmed_at,now()) WHERE id=$1',[user.id]);
+ await pool.query('UPDATE profiles SET email_confirmed_at=coalesce(email_confirmed_at,now()),last_active_at=now() WHERE id=$1',[user.id]);
+ const fresh=await pool.query('SELECT * FROM users WHERE id=$1',[user.id]);
+ const accessToken=sign(fresh.rows[0]);
+ res.set('Cache-Control','no-store').redirect(appUrl+'/prijava#google_access_token='+encodeURIComponent(accessToken));
+}));
+
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const {email,password,metadata={}}=req.body||{},e=String(email||'').trim().toLowerCase();
  const first=String(metadata.ime||'').trim(),last=String(metadata.prezime||'').trim(),city=String(metadata.grad||'').trim(),phone=normalizePhone(metadata.telefon);
