@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 import { ispravanPib } from "@/lib/pib";
@@ -43,12 +43,22 @@ function Registracija() {
   const [busy, setBusy] = useState(false);
   const [prikaziLozinku, setPrikaziLozinku] = useState(false);
   const [prihvatioPravila, setPrihvatioPravila] = useState(false);
+  const [pravilaVerzija, setPravilaVerzija] = useState<number | null>(null);
+  useEffect(() => {
+    let active = true;
+    fetch("/api/platform-rules", { cache: "no-store" })
+      .then(async response => { if (!response.ok) throw new Error("Pravilnik nije dostupan."); return response.json(); })
+      .then(result => { if (active) setPravilaVerzija(Number(result.data?.version) || 1); })
+      .catch(() => { if (active) setPravilaVerzija(null); });
+    return () => { active = false; };
+  }, []);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
     if (!prihvatioPravila) return setGreska("Za registraciju je potrebno da prihvatiš Pravilnik o ponašanju i potvrdiš da si pročitao Politiku privatnosti.");
+    if (pravilaVerzija === null) return setGreska("Nije moguće proveriti aktuelnu verziju pravilnika. Osveži stranicu i pokušaj ponovo.");
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
@@ -75,6 +85,7 @@ function Registracija() {
             adresa: f.adresa.trim(),
             tip_lica: tip,
             pravila_prihvacena: true,
+            pravila_verzija: pravilaVerzija,
             punoletstvo_potvrdjeno: true,
             politika_privatnosti_potvrdjena: true,
             ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
@@ -148,7 +159,7 @@ function Registracija() {
         </div>
         <label className="flex items-start gap-3 rounded-xl border border-input p-3 text-sm leading-6">
           <input type="checkbox" required checked={prihvatioPravila} onChange={e => setPrihvatioPravila(e.target.checked)} className="mt-1 size-4 shrink-0 accent-current" />
-          <span>Potvrđujem da imam najmanje 18 godina. Pročitao/la sam i prihvatam <Link to="/pravila" target="_blank" className="font-semibold text-brand underline">Pravilnik o ponašanju</Link> i potvrđujem da sam upoznat/a sa <Link to="/privatnost" target="_blank" className="font-semibold text-brand underline">Politikom privatnosti</Link>, uključujući mogućnost opravdanog i evidentiranog administratorskog pristupa privatnim razgovorima.</span>
+          <span>Potvrđujem da imam najmanje 18 godina. Pročitao/la sam i prihvatam <Link to="/pravila" target="_blank" className="font-semibold text-brand underline">Pravilnik o ponašanju</Link> (verzija {pravilaVerzija ?? "učitava se"}) i potvrđujem da sam upoznat/a sa <Link to="/privatnost" target="_blank" className="font-semibold text-brand underline">Politikom privatnosti</Link>, uključujući mogućnost opravdanog i evidentiranog administratorskog pristupa privatnim razgovorima.</span>
         </label>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
