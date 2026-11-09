@@ -32,6 +32,12 @@ Registracija zahteva potvrdu prihvatanja pravila platforme, upoznavanje sa obave
 
 Stranica „Obaveštenje o privatnosti“ je radna verzija. Pre javnog puštanja obavezno uneti puno poslovno ime i adresu rukovaoca, matični broj/PIB, kontakt za privatnost, stvarne hosting i druge obrađivače, lokacije obrade i konkretne rokove čuvanja; zatim pribaviti pravnu proveru. Potvrda punoletstva je samostalna izjava korisnika i nije provera identiteta ličnom kartom.
 
+## Prijave sadržaja i moderatorsko uklanjanje
+
+Administrator u kartici „Prijave“ može da pregleda prijavljenu ponudu ili zahtev, označi prijavu kao pregledanu ili odbijenu, privremeno ukloni oglas iz javnog prikaza ili ga vrati u javni prikaz nakon provere. Uklanjanje ne briše oglas ni fotografije: postavlja se `moderacija_blokirana=true`, pa sadržaj ostaje dostupan administratoru i vlasniku radi pregleda, ali se ne prikazuje u javnoj pretrazi, listama i detaljima za druge korisnike. Svaka odluka se beleži uz administratora, vreme i napomenu.
+
+Baza dobija kolonu `moderacija_blokirana` na tabelama `ponude` i `zahtevi`, kao i dodatne statuse prijave `oglas_uklonjen` i `vracen_u_prikaz`. Prilikom inicijalizacije baze izvršava se i bezbedna `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` migracija. Za već postojeću bazu proveriti da je primenjen ažurirani `standalone/db/init.sql` pre pokretanja nove verzije API-ja.
+
 ## Status prodavca i rangiranje pretrage
 
 Pri registraciji korisnik se izjašnjava da li ponude objavljuje kao trgovac u okviru registrovane delatnosti ili kao privatno lice. Status se čuva na profilu, prenosi na ponude i prikazuje uz ponudu. Administrator može da ispravi status, a izmena se prenosi na postojeće ponude. Za postojeće naloge status ostaje „nije potvrđen“ dok ga korisnik/administrator ne utvrdi.
