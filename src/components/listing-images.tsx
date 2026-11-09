@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ImagePlus, Link2, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { ponudimi } from "@/integrations/standalone/client";
+import { ponudimi, sinhronizujFotografijeOglasa } from "@/integrations/standalone/client";
 
 export type ListingPhoto = {
   id?: string;
@@ -167,47 +167,21 @@ export async function ucitajSlikeOglasa(kind: "ponuda" | "zahtev", id: string): 
   });
 }
 
-export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, userId: string, photos: ListingPhoto[]) {
+export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, _userId: string, photos: ListingPhoto[]) {
   if (photos.length > MAX_PHOTOS) throw new Error("Dozvoljeno je najviše 7 fotografija.");
-  const column = kind === "ponuda" ? "ponuda_id" : "zahtev_id";
-  const { data: existing, error: readError } = await ponudimi.from("slike_oglasa").select("*").eq(column, id);
-  if (readError) throw readError;
-  const keepIds = new Set(photos.map((p) => p.id).filter(Boolean));
-  const removeRows = (existing ?? []).filter((row) => !keepIds.has(row.id));
-  for (const row of removeRows) {
-    const { error } = await ponudimi.from("slike_oglasa").delete().eq("id", row.id);
-    if (error) throw error;
-    // Prvo uklanjamo vezu iz baze; neuspešno brisanje fajla ne sme ostaviti pokvarenu fotografiju u oglasu.
-    if (row.storage_path) {
-      const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove([row.storage_path]);
-      if (storageError) console.error("Fotografija je uklonjena iz oglasa, ali fajl nije očišćen:", storageError);
-    }
-  }
-  for (let index = 0; index < photos.length; index++) {
-    const photo = photos[index];
-    if (photo.id) {
-      const { error } = await ponudimi.from("slike_oglasa").update({ pozicija: index }).eq("id", photo.id);
-      if (error) throw error;
-      continue;
-    }
-    if (photo.externalUrl) {
-      const payload = { [column]: id, external_url: photo.externalUrl, storage_path: null, pozicija: index };
-      const { error } = await ponudimi.from("slike_oglasa").insert(payload);
-      if (error) throw error;
-      continue;
-    }
+  const form = new FormData();
+  let fileIndex = 0;
+  const meta = photos.map((photo) => {
+    if (photo.id) return { type: "existing", id: photo.id };
+    if (photo.externalUrl) return { type: "external", url: photo.externalUrl };
     if (photo.file) {
-      const path = `${userId}/${kind}/${id}/${crypto.randomUUID()}.jpg`;
-      const { error: uploadError } = await ponudimi.storage.from("slike-oglasa").upload(path, photo.file, { contentType: "image/jpeg", upsert: false });
-      if (uploadError) throw uploadError;
-      const payload = { [column]: id, storage_path: path, external_url: null, pozicija: index };
-      const { error } = await ponudimi.from("slike_oglasa").insert(payload);
-      if (error) {
-        await ponudimi.storage.from("slike-oglasa").remove([path]);
-        throw error;
-      }
+      form.append("fotografije", photo.file);
+      return { type: "file", fileIndex: fileIndex++ };
     }
-  }
+    throw new Error("Jedna od fotografija nema ispravan fajl ili adresu.");
+  });
+  form.append("meta", JSON.stringify(meta));
+  await sinhronizujFotografijeOglasa(id, kind, form);
 }
 
 export function ListingImageGallery({ kind, id, singlePreview = false }: { kind: "ponuda" | "zahtev"; id: string; singlePreview?: boolean }) {
