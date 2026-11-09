@@ -2,7 +2,7 @@
  * Keeps the existing application call sites while using the self-hosted API.
  */
 const configuredApiOrigin = (import.meta as any).env?.VITE_API_ORIGIN;
-export const API_ORIGIN = String(configuredApiOrigin || (typeof window !== "undefined" ? window.location.origin : process.env.PUBLIC_APP_URL || "http://localhost")).replace(/\\/+$/, "");
+export const API_ORIGIN = String(configuredApiOrigin || (typeof window !== "undefined" ? window.location.origin : process.env.PUBLIC_APP_URL || "http://localhost")).replace(/\/+$/, "");
 const SESSION_KEY = "ponudimi_session";
 type AnyRecord = Record<string, any>;
 
