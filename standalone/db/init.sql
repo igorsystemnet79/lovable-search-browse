@@ -455,9 +455,21 @@ CREATE TABLE IF NOT EXISTS message_conversations (
  seller_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now(),
- CHECK (buyer_id <> seller_id),
  UNIQUE(listing_type,listing_id,buyer_id,seller_id)
 );
+-- Existing databases: remove the former restriction so an owner can create a self-test conversation.
+DO $
+DECLARE constraint_row record;
+BEGIN
+ FOR constraint_row IN
+  SELECT conname FROM pg_constraint
+  WHERE conrelid='message_conversations'::regclass AND contype='c'
+    AND pg_get_constraintdef(oid) ILIKE '%buyer_id%'
+    AND pg_get_constraintdef(oid) ILIKE '%seller_id%'
+ LOOP
+  EXECUTE format('ALTER TABLE message_conversations DROP CONSTRAINT %I',constraint_row.conname);
+ END LOOP;
+END $;
 CREATE INDEX IF NOT EXISTS message_conversations_buyer_idx ON message_conversations(buyer_id,updated_at DESC);
 CREATE INDEX IF NOT EXISTS message_conversations_seller_idx ON message_conversations(seller_id,updated_at DESC);
 CREATE TABLE IF NOT EXISTS marketplace_messages (
