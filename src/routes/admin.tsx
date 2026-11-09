@@ -440,7 +440,7 @@ function Korisnici({ selfId }: { selfId: string }) {
     if (prikaz === "firme" ? p.tip_lica !== "pravno" : p.tip_lica === "pravno") return false;
     if (!pojmoviPretrage.length) return true;
     const profil = p as Profil & { username?: string; user_metadata?: Record<string, unknown>; metadata?: Record<string, unknown> };
-    const korisnickoIme = String(profil.username || profil.user_metadata?.username || profil.metadata?.username || "");
+    const korisnickoIme = String(p.korisnicko_ime || profil.username || profil.user_metadata?.username || profil.metadata?.username || "");
     const pretraziviTekst = normalizujPretragu(
       [p.ime, p.prezime, p.email, korisnickoIme, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
         .filter(Boolean)
@@ -494,7 +494,7 @@ function Korisnici({ selfId }: { selfId: string }) {
             {lista.map((p) => {
               const roles = uloge[p.id] ?? [];
               const profil = p as Profil & { username?: string; user_metadata?: Record<string, unknown>; metadata?: Record<string, unknown> };
-              const username = String(profil.username || profil.user_metadata?.username || profil.metadata?.username || "—");
+              const username = String(p.korisnicko_ime || profil.username || profil.user_metadata?.username || profil.metadata?.username || "—");
               const infoOpen = Boolean(passwordInfoOpen[p.id]);
               return (
                 <Fragment key={p.id}>
@@ -540,8 +540,8 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <tr className="border-t border-input bg-background">
                       <td colSpan={9} className="p-4">
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                          {(["ime", "prezime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
-                            <Input key={k} className={inputCls} placeholder={k === "prezime" ? "Prezime" : k} value={(edit as any)[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null } as Profil)} />
+                          {(["ime", "prezime", "korisnicko_ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
+                            <Input key={k} className={inputCls} placeholder={k === "prezime" ? "Prezime" : k === "korisnicko_ime" ? "Korisničko ime" : k} value={(edit as any)[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null } as Profil)} />
                           ))}
                           <select className={inputCls} value={edit.tip_lica} onChange={(e) => setEdit({ ...edit, tip_lica: e.target.value } as Profil)}>
                             <option value="fizicko">Fizičko lice</option>
@@ -549,7 +549,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className={small} onClick={() => { const { id, ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
+                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
                           <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                         </div>
                       </td>
