@@ -124,7 +124,7 @@ function NotificationsBell() {
                         <p className="text-sm font-semibold">{item.title}</p>
                         <p className="mt-1 text-sm">{item.message}</p>
                         <p className="mt-1 text-xs text-muted-foreground">{new Date(item.created_at).toLocaleString("sr-RS")}</p>
-                        {item.link === "/praceni-oglasi" && <button type="button" className="mt-2 text-xs font-semibold text-brand hover:underline" onClick={async () => { if (!item.read_at) await markRead(item.id); setOpen(false); window.location.href = "/praceni-oglasi"; }}>Otvori praćene oglase</button>}
+                        {(item.link === "/praceni-oglasi" || item.link === "/poruke") && <button type="button" className="mt-2 text-xs font-semibold text-brand hover:underline" onClick={async () => { if (!item.read_at) await markRead(item.id); setOpen(false); window.location.href = item.link!; }}>{item.link === "/poruke" ? "Otvori poruke" : "Otvori praćene oglase"}</button>}
                       </div>
                       {!item.read_at && <button type="button" className="rounded-full p-1.5 text-muted-foreground hover:bg-secondary" title="Označi kao pročitano" onClick={() => markRead(item.id)}><CheckCheck className="h-4 w-4" /></button>}
                     </div>
