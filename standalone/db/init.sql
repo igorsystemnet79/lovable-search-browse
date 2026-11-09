@@ -786,3 +786,8 @@ CREATE TABLE IF NOT EXISTS prihvatanja_uslova (
 );
 ALTER TABLE prihvatanja_uslova ADD COLUMN IF NOT EXISTS upoznat_sa_privatnoscu boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS prihvatanja_uslova_user_idx ON prihvatanja_uslova(user_id,prihvaceno_at DESC);
+ 
+-- Status prodavca za jasno obaveštavanje kupaca na onlajn tržištu.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
+ALTER TABLE ponude ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
+ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
