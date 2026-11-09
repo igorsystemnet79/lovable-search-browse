@@ -1062,9 +1062,9 @@ function AdminKorisnickePoruke() {
    const blob=await response.blob();
    const url=URL.createObjectURL(blob);
    const link=document.createElement("a");
-   link.href=url;link.download=`ponudimi-prepiska-${selected.id}.json`;
+   link.href=url;link.download=`ponudimi-prepiska-${selected.id}.txt`;
    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-   setNotice("Arhiva je sačuvana u administraciji i preuzeta na uređaj. Sadrži vremenske oznake i SHA-256 kontrolni zbir.");
+   setNotice("Tekstualna prepiska (.txt) sačuvana je u arhivi i preuzeta na uređaj. Sadrži učesnike, datume, vreme i SHA-256 kontrolni zbir.");
    await loadArchives();
   }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
   finally{setBusy(false);}
@@ -1075,8 +1075,8 @@ function AdminKorisnickePoruke() {
    const response=await fetch(`${API_ORIGIN}/api/admin/message-archives/${encodeURIComponent(archive.id)}/download`,{cache:'no-store',headers:headers()});
    if(!response.ok){const data=await response.json().catch(()=>({}));throw new Error(data.error||'Preuzimanje arhive nije uspelo.');}
    const blob=await response.blob(),url=URL.createObjectURL(blob),link=document.createElement('a');
-   link.href=url;link.download=archive.file_name;document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-   setNotice('Arhiva je preuzeta. Preuzimanje je evidentirano.');
+   link.href=url;link.download=archive.file_name.replace(/\.json$/i,'.txt').replace(/\.txt$/i,'')+'.txt';document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
+   setNotice('Tekstualna prepiska (.txt) je preuzeta. Preuzimanje je evidentirano.');
   }catch(e){setError(e instanceof Error?e.message:'Greška pri preuzimanju arhive.');}
   finally{setBusy(false);}
  }
@@ -1152,7 +1152,7 @@ function AdminKorisnickePoruke() {
     {!busy&&!rows.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
    </div>
    <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
-    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={small} onClick={()=>void exportConversation()} disabled={busy}>Izvezi prepisku (.json)</button><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy}>Obriši ceo razgovor</button></div></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3>{selected.buyer_id===selected.seller_id&&<p className="mt-1 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">Test razgovor — poruke sebi</p>}<p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="flex flex-wrap gap-2"><button type="button" className={small} onClick={()=>void exportConversation()} disabled={busy}>Izvezi prepisku (.txt)</button><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy}>Obriši ceo razgovor</button></div></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
    </div>
   </div>
   <section className="space-y-3 rounded-2xl border border-input bg-surface p-4">
