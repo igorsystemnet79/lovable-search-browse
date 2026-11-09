@@ -205,8 +205,6 @@ export interface FileRouteTypes {
     | '/oglas/$kind/$id'
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
-    | '/kriterijumi-rangiranja'
-    | '/politika-privatnosti'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
