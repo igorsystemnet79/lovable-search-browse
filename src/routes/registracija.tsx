@@ -42,11 +42,13 @@ function Registracija() {
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prikaziLozinku, setPrikaziLozinku] = useState(false);
+  const [prihvatioPravila, setPrihvatioPravila] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (busy) return;
+    if (!prihvatioPravila) return setGreska("Za registraciju je potrebno da prihvatiš Pravilnik o ponašanju i potvrdiš da si pročitao Politiku privatnosti.");
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
@@ -72,6 +74,8 @@ function Registracija() {
             grad: f.grad.trim(),
             adresa: f.adresa.trim(),
             tip_lica: tip,
+            pravila_prihvacena: true,
+            politika_privatnosti_potvrdjena: true,
             ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
           },
         },
@@ -141,6 +145,10 @@ function Registracija() {
             {prikaziLozinku ? "Sakrij" : "Prikaži"}
           </button>
         </div>
+        <label className="flex items-start gap-3 rounded-xl border border-input p-3 text-sm leading-6">
+          <input type="checkbox" required checked={prihvatioPravila} onChange={e => setPrihvatioPravila(e.target.checked)} className="mt-1 size-4 shrink-0 accent-current" />
+          <span>Pročitao/la sam i prihvatam <Link to="/pravila" target="_blank" className="font-semibold text-brand underline">Pravilnik o ponašanju</Link> i potvrđujem da sam upoznat/a sa <Link to="/privatnost" target="_blank" className="font-semibold text-brand underline">Politikom privatnosti</Link>, uključujući mogućnost opravdanog i evidentiranog administratorskog pristupa privatnim razgovorima.</span>
+        </label>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
       </form>
