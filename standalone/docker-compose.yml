@@ -55,6 +55,22 @@ services:
     depends_on:
       db:
         condition: service_healthy
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ponudimi
+      POSTGRES_USER: ponudimi
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    entrypoint: ["/bin/sh", "/backup-scripts/backup-loop.sh"]
+    volumes:
+      - uploads_data:/uploads:ro
+      - ./backups:/backups
+      - ./scripts/backup-loop.sh:/backup-scripts/backup-loop.sh:ro
+    depends_on:
+      db:
+        condition: service_healthy
   web:
     build:
       context: ..
