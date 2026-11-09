@@ -20,7 +20,7 @@ Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotogr
 
 Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni `localhost` koristi se HTTP.
 
-Frontend podrazumevano koristi isti domen za API (Caddy prosleđuje `/api/*` na API servis). U `.env` ostavi `VITE_API_ORIGIN` praznim za standardnu samostalnu instalaciju. Popuni ga samo ako API namerno hostuješ na drugoj HTTPS adresi, pa ponovo izgradi web servis. `API_INTERNAL_URL` je interna Docker adresa koju koristi server-side deo aplikacije; nemoj je menjati za standardni Compose raspored.
+Frontend podrazumevano koristi isti domen za API (Caddy prosleđuje `/api/*` na API servis). U `.env` ostavi `VITE_API_ORIGIN=same-origin` za standardnu samostalnu instalaciju. Popuni ga samo ako API namerno hostuješ na drugoj HTTPS adresi, pa ponovo izgradi web servis. `API_INTERNAL_URL` je interna Docker adresa koju koristi server-side deo aplikacije; nemoj je menjati za standardni Compose raspored.
 
 ## Registracija i podaci korisnika
 
