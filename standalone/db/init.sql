@@ -347,7 +347,7 @@ ALTER TABLE admin_2fa ADD COLUMN IF NOT EXISTS last_totp_step bigint;
 
 -- Append-only audit trail for authenticated changes across the platform.
 CREATE TABLE IF NOT EXISTS admin_audit_log (
- id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid,
  actor_email text, action text NOT NULL, http_method text NOT NULL, route text NOT NULL, target_id text,
  response_status integer NOT NULL, details jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamptz NOT NULL DEFAULT now()
 );
@@ -358,3 +358,6 @@ CREATE OR REPLACE FUNCTION prevent_admin_audit_log_mutation() RETURNS trigger LA
 BEGIN RAISE EXCEPTION 'Administrativna evidencija je neizmenjiva.'; END $$;
 DROP TRIGGER IF EXISTS admin_audit_log_no_update ON admin_audit_log;
 CREATE TRIGGER admin_audit_log_no_update BEFORE UPDATE OR DELETE ON admin_audit_log FOR EACH ROW EXECUTE FUNCTION prevent_admin_audit_log_mutation();
+
+-- Keep audit history independent from user deletion; actor_id is an immutable historical identifier.
+ALTER TABLE admin_audit_log DROP CONSTRAINT IF EXISTS admin_audit_log_actor_id_fkey;
