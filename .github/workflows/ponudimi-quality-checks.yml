@@ -27,8 +27,11 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Build frontend
         run: npm run build
+      - name: TypeScript type check
+        run: npx tsc --noEmit
       - name: Lint frontend (excluding repository-wide formatting debt)
-        run: npm run lint -- --rule 'prettier/prettier: off'
+        run: |
+          npm run lint -- --rule '{"prettier/prettier":"off"}'
       - name: Check standalone API syntax
         if: always()
         run: node --check standalone/api/server.mjs
