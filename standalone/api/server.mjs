@@ -187,8 +187,10 @@ app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRo
  const kind=req.body?.tip==='zahtev'?'zahtev':'ponuda';
  const table=kind==='ponuda'?'ponude':'zahtevi';
  const col=kind==='ponuda'?'ponuda_id':'zahtev_id';
+ const rawMeta=String(req.body?.meta||'[]');
+ if(rawMeta.length>20000)return res.status(400).json({error:'Podaci o fotografijama su preveliki.'});
  let plan;
- try { plan=JSON.parse(String(req.body?.meta||'[]')); } catch { return res.status(400).json({error:'Podaci o redosledu fotografija nisu ispravni.'}); }
+ try { plan=JSON.parse(rawMeta); } catch { return res.status(400).json({error:'Podaci o redosledu fotografija nisu ispravni.'}); }
  if(!Array.isArray(plan)||plan.length>7)return res.status(400).json({error:'Dozvoljeno je najviše 7 fotografija po oglasu.'});
  const files=req.files||[];
  const fileIndexes=new Set();
@@ -197,7 +199,7 @@ app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRo
    if(typeof item.id!=='string')return res.status(400).json({error:'ID postojeće fotografije nije ispravan.'});
   } else if(item?.type==='external'){
    let url;try{url=new URL(String(item.url||''));}catch{return res.status(400).json({error:'Adresa fotografije nije ispravna.'});}
-   if(!['http:','https:'].includes(url.protocol))return res.status(400).json({error:'Dozvoljene su samo HTTP/HTTPS adrese fotografija.'});
+   if(!['http:','https:'].includes(url.protocol)||String(item.url).length>2048)return res.status(400).json({error:'Dozvoljene su samo ispravne HTTP/HTTPS adrese fotografija do 2.048 znakova.'});
   } else if(item?.type==='file'){
    if(!Number.isInteger(item.fileIndex)||item.fileIndex<0||item.fileIndex>=files.length||fileIndexes.has(item.fileIndex))return res.status(400).json({error:'Izabrani fajl fotografije nije ispravan.'});
    fileIndexes.add(item.fileIndex);
@@ -437,6 +439,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(table==='profiles' && !adminUser) addWhere('id = ?',userId);
  if(table==='pracenja' && !adminUser) { if(action==='insert'){ for(const row of supplied) row.user_id=userId; } else addWhere('user_id = ?',userId); }
  if(table==='user_roles' && !adminUser) addWhere('user_id = ?',userId);
+ if(table==='slike_oglasa' && write)return res.status(403).json({error:'Fotografije se menjaju kroz bezbednu sinhronizaciju oglasa.'});
  if(table==='slike_oglasa' && write && action!=='insert' && !adminUser){
    // Require a concrete image ID and verify its parent listing belongs to the caller.
    const idFilter=(filters||[]).find(f=>f.column==='id'&&f.op==='eq');
