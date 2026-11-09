@@ -21,6 +21,7 @@ Ovaj spisak je deo razvojne dokumentacije. Nije zamena za pravni savet. Pre obja
 - [ ] Potvrditi postupak prijave, privremenog skrivanja oglasa, blokiranja naloga i žalbe.
 - [ ] Definisati kontakt i rok za odgovor na žalbe korisnika.
 - [ ] Potvrditi pravila za poslovne korisnike, profesionalne oglašivače, recenzije i intelektualnu svojinu.
+- [ ] Ako ostaje zahtev da fizička lica budu proverena ličnom kartom, implementirati poseban, bezbedan postupak provere identiteta i utvrditi pravni osnov i rok čuvanja. Trenutna registracija beleži samo izjavu o punoletstvu; ona ne predstavlja proveru lične karte. Ne tražiti kopije dokumenata kroz privatne poruke.
 - [ ] Jasno objasniti da se privatne poruke ne prikazuju javno, ali da ovlašćeni administrator može izvršiti opravdan i evidentiran pregled radi bezbednosti, prijave, spora, podrške ili zakonskog zahteva.
 
 ## Evidencija prihvatanja
