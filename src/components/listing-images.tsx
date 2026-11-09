@@ -144,7 +144,11 @@ export function ListingImages({
     const target = index + delta;
     if (target < 0 || target >= value.length) return;
     const next = [...value];
-    [next[index], next[target]] = [next[target], next[index]];
+    const currentPhoto = next[index];
+    const targetPhoto = next[target];
+    if (!currentPhoto || !targetPhoto) return;
+    next[index] = targetPhoto;
+    next[target] = currentPhoto;
     onChange(next);
   }
 
@@ -196,8 +200,9 @@ export async function ucitajSlikeOglasa(kind: "ponuda" | "zahtev", id: string): 
   const column = kind === "ponuda" ? "ponuda_id" : "zahtev_id";
   const { data, error } = await ponudimi.from("slike_oglasa").select("*").eq(column, id).order("pozicija");
   if (error) throw error;
-  return (data ?? []).map((row) => {
-    const path = row.storage_path as string | null;
+  const rows = (data ?? []) as Array<{ id: string; storage_path: string | null; external_url: string | null }>;
+  return rows.map((row) => {
+    const path = row.storage_path;
     const external = row.external_url as string | null;
     const preview = external ?? (path ? ponudimi.storage.from("slike-oglasa").getPublicUrl(path).data.publicUrl : "");
     return { id: row.id as string, preview, externalUrl: external ?? undefined, storagePath: path ?? undefined };
@@ -209,8 +214,9 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
   const column = kind === "ponuda" ? "ponuda_id" : "zahtev_id";
   const { data: existing, error: readError } = await ponudimi.from("slike_oglasa").select("*").eq(column, id);
   if (readError) throw readError;
-  const keepIds = new Set(photos.map((p) => p.id).filter(Boolean));
-  const removeRows = (existing ?? []).filter((row) => !keepIds.has(row.id));
+  const existingRows = (existing ?? []) as Array<{ id: string; storage_path: string | null }>;
+  const keepIds = new Set(photos.map((p) => p.id).filter((id): id is string => !!id));
+  const removeRows = existingRows.filter((row) => !keepIds.has(row.id));
   for (const row of removeRows) {
     if (row.storage_path) await ponudimi.storage.from("slike-oglasa").remove([row.storage_path]);
     const { error } = await ponudimi.from("slike_oglasa").delete().eq("id", row.id);
@@ -218,6 +224,7 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
   }
   for (let index = 0; index < photos.length; index++) {
     const photo = photos[index];
+    if (!photo) continue;
     if (photo.id) {
       const { error } = await ponudimi.from("slike_oglasa").update({ pozicija: index }).eq("id", photo.id);
       if (error) throw error;
