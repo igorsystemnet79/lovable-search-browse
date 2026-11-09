@@ -48,7 +48,7 @@ function Prijava() {
       return;
     }
     const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const accessToken = fragment.get("access_token");
+    const accessToken = fragment.get("google_access_token") || fragment.get("access_token");
     if (!accessToken) return;
     window.history.replaceState({}, "", window.location.pathname);
     void ponudimi.auth.setSession({ access_token: accessToken }).then(({ error }: any) => {
