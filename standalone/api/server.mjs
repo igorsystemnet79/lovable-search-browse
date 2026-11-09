@@ -40,8 +40,18 @@ const imageMime = new Set(['image/jpeg','image/png','image/webp']);
 const safeObjectKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 async function saveImage(key, buffer, contentType) {
  if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
- if (s3) await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
- else { await pool.query('INSERT INTO storage_objects(object_key,content_type,body) VALUES($1,$2,$3) ON CONFLICT(object_key) DO UPDATE SET content_type=EXCLUDED.content_type,body=EXCLUDED.body,created_at=now()',[key,contentType,buffer]); }
+ const safeKey=safeObjectKey(key);
+ if(!safeKey)throw new Error('Putanja fotografije nije ispravna.');
+ if (s3) {
+  await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: safeKey, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
+ } else {
+  const root=path.resolve(uploadDir), target=path.resolve(root,safeKey);
+  if(!target.startsWith(root+path.sep))throw new Error('Putanja fotografije nije dozvoljena.');
+  await fs.promises.mkdir(path.dirname(target),{recursive:true});
+  const temporary=`${target}.${randomUUID()}.tmp`;
+  try { await fs.promises.writeFile(temporary,buffer,{flag:'wx'}); await fs.promises.rename(temporary,target); }
+  catch(error) { try { await fs.promises.unlink(temporary); } catch {} throw error; }
+ }
 }
 async function attachListingImages({ table, listingId, ownerId, files }) {
  const col=table==='ponude'?'ponuda_id':'zahtev_id';
@@ -72,8 +82,14 @@ async function attachListingImages({ table, listingId, ownerId, files }) {
  } finally {c.release();}
 }
 async function removeImage(key) {
- if (s3) await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: key }));
- else { await pool.query('DELETE FROM storage_objects WHERE object_key=$1',[key]); const target=path.resolve(uploadDir,key); if(target.startsWith(path.resolve(uploadDir)+path.sep) && fs.existsSync(target)) fs.unlinkSync(target); }
+ const safeKey=safeObjectKey(key);
+ if(!safeKey)return;
+ if (s3) await s3.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET, Key: safeKey }));
+ else {
+  await pool.query('DELETE FROM storage_objects WHERE object_key=$1',[safeKey]);
+  const root=path.resolve(uploadDir), target=path.resolve(root,safeKey);
+  if(target.startsWith(root+path.sep))await fs.promises.unlink(target).catch(error=>{if(error.code!=='ENOENT')throw error;});
+ }
 }
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
@@ -454,9 +470,9 @@ app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
 app.get('/api/storage/public',asyncRoute(async(req,res)=>{
  const key=safeObjectKey(req.query.path);if(!key)return res.status(400).end();
  if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=86400');object.Body.pipe(res);}
- else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');return res.send(stored.rows[0].body);}const target=path.resolve(uploadDir,key);if(!target.startsWith(path.resolve(uploadDir)+path.sep))return res.status(404).end();res.type('image/jpeg').sendFile(target);}
+  else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}
 }));
-app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(!stored.rows[0])return res.status(404).end();res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');res.send(stored.rows[0].body);}));
+app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=31536000, immutable');return object.Body.pipe(res);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
 const BUSINESS_PACKAGES = {
