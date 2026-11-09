@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma", "Evidencija aktivnosti"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -51,7 +51,7 @@ function AdminPage() {
         {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
         {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
-        {tab === "Platforma" && <PlatformSettings />}
+        {tab === "Platforma" && <PlatformSettings />}\n        {tab === "Evidencija aktivnosti" && <EvidencijaAktivnosti />}
       </>
     );
 
@@ -370,6 +370,101 @@ function PlatformSettings() {
       {notice && <p role="status" className="mt-3 text-sm font-medium text-green-700">{notice}</p>}
       {error && <p role="alert" className="mt-3 text-sm font-medium text-destructive">{error}</p>}
       {updatedAt && <p className="mt-2 text-xs text-muted-foreground">Poslednja izmena: {new Date(updatedAt).toLocaleString("sr-RS")}</p>}
+    </section>
+  );
+}
+
+
+type AuditRow = {
+  id: string; actor_email: string | null; action: string; http_method: string;
+  route: string; target_id: string | null; response_status: number;
+  details: Record<string, unknown>; created_at: string; total: number;
+};
+
+function EvidencijaAktivnosti() {
+  const [rows, setRows] = useState<AuditRow[]>([]);
+  const [actor, setActor] = useState("");
+  const [action, setAction] = useState("");
+  const [from, setFrom] = useState("");
+  const [to, setTo] = useState("");
+  const [offset, setOffset] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const limit = 100;
+  const token = () => {
+    try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; }
+    catch { return ""; }
+  };
+  const query = () => {
+    const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (actor.trim()) params.set("actor", actor.trim());
+    if (action.trim()) params.set("action", action.trim());
+    if (from) params.set("from", from);
+    if (to) params.set("to", to);
+    return params.toString();
+  };
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const response = await fetch("/api/admin/audit-log?" + query(), { cache: "no-store", headers: { Authorization: `Bearer ${token()}` } });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Evidencija aktivnosti nije dostupna.");
+      setRows(data.data || []); setTotal(Number(data.total || 0));
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju evidencije."); }
+    finally { setBusy(false); }
+  }, [actor, action, from, to, offset]);
+  useEffect(() => { load(); }, [load]);
+  async function exportCsv() {
+    try {
+      const response = await fetch("/api/admin/audit-log/export?" + query(), { cache: "no-store", headers: { Authorization: `Bearer ${token()}` } });
+      if (!response.ok) { const data = await response.json().catch(() => ({})); throw new Error(data.error || "Izvoz nije uspeo."); }
+      const blob = await response.blob(), url = URL.createObjectURL(blob), link = document.createElement("a");
+      link.href = url; link.download = "ponudimi-evidencija-aktivnosti.csv"; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(url);
+    } catch (e) { setError(e instanceof Error ? e.message : "Izvoz nije uspeo."); }
+  }
+  return (
+    <section className="space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold">Evidencija aktivnosti</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Pregled izmena i administrativnih radnji na platformi. Lozinke, tokeni i tajni podaci se ne čuvaju.</p>
+      </div>
+      <div className="grid gap-2 rounded-2xl bg-surface p-4 shadow-card sm:grid-cols-2 lg:grid-cols-4">
+        <input className={inputCls} placeholder="Korisnik / e-mail" value={actor} onChange={e => { setActor(e.target.value); setOffset(0); }} />
+        <input className={inputCls} placeholder="Vrsta aktivnosti ili putanja" value={action} onChange={e => { setAction(e.target.value); setOffset(0); }} />
+        <label className="text-xs text-muted-foreground">Od datuma<input type="date" className={inputCls + " mt-1 w-full"} value={from} onChange={e => { setFrom(e.target.value); setOffset(0); }} /></label>
+        <label className="text-xs text-muted-foreground">Do datuma<input type="date" className={inputCls + " mt-1 w-full"} value={to} onChange={e => { setTo(e.target.value); setOffset(0); }} /></label>
+        <div className="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+          <button type="button" className={small} onClick={() => { setActor(""); setAction(""); setFrom(""); setTo(""); setOffset(0); }}>Očisti filtere</button>
+          <button type="button" className={small} onClick={load} disabled={busy}>Osveži</button>
+          <button type="button" className={small} onClick={exportCsv}>Izvezi CSV</button>
+          <span className="text-sm text-muted-foreground">Ukupno zapisa: {total.toLocaleString("sr-RS")}</span>
+        </div>
+      </div>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <div className="overflow-x-auto rounded-2xl bg-surface shadow-card">
+        <table className="w-full min-w-[760px] text-left text-sm">
+          <thead className="bg-secondary/60 text-muted-foreground"><tr><th className="p-3">Datum i vreme</th><th className="p-3">Korisnik</th><th className="p-3">Aktivnost</th><th className="p-3">Cilj</th><th className="p-3">Rezultat</th></tr></thead>
+          <tbody>
+            {rows.map(row => (
+              <tr key={row.id} className="border-t border-input">
+                <td className="whitespace-nowrap p-3">{new Date(row.created_at).toLocaleString("sr-RS")}</td>
+                <td className="p-3">{row.actor_email || row.actor_id || "Nepoznat nalog"}</td>
+                <td className="p-3"><span className="font-medium">{row.action}</span><span className="block text-xs text-muted-foreground">{row.http_method} · {row.route}</span></td>
+                <td className="p-3">{row.target_id || "—"}</td>
+                <td className="p-3"><span className={row.response_status >= 400 ? "font-semibold text-destructive" : "font-semibold text-green-700"}>{row.response_status}</span></td>
+              </tr>
+            ))}
+            {!busy && rows.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Nema aktivnosti za izabrane filtere.</td></tr>}
+            {busy && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">Učitavanje evidencije...</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <button type="button" className={small} disabled={offset === 0 || busy} onClick={() => setOffset(v => Math.max(0, v - limit))}>Prethodna</button>
+        <span className="text-xs text-muted-foreground">{total ? offset + 1 : 0}–{Math.min(offset + limit, total)} od {total}</span>
+        <button type="button" className={small} disabled={offset + limit >= total || busy} onClick={() => setOffset(v => v + limit)}>Sledeća</button>
+      </div>
     </section>
   );
 }
