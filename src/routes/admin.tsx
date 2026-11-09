@@ -258,6 +258,7 @@ function Poruke() {
   async function openThread(thread: any) {
     setSelected(thread);
     setMessages([]);
+    setError("");
     if (accessReason.trim().length < 10) { setError("Pre pregleda privatne prepiske unesite konkretan razlog (najmanje 10 karaktera), npr. broj prijave ili sumnju na zloupotrebu."); return; }
     try {
       const r = await fetch(`/api/admin/messages/${thread.id}/view`, { method: "POST", cache: "no-store", headers: { ...headers(), "Content-Type": "application/json" }, body: JSON.stringify({ reason: accessReason.trim() }) });
