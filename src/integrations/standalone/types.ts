@@ -1,7 +1,8 @@
 export type ProfileRow = {
   id: string;
   ime: string | null;
-  prezime?: string | null;
+  prezime: string | null;
+  korisnicko_ime: string | null;
   telefon_normalizovan?: string | null;
   telefon_verifikovan_at?: string | null;
   email_confirmed_at?: string | null;
