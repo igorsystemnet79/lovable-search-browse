@@ -377,6 +377,18 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
+-- Idempotency ledger for optional email notifications; failed sends are released for retry.
+CREATE TABLE IF NOT EXISTS notification_email_deliveries (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ dedupe_key text NOT NULL,
+ notification_id uuid REFERENCES user_notifications(id) ON DELETE SET NULL,
+ sent_at timestamptz,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(user_id,dedupe_key)
+);
+CREATE INDEX IF NOT EXISTS notification_email_deliveries_created_idx ON notification_email_deliveries(created_at DESC);
+
 -- Append-only audit trail for authenticated changes across the platform.
 CREATE TABLE IF NOT EXISTS admin_audit_log (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), actor_id uuid,
