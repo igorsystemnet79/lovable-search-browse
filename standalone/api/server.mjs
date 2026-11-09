@@ -176,7 +176,7 @@ async function notifyListingFollowers(table,listing,actorId){
  const title=isOffer?'Praćena ponuda je izmenjena':'Praćeni zahtev je izmenjen';
  const label=String(listing.naslov||'Oglas').slice(0,120);
  const message=`Izmenjeni su podaci oglasa „${label}“ koji pratiš.`;
- const followers=await pool.query(`SELECT f.user_id FROM pracenja f LEFT JOIN notification_preferences n ON n.user_id=f.user_id WHERE f.${followColumn}=$1 AND f.user_id<>$2 AND COALESCE(n.in_app_enabled,true) AND COALESCE(n.listing_updates,true)`,[listing.id,actorId]);
+ const followers=await pool.query(`SELECT f.user_id FROM pracenja f LEFT JOIN notification_preferences n ON n.user_id=f.user_id WHERE f.${followColumn}=$1 AND f.user_id<>$2 AND (COALESCE(n.in_app_enabled,true) OR COALESCE(n.email_enabled,false)) AND COALESCE(n.listing_updates,true)`,[listing.id,actorId]);
  for(const follower of followers.rows) await createUserNotification(follower.user_id,type,title,message,'/praceni-oglasi',{listing_id:listing.id,listing_type:table},randomUUID());
 }
 async function notifyNewListingSubscribers(table,listing,ownerId){
