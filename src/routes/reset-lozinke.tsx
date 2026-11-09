@@ -27,14 +27,14 @@ function Reset() {
   const [gotovo, setGotovo] = useState(false);
 
   useEffect(() => {
-    const { data: sub } = ponudimi.auth.onAuthStateChange((event, session) => {
+    const { data: sub } = ponudimi.auth.onAuthStateChange((event: string, session: { user?: unknown } | null) => {
       if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) setSpreman("da");
     });
     const query = new URLSearchParams(window.location.search);
     if (query.get("token")) setSpreman("da");
     else if (query.get("error")) setSpreman("ne");
     else {
-      ponudimi.auth.getSession().then(({ data }) => {
+      ponudimi.auth.getSession().then(({ data }: { data: { session: unknown } }) => {
         if (data.session) setSpreman("da");
         else setSpreman("ne");
       });
