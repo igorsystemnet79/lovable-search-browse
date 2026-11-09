@@ -48,7 +48,7 @@ export type AprSyncRow = {
   created_at: string;
 };
 
-export type Tables<Name extends "profiles" | "poruke_podrske" | "apr_firme" | "apr_sinhronizacije"> =
+export type Tables<Name extends "profiles" | "poruke_podrske" | "apr_firme" | "apr_sinhronizacije" | "paketi_firmi"> =
   Name extends "profiles" ? ProfileRow :
   Name extends "poruke_podrske" ? SupportMessageRow :
   Name extends "apr_firme" ? AprFirmRow : AprSyncRow;
