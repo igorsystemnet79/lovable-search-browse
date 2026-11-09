@@ -689,6 +689,83 @@ for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
 }
 app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';const table=kind==='ponuda'?'ponude':'zahtevi';const col=kind==='ponuda'?'ponuda_id':'zahtev_id';const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen.'});if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju u JPG, PNG ili WebP formatu.'});const old=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);if(old.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});const out=[];const saved=[];try{for(const [i,file] of req.files.entries()){const key=`${req.user.sub}/${randomUUID()}.jpg`;const normalized=await normalizeImage(file.buffer);await saveImage(key,normalized,'image/jpeg');saved.push(key);const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,old.rows[0].n+i]);out.push(inserted.rows[0]);}}catch(error){for(const key of saved){try{await removeImage(key);}catch(cleanupError){console.error('Neuspešno čišćenje nepotpune fotografije:',cleanupError.message);}}throw error;}res.status(201).json(out);}));
 
+app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
+ const kind=req.body?.tip==='zahtev'?'zahtev':'ponuda';
+ const table=kind==='ponuda'?'ponude':'zahtevi';
+ const col=kind==='ponuda'?'ponuda_id':'zahtev_id';
+ const own=await pool.query(\`SELECT id FROM \${table} WHERE id=$1 AND user_id=$2\`,[req.params.id,req.user.sub]);
+ if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});
+ let meta;
+ try{meta=JSON.parse(String(req.body?.meta||'[]'));}catch{return res.status(400).json({error:'Spisak fotografija nije ispravan.'});}
+ if(!Array.isArray(meta)||meta.length>7)return res.status(400).json({error:'Oglas može imati najviše 7 fotografija.'});
+ const oldResult=await pool.query(\`SELECT * FROM slike_oglasa WHERE \${col}=$1 ORDER BY pozicija\`,[req.params.id]);
+ const oldById=new Map(oldResult.rows.map(row=>[String(row.id),row]));
+ const keepIds=[],fileIndexes=new Set(),newItems=[];
+ for(let position=0;position<meta.length;position++){
+  const item=meta[position];
+  if(!item||typeof item!=='object')return res.status(400).json({error:'Podatak o fotografiji nije ispravan.'});
+  if(item.type==='existing'){
+   const id=String(item.id||'');
+   if(!oldById.has(id)||keepIds.includes(id))return res.status(400).json({error:'Izabrana fotografija ne pripada ovom oglasu.'});
+   keepIds.push(id);
+   newItems.push({type:'existing',id,position});
+  }else if(item.type==='external'){
+   let url;
+   try{url=new URL(String(item.url||''));}catch{return res.status(400).json({error:'Adresa fotografije nije ispravna.'});}
+   if(!['http:','https:'].includes(url.protocol)||url.href.length>2048)return res.status(400).json({error:'Dozvoljene su samo HTTP/HTTPS adrese fotografija.'});
+   newItems.push({type:'external',url:url.href,position});
+  }else if(item.type==='file'){
+   const index=Number(item.fileIndex);
+   if(!Number.isInteger(index)||index<0||index>=(req.files||[]).length||fileIndexes.has(index))return res.status(400).json({error:'Poslati fajl fotografije nije ispravan.'});
+   fileIndexes.add(index);
+   newItems.push({type:'file',fileIndex:index,position});
+  }else return res.status(400).json({error:'Nepoznata vrsta fotografije.'});
+ }
+ if(fileIndexes.size!==(req.files||[]).length)return res.status(400).json({error:'Nisu sve poslate fotografije povezane sa oglasom.'});
+ const savedKeys=[];
+ const client=await pool.connect();
+ try{
+  for(const item of newItems){
+   if(item.type!=='file')continue;
+   const file=req.files[item.fileIndex];
+   const key=\`\${req.user.sub}/\${randomUUID()}.jpg\`;
+   const normalized=await normalizeImage(file.buffer);
+   await saveImage(key,normalized,'image/jpeg');
+   savedKeys.push(key);
+   item.storagePath=\`/uploads/\${key}\`;
+  }
+  await client.query('BEGIN');
+  const retained=keepIds;
+  if(retained.length){
+   await client.query(\`DELETE FROM slike_oglasa WHERE \${col}=$1 AND NOT (id=ANY($2::uuid[]))\`,[req.params.id,retained]);
+  }else{
+   await client.query(\`DELETE FROM slike_oglasa WHERE \${col}=$1\`,[req.params.id]);
+  }
+  for(const item of newItems){
+   if(item.type==='existing'){
+    await client.query('UPDATE slike_oglasa SET pozicija=$2 WHERE id=$1',[item.id,item.position]);
+   }else if(item.type==='external'){
+    await client.query(\`INSERT INTO slike_oglasa(\${col},external_url,pozicija) VALUES($1,$2,$3)\`,[req.params.id,item.url,item.position]);
+   }else{
+    await client.query(\`INSERT INTO slike_oglasa(\${col},storage_path,pozicija) VALUES($1,$2,$3)\`,[req.params.id,item.storagePath,item.position]);
+   }
+  }
+  await client.query('COMMIT');
+ }catch(error){
+  try{await client.query('ROLLBACK');}catch{}
+  for(const key of savedKeys){try{await removeImage(key);}catch(cleanupError){console.error('Neuspešno čišćenje nepotpune fotografije:',cleanupError.message);}}
+  throw error;
+ }finally{client.release();}
+ const removed=oldResult.rows.filter(row=>!keepIds.includes(String(row.id))&&row.storage_path);
+ for(const row of removed){
+  const parts=String(row.storage_path).split('/').filter(Boolean);
+  if(parts[0]==='uploads')parts.shift();
+  if(parts.length)await removeImage(parts.join('/')).catch(error=>console.error('Neuspešno brisanje stare fotografije:',error.message));
+ }
+ const result=await pool.query(\`SELECT * FROM slike_oglasa WHERE \${col}=$1 ORDER BY pozicija\`,[req.params.id]);
+ res.json(result.rows);
+}));
+
 app.post('/api/admin/listings/:kind/:id/images',auth,admin,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{
  const table=req.params.kind==='ponude'?'ponude':req.params.kind==='zahtevi'?'zahtevi':null;
  if(!table)return res.status(400).json({error:'Nepoznat tip oglasa.'});
