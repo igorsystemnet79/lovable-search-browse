@@ -571,13 +571,14 @@ app.post('/api/auth/register',asyncRoute(async(req,res)=>{
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
+  const acceptedRules=await c.query('SELECT version FROM platform_rules WHERE singleton=true FOR SHARE');
+  const rulesVersion=Number(acceptedRules.rows[0]?.version||1);
+  if(Number(metadata.pravila_verzija)!==rulesVersion){await c.query('ROLLBACK');return res.status(409).json({error:'Pravilnik je u međuvremenu izmenjen. Osveži stranicu i ponovo potvrdi aktuelna pravila.'});}
   const created=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,NULL,$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,ime:first,prezime:last,telefon:phone,grad:city})]);
   const u=created.rows[0],pib=metadata.tip_lica==='pravno'&&validPib(metadata.pib)?String(metadata.pib).replace(/\s/g,''):null;
   const firm=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount);
   const sameName=await c.query("SELECT id FROM profiles WHERE lower(unaccent(coalesce(ime,'')))=lower(unaccent($1)) AND lower(unaccent(coalesce(prezime,'')))=lower(unaccent($2)) AND lower(unaccent(coalesce(grad,'')))=lower(unaccent($3)) LIMIT 1",[first,last,city]);
   if(sameName.rows[0])await c.query('UPDATE profiles SET duplikat_sumnja=true WHERE id=$1',[sameName.rows[0].id]);
-  const acceptedRules=await c.query('SELECT version FROM platform_rules WHERE singleton=true');
-  const rulesVersion=Number(acceptedRules.rows[0]?.version||1);
   await c.query('INSERT INTO profiles(id,ime,prezime,telefon,telefon_normalizovan,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,duplikat_sumnja,pravila_prihvacena_at,pravila_verzija,politika_privatnosti_potvrdjena_at,politika_privatnosti_verzija,punoletstvo_potvrdjeno_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,now(),$14,now(),$15,now())',[u.id,first,last,phone,phone,city,String(metadata.adresa||'').trim()||null,metadata.tip_lica,metadata.naziv_firme||null,pib,e,firm,!!sameName.rowCount,rulesVersion,'1.0']);
   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]);
   await c.query('COMMIT');
