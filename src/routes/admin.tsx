@@ -30,6 +30,12 @@ type Uloga = "admin" | "moderator" | "user";
 const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "Pravilnik", "APR firme", "Poslovni paketi", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
+const businessPackageOptions = [
+  { code: "monthly", label: "Mesečni paket", price: 10 },
+  { code: "quarterly", label: "Tromesečni paket", price: 20 },
+  { code: "semiannual", label: "Šestomesečni paket", price: 50 },
+  { code: "annual_premium", label: "Premium godišnji paket", price: 100 },
+] as const;
 
 function AdminPage() {
   const { user, isAdmin, checked } = useIsAdmin();
@@ -720,12 +726,7 @@ function AdminPoslovniPaketi() {
     catch { return ""; }
   };
   const headers = () => ({ Authorization: `Bearer ${token()}` });
-  const plans = [
-    { code: "monthly", label: "Mesečni paket", price: 10 },
-    { code: "quarterly", label: "Tromesečni paket", price: 20 },
-    { code: "semiannual", label: "Šestomesečni paket", price: 50 },
-    { code: "annual_premium", label: "Premium godišnji paket", price: 100 },
-  ];
+  const plans = businessPackageOptions;
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try {
