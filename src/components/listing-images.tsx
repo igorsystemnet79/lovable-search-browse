@@ -175,9 +175,13 @@ export async function sacuvajSlikeOglasa(kind: "ponuda" | "zahtev", id: string, 
   const keepIds = new Set(photos.map((p) => p.id).filter(Boolean));
   const removeRows = (existing ?? []).filter((row) => !keepIds.has(row.id));
   for (const row of removeRows) {
-    if (row.storage_path) await ponudimi.storage.from("slike-oglasa").remove([row.storage_path]);
     const { error } = await ponudimi.from("slike_oglasa").delete().eq("id", row.id);
     if (error) throw error;
+    // Prvo uklanjamo vezu iz baze; neuspešno brisanje fajla ne sme ostaviti pokvarenu fotografiju u oglasu.
+    if (row.storage_path) {
+      const { error: storageError } = await ponudimi.storage.from("slike-oglasa").remove([row.storage_path]);
+      if (storageError) console.error("Fotografija je uklonjena iz oglasa, ali fajl nije očišćen:", storageError);
+    }
   }
   for (let index = 0; index < photos.length; index++) {
     const photo = photos[index];
