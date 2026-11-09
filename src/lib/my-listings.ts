@@ -37,7 +37,8 @@ export const pracenjaQuery = (userId: string) => ({
     if (requestsError) throw requestsError;
     const offersById = new Map<string, Ponuda>((offers ?? []).map((offer: Ponuda) => [offer.id, offer] as const));
     const requestsById = new Map<string, Zahtev>((requests ?? []).map((request: Zahtev) => [request.id, request] as const));
-    return (data ?? []).map((follow: any) => ({
+    const followRows = (data ?? []) as Array<Pick<Pracenje, "id" | "ponuda_id" | "zahtev_id" | "pocetna_cena" | "pocetni_budzet">>;
+    return followRows.map((follow) => ({
       ...follow,
       ponude: follow.ponuda_id ? offersById.get(follow.ponuda_id) ?? null : null,
       zahtevi: follow.zahtev_id ? requestsById.get(follow.zahtev_id) ?? null : null,
