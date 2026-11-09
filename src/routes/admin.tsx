@@ -168,14 +168,14 @@ function Prijave() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  async function decide(item: PrijavaOglasa, status: "pregledano" | "odbijeno") {
-    const napomena = prompt(status === "pregledano" ? "Napomena administratora (opciono):" : "Razlog odbijanja (opciono):");
+  async function decide(item: PrijavaOglasa, status: "pregledano" | "odbijeno" | "oglas_uklonjen" | "vracen_u_prikaz") {
+    const napomena = prompt(status === "oglas_uklonjen" ? "Unesi razlog uklanjanja oglasa (opciono):" : status === "vracen_u_prikaz" ? "Napomena o vraćanju oglasa (opciono):" : status === "pregledano" ? "Napomena administratora (opciono):" : "Razlog odbijanja (opciono):");
     if (napomena === null) return;
     setBusy(item.id);
     setMsg("");
     try {
       await obradiPrijavu(item.id, status, napomena);
-      setMsg(status === "pregledano" ? "Prijava je označena kao pregledana." : "Prijava je odbijena.");
+      setMsg(status === "pregledano" ? "Prijava je označena kao pregledana." : status === "odbijeno" ? "Prijava je odbijena." : status === "oglas_uklonjen" ? "Oglas je uklonjen iz javnog prikaza." : "Oglas je vraćen u javni prikaz.");
       await load();
     } catch (error) {
       setMsg(error instanceof Error ? error.message : "Obrada prijave nije uspela.");
@@ -218,7 +218,7 @@ function Prijave() {
               <p className="font-semibold">{item.oglas_naslov || "Oglas više nije dostupan"}</p>
               <p className="mt-1 text-xs text-muted-foreground">{item.tabela === "ponude" ? "Ponuda" : "Zahtev"} · {item.oglas_lokacija || "Lokacija nije dostupna"} · {new Date(item.created_at).toLocaleString("sr-RS")}</p>
             </div>
-            <span className={item.status === "na_cekanju" ? "rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-secondary px-3 py-1 text-xs font-semibold"}>{item.status === "na_cekanju" ? "Čeka pregled" : item.status === "pregledano" ? "Pregledano" : "Odbijeno"}</span>
+            <span className={item.status === "na_cekanju" ? "rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800" : "rounded-full bg-secondary px-3 py-1 text-xs font-semibold"}>{item.status === "na_cekanju" ? "Čeka pregled" : item.status === "pregledano" ? "Pregledano" : item.status === "odbijeno" ? "Odbijeno" : item.status === "oglas_uklonjen" ? "Oglas uklonjen" : "Oglas vraćen u prikaz"}</span>
           </div>
           <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
             <p><span className="text-muted-foreground">Razlog: </span><b>{reasonLabels[item.razlog] || item.razlog}</b></p>
@@ -229,7 +229,7 @@ function Prijave() {
           </div>
           {item.detalji && <p className="mt-3 whitespace-pre-wrap rounded-xl border border-input p-3 text-sm">{item.detalji}</p>}
           {item.admin_napomena && <p className="mt-2 text-sm text-muted-foreground">Napomena administratora: {item.admin_napomena}</p>}
-          {item.status === "na_cekanju" && <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={small} disabled={busy === item.id} onClick={() => decide(item, "pregledano")}>Označi kao pregledano</button><button type="button" className={danger} disabled={busy === item.id} onClick={() => decide(item, "odbijeno")}>Odbij prijavu</button></div>}
+          {item.status === "na_cekanju" && <div className="mt-4 flex flex-wrap gap-2"><button type="button" className={small} disabled={busy === item.id} onClick={() => decide(item, "pregledano")}>Označi kao pregledano</button><button type="button" className={small} disabled={busy === item.id} onClick={() => decide(item, "odbijeno")}>Odbij prijavu</button><button type="button" className={danger} disabled={busy === item.id} onClick={() => decide(item, "oglas_uklonjen")}>Ukloni oglas iz javnog prikaza</button></div>}{item.status === "oglas_uklonjen" && <div className="mt-4"><button type="button" className={small} disabled={busy === item.id} onClick={() => decide(item, "vracen_u_prikaz")}>Vrati oglas u javni prikaz</button></div>}
         </article>
       ))}
       {!visible.length && <p className="rounded-2xl bg-surface p-5 text-sm text-muted-foreground">{rows.length ? "Nema prijava koje odgovaraju pretrazi." : "Još nema prijava oglasa."}</p>}
