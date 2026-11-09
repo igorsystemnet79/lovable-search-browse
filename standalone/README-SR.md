@@ -1,6 +1,6 @@
 # PonudiMi — samostalna instalacija
 
-Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotografija. Aplikacija ne zahteva Supabase nalog niti Lovable Cloud. Postojeći React interfejs, rute i stilovi ostaju osnova platforme; podaci se čuvaju na serveru.
+Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotografija. Postojeći React interfejs, rute i stilovi ostaju osnova platforme; podaci se čuvaju na serveru.
 
 ## Potrebno
 
