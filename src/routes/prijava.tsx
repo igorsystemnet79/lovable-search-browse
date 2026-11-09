@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ponudimi } from "@/integrations/standalone/client";
+import { useEffect, useState } from "react";
+import { API_ORIGIN, ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 
 export const Route = createFileRoute("/prijava")({
@@ -38,6 +38,24 @@ function Prijava() {
   const [greska, setGreska] = useState("");
   const [info, setInfo] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleError = params.get("google_error");
+    if (googleError) {
+      setGreska(googleError);
+      window.history.replaceState({}, "", window.location.pathname);
+      return;
+    }
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const accessToken = fragment.get("access_token");
+    if (!accessToken) return;
+    window.history.replaceState({}, "", window.location.pathname);
+    void ponudimi.auth.setSession({ access_token: accessToken }).then(({ error }: any) => {
+      if (error) setGreska("Google prijava nije uspela. Pokušaj ponovo.");
+      else window.location.replace("/");
+    }).catch(() => setGreska("Google prijava nije uspela. Pokušaj ponovo."));
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
