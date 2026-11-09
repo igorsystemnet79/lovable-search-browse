@@ -892,7 +892,13 @@ app.post('/api/admin/packages/:userId',auth,admin,asyncRoute(async(req,res)=>{
  const months=plan.months;
  if(Number.isNaN(startsAt.getTime()))return res.status(400).json({error:'Datum početka paketa nije ispravan.'});
  const endsAt=req.body?.ends_at?new Date(req.body.ends_at):new Date(startsAt);
- if(!req.body?.ends_at)endsAt.setUTCMonth(endsAt.getUTCMonth()+months);
+ if(!req.body?.ends_at){
+  const day=endsAt.getUTCDate();
+  endsAt.setUTCDate(1);
+  endsAt.setUTCMonth(endsAt.getUTCMonth()+months);
+  const lastDay=new Date(Date.UTC(endsAt.getUTCFullYear(),endsAt.getUTCMonth()+1,0)).getUTCDate();
+  endsAt.setUTCDate(Math.min(day,lastDay));
+ }
  if(Number.isNaN(endsAt.getTime())||endsAt<=startsAt)return res.status(400).json({error:'Datum isteka mora biti nakon početka paketa.'});
  const c=await pool.connect();
  try{
