@@ -908,6 +908,33 @@ function AdminKorisnickePoruke() {
   finally{setBusy(false);}
  },[filter]);
  useEffect(()=>{load();},[load]);
+ async function deleteMessage(message:AdminConversationMessage){
+  if(!selected||reason.trim().length<10){setError("Pre brisanja unesi razlog od najmanje 10 karaktera.");return;}
+  if(!window.confirm("Trajno obrisati ovu poruku? Ova radnja se ne može poništiti."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`/api/admin/messages/${encodeURIComponent(selected.id)}/message/${encodeURIComponent(message.id)}`,{method:"DELETE",headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Brisanje poruke nije uspelo.");
+   setReason("");setMessages(current=>current.filter(item=>item.id!==message.id));
+   setRows(current=>current.map(row=>row.id===selected.id?{...row,message_count:Math.max(0,row.message_count-1)}:row));
+   setNotice("Poruka je obrisana. Radnja je zabeležena u administratorskoj evidenciji.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri brisanju poruke.");}
+  finally{setBusy(false);}
+ }
+ async function deleteConversation(){
+  if(!selected||reason.trim().length<10){setError("Pre brisanja unesi razlog od najmanje 10 karaktera.");return;}
+  if(!window.confirm("Trajno obrisati ceo razgovor i sve poruke između ovih korisnika? Ova radnja se ne može poništiti."))return;
+  setBusy(true);setError("");setNotice("");
+  try{
+   const response=await fetch(`/api/admin/messages/${encodeURIComponent(selected.id)}`,{method:"DELETE",headers:headers(),body:JSON.stringify({reason:reason.trim()})});
+   const data=await response.json().catch(()=>({}));
+   if(!response.ok)throw new Error(data.error||"Brisanje razgovora nije uspelo.");
+   setRows(current=>current.filter(row=>row.id!==selected.id));setSelected(null);setMessages([]);setSelectedReason("");setReason("");
+   setNotice("Razgovor i sve njegove poruke su obrisani. Radnja je zabeležena u administratorskoj evidenciji.");
+  }catch(e){setError(e instanceof Error?e.message:"Greška pri brisanju razgovora.");}
+  finally{setBusy(false);}
+ }
  async function openConversation(row:AdminConversation){
   const reviewReason=reason.trim();
   setSelected(null);setMessages([]);setSelectedReason("");setError("");setNotice("");
@@ -925,7 +952,7 @@ function AdminKorisnickePoruke() {
  return <section className="space-y-4">
   <div><h2 className="text-xl font-semibold">Privatne poruke korisnika</h2><p className="mt-1 text-sm text-muted-foreground">Pregled razgovora kupaca i prodavaca. Privatnu prepisku otvaraj samo kada postoji opravdan razlog; svaki pristup se beleži.</p></div>
   <div className="rounded-2xl bg-surface p-4 shadow-card space-y-3">
-   <label className="block text-sm font-medium">Razlog administratorskog pregleda (obavezno, najmanje 10 karaktera)
+   <label className="block text-sm font-medium">Razlog pregleda ili brisanja (obavezno, najmanje 10 karaktera)
     <textarea className={inputCls+" mt-1 w-full"} rows={2} maxLength={500} value={reason} onChange={e=>setReason(e.target.value)} placeholder="Npr. provera prijave korisnika zbog sumnje na prevaru..."/>
    </label>
    <div className="flex flex-wrap items-center gap-2"><div className="w-full max-w-sm"><ClearableSearchInput className={inputCls} placeholder="Pretraga po korisniku, e-mailu ili oglasu" ariaLabel="Pretraga privatnih razgovora" value={filter} onChange={setFilter}/></div><button type="button" className={small} onClick={load} disabled={busy}>Osveži</button><span className="text-xs text-muted-foreground">Razgovora: {rows.length}</span></div>
@@ -941,7 +968,7 @@ function AdminKorisnickePoruke() {
     {!busy&&!rows.length&&<p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora korisnika.</p>}
    </div>
    <div className="min-h-[360px] rounded-2xl border border-input bg-surface p-4">
-    {selected?<><div className="border-b border-input pb-3"><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><p className="mb-1 text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
+    {selected?<><div className="flex flex-wrap items-start justify-between gap-3 border-b border-input pb-3"><div><h3 className="font-semibold">{selected.buyer_name} ↔ {selected.seller_name}</h3><p className="text-xs text-muted-foreground">{selected.listing_title||"Oglas"} · {selected.listing_type==="ponude"?"Ponuda":"Zahtev"}</p><p className="mt-1 text-[11px] text-muted-foreground">Pregledan razlog: {selectedReason}</p></div><button type="button" className={danger} onClick={()=>void deleteConversation()} disabled={busy||reason.trim().length<10}>Obriši ceo razgovor</button></div><div className="max-h-[560px] space-y-3 overflow-y-auto py-4">{messages.map(m=><article key={m.id} className="rounded-xl bg-secondary/70 p-3"><div className="mb-1 flex flex-wrap items-center justify-between gap-2"><p className="text-[11px] font-semibold text-muted-foreground">{m.sender_id===selected.buyer_id?selected.buyer_name:selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p><button type="button" className={danger+" min-h-8 px-2 py-1 text-[11px]"} onClick={()=>void deleteMessage(m)} disabled={busy||reason.trim().length<10}>Obriši poruku</button></div><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p></article>)}{!messages.length&&<p className="text-sm text-muted-foreground">Nema poruka u razgovoru.</p>}</div></>:<p className="flex min-h-[320px] items-center justify-center text-center text-sm text-muted-foreground">Izaberi razgovor. Pre otvaranja moraš navesti razlog pregleda.</p>}
    </div>
   </div>
  </section>;
