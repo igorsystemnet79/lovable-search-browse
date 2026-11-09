@@ -438,7 +438,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
  const payment=String(req.body?.status_uplate||'ceka_uplatu');
  const note=String(req.body?.napomena||'').trim().slice(0,1000);
  const reference=String(req.body?.referenca_uplate||'').trim().slice(0,120);
- const selected=BUSINESS_PACKAGES[code];
+ const selected=Object.prototype.hasOwnProperty.call(BUSINESS_PACKAGES,code)?BUSINESS_PACKAGES[code]:null;
  if(!userId||!selected)return res.status(400).json({error:'Izaberi firmu i važeći paket.'});
  if(!['ceka_uplatu','placeno','oslobodjeno'].includes(payment))return res.status(400).json({error:'Status uplate nije ispravan.'});
  const c=await pool.connect();
