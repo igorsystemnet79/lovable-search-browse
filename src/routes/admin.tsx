@@ -1124,7 +1124,6 @@ function AdminKorisnickePoruke() {
   const reviewReason=reason.trim();
   setSelected(null);setMessages([]);setSelectedReason("");setError("");setNotice("");
   if(reviewReason.length<10){setError("Pre pregleda privatne prepiske unesi opravdan razlog od najmanje 10 karaktera.");return;}
-  setReason("");
   setBusy(true);
   try{
    const response=await fetch(`${API_ORIGIN}/api/admin/messages/${encodeURIComponent(row.id)}/view`,{method:"POST",headers:headers(),body:JSON.stringify({reason:reviewReason})});
