@@ -746,3 +746,27 @@ BEGIN
 END $$;
 DROP TRIGGER IF EXISTS ogranicenje_broj_slika_oglasa ON slike_oglasa;
 CREATE TRIGGER ogranicenje_broj_slika_oglasa BEFORE INSERT OR UPDATE OF ponuda_id,zahtev_id ON slike_oglasa FOR EACH ROW EXECUTE FUNCTION proveri_broj_slika_oglasa();
+
+
+-- Evidencija paketa pravnih lica i istorija pretplata.
+CREATE TABLE IF NOT EXISTS paketi_firmi (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ paket text NOT NULL CHECK (paket IN ('mesecni','tromesecni','sestomesecni','godisnji')),
+ cena_eur numeric(10,2) NOT NULL CHECK (cena_eur IN (10,20,50,100)),
+ status text NOT NULL DEFAULT 'na_cekanju' CHECK (status IN ('na_cekanju','aktivan','istekao','otkazan')),
+ status_uplate text NOT NULL DEFAULT 'ceka_uplatu' CHECK (status_uplate IN ('ceka_uplatu','placeno','oslobodjeno')),
+ vazi_od date NOT NULL,
+ vazi_do date NOT NULL,
+ napomena text,
+ referenca_uplate text,
+ kreirao_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ email_podsetnik_poslat_at timestamptz,
+ email_podsetnik_greska text,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (vazi_do > vazi_od)
+);
+CREATE INDEX IF NOT EXISTS paketi_firmi_user_idx ON paketi_firmi(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS paketi_firmi_aktivni_istek_idx ON paketi_firmi(status,vazi_do) WHERE status='aktivan';
+CREATE UNIQUE INDEX IF NOT EXISTS paketi_firmi_jedan_aktivan_po_firmi ON paketi_firmi(user_id) WHERE status='aktivan';
