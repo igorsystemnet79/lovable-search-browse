@@ -32,6 +32,14 @@ Registracija zahteva potvrdu prihvatanja pravila platforme, upoznavanje sa obave
 
 Stranica „Obaveštenje o privatnosti“ je radna verzija. Pre javnog puštanja obavezno uneti puno poslovno ime i adresu rukovaoca, matični broj/PIB, kontakt za privatnost, stvarne hosting i druge obrađivače, lokacije obrade i konkretne rokove čuvanja; zatim pribaviti pravnu proveru. Potvrda punoletstva je samostalna izjava korisnika i nije provera identiteta ličnom kartom.
 
+## Status prodavca i rangiranje pretrage
+
+Pri registraciji korisnik se izjašnjava da li ponude objavljuje kao trgovac u okviru registrovane delatnosti ili kao privatno lice. Status se čuva na profilu, prenosi na ponude i prikazuje uz ponudu. Administrator može da ispravi status, a izmena se prenosi na postojeće ponude. Za postojeće naloge status ostaje „nije potvrđen“ dok ga korisnik/administrator ne utvrdi.
+
+Stranica „Kriterijumi rangiranja“ objašnjava parametre pretrage: najnovije, najstarije, cena/budžet rastuće i opadajuće. Filteri ključne reči, lokacije, kategorije, raspona cene i valute određuju skup rezultata. Istaknute ponude prikazuju se odvojeno i ne menjaju redosled standardne pretrage.
+
+Ovo su tehničke funkcije za transparentnost onlajn tržišta. Pre javnog puštanja potrebno je pravno proveriti klasifikaciju trgovca za različite tipove korisnika, raspodelu obaveza između platforme i prodavca, informacije pre zaključenja ugovora i postupak za reklamacije/prijave.
+
 ## Prvi administratorski nalog
 
 Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija administratorsku ulogu. Registruj ga kroz stranicu Registracija nakon prvog pokretanja. Nemoj javno deliti tu adresu ili tajne iz `.env` fajla.
