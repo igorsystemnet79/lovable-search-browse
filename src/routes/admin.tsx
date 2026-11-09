@@ -232,21 +232,77 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
 }
 
 function Poruke() {
-  const [rows, setRows] = useState<Tables<"poruke_podrske">[]>([]);
+  const [supportRows, setSupportRows] = useState<Tables<"poruke_podrske">[]>([]);
+  const [threads, setThreads] = useState<any[]>([]);
+  const [selected, setSelected] = useState<any>(null);
+  const [messages, setMessages] = useState<any[]>([]);
+  const [filter, setFilter] = useState("");
+  const [error, setError] = useState("");
+  const token = () => { try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; } catch { return ""; } };
+  const headers = () => ({ Authorization: `Bearer ${token()}` });
   const load = useCallback(async () => {
-    const { data } = await ponudimi.from("poruke_podrske").select("*").order("created_at", { ascending: false });
-    setRows(data ?? []);
-  }, []);
+    try {
+      const [r, s] = await Promise.all([
+        fetch(`/api/admin/messages?q=${encodeURIComponent(filter)}`, { cache: "no-store", headers: headers() }),
+        ponudimi.from("poruke_podrske").select("*").order("created_at", { ascending: false }),
+      ]);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Razgovori nisu dostupni.");
+      setThreads(data.data || []); setSupportRows(s.data ?? []); setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju poruka."); }
+  }, [filter]);
   useEffect(() => { load(); }, [load]);
+  async function openThread(thread: any) {
+    setSelected(thread);
+    try {
+      const r = await fetch(`/api/admin/messages/${thread.id}`, { cache: "no-store", headers: headers() });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Razgovor nije moguće otvoriti.");
+      setMessages(data.messages || []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška."); }
+  }
   return (
-    <div className="space-y-3">
-      {rows.length === 0 && <p className="text-muted-foreground">Nema poruka.</p>}
-      {rows.map((m) => (
-        <div key={m.id} className="flex items-start justify-between gap-3 rounded-2xl bg-surface p-4 text-sm shadow-card">
-          <div><p className="font-semibold">{m.ime} · {m.email}</p><p className="mt-1 whitespace-pre-wrap">{m.poruka}</p></div>
-          <button className={danger} onClick={async () => { if (confirm("Obrisati poruku?")) { await ponudimi.from("poruke_podrske").delete().eq("id", m.id); load(); } }}>Obriši</button>
+    <div className="space-y-6">
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div><h2 className="text-lg font-semibold">Privatni razgovori korisnika</h2><p className="text-sm text-muted-foreground">Pregled svih razgovora između korisnika. Svako otvaranje razgovora se evidentira.</p></div>
+          <button type="button" className={small} onClick={load}>Osveži</button>
         </div>
-      ))}
+        <div className="max-w-md"><ClearableSearchInput className={inputCls} placeholder="Pretraga po korisniku ili oglasu" ariaLabel="Pretraga razgovora" value={filter} onChange={setFilter} /></div>
+        {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+        <div className="grid gap-3 lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)]">
+          <div className="max-h-[620px] space-y-2 overflow-y-auto">
+            {threads.map(t => <button type="button" key={t.id} onClick={() => openThread(t)} className={`w-full rounded-xl border p-3 text-left text-sm ${selected?.id === t.id ? "border-brand bg-brand/5" : "border-input bg-surface"}`}>
+              <p className="font-semibold">{t.buyer_name} ↔ {t.seller_name}</p>
+              <p className="text-xs text-muted-foreground">{t.listing_type === "ponude" ? "Ponuda" : "Zahtev"}: {t.listing_title || "Oglas nije dostupan"} · {t.message_count} por.</p>
+              <p className="mt-1 line-clamp-2">{t.last_message || "Nema poruka"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{t.last_message_at ? new Date(t.last_message_at).toLocaleString("sr-RS") : ""}</p>
+            </button>)}
+            {!threads.length && <p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora.</p>}
+          </div>
+          <div className="min-h-72 rounded-xl border border-input bg-surface p-4">
+            {selected ? <>
+              <h3 className="font-semibold">{selected.buyer_email} ↔ {selected.seller_email}</h3>
+              <p className="mb-4 text-xs text-muted-foreground">{selected.listing_title || "Oglas"} · administratorski pregled</p>
+              <div className="max-h-[520px] space-y-3 overflow-y-auto">
+                {messages.map(m => <div key={m.id} className={`max-w-[90%] rounded-xl p-3 text-sm ${m.sender_id === selected.buyer_id ? "bg-secondary" : "ml-auto bg-brand/10"}`}>
+                  <p className="mb-1 text-xs font-semibold text-muted-foreground">{m.sender_id === selected.buyer_id ? selected.buyer_name : selected.seller_name} · {new Date(m.created_at).toLocaleString("sr-RS")}</p>
+                  <p className="whitespace-pre-wrap break-words">{m.body}</p>
+                </div>)}
+                {!messages.length && <p className="text-sm text-muted-foreground">Razgovor nema poruka.</p>}
+              </div>
+            </> : <p className="text-sm text-muted-foreground">Izaberi razgovor da pregledaš poruke.</p>}
+          </div>
+        </div>
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-lg font-semibold">Poruke podršci</h2>
+        {supportRows.length === 0 && <p className="text-sm text-muted-foreground">Nema poruka podršci.</p>}
+        {supportRows.map(m => <div key={m.id} className="flex items-start justify-between gap-3 rounded-2xl bg-surface p-4 text-sm shadow-card">
+          <div><p className="font-semibold">{m.ime} · {m.email}</p><p className="mt-1 whitespace-pre-wrap">{m.poruka}</p><p className="mt-1 text-xs text-muted-foreground">{new Date(m.created_at).toLocaleString("sr-RS")}</p></div>
+          <button className={danger} onClick={async () => { if (confirm("Obrisati poruku podršci?")) { await ponudimi.from("poruke_podrske").delete().eq("id", m.id); load(); } }}>Obriši</button>
+        </div>)}
+      </section>
     </div>
   );
 }
