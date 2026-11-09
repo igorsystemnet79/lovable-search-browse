@@ -22,6 +22,11 @@ export function SiteFooter() {
           </div>
         </div>
 
+        <nav aria-label="Pravne informacije" className="flex flex-wrap gap-4 text-sm text-brand-foreground/80">
+          <Link to="/pravila-platforme" className="hover:underline">Pravila platforme</Link>
+          <Link to="/politika-privatnosti" className="hover:underline">Politika privatnosti</Link>
+        </nav>
+
         <Button
           asChild
           className="h-auto rounded-full bg-highlight px-6 py-3 font-semibold text-highlight-foreground transition-opacity hover:bg-highlight hover:opacity-90"
