@@ -1367,6 +1367,21 @@ app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
  res.set('Cache-Control','private, no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
 
+const ensureAdminMessageArchives = async () => {
+ await pool.query(`CREATE TABLE IF NOT EXISTS admin_message_archives (
+  id uuid PRIMARY KEY,
+  conversation_id uuid,
+  file_name text NOT NULL,
+  document jsonb NOT NULL,
+  sha256 char(64) NOT NULL,
+  message_count integer NOT NULL DEFAULT 0,
+  created_by uuid,
+  created_by_email text,
+  export_reason text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+ )`);
+ await pool.query('CREATE INDEX IF NOT EXISTS admin_message_archives_created_at_idx ON admin_message_archives(created_at DESC)');
+};
 app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id;
  if(!validUuid(conversationId))return res.status(400).json({error:'ID razgovora nije ispravan.'});
@@ -1385,13 +1400,51 @@ app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversation=result.rows[0];
  const messageResult=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC',[conversationId]);
  const messages=messageResult.rows.map(m=>({...m,sender_name:m.sender_id===conversation.buyer_id?conversation.buyer_name:conversation.seller_name,sender_email:m.sender_id===conversation.buyer_id?conversation.buyer_email:conversation.seller_email}));
- const payload={document_type:'PonudiMi — arhiva privatne prepiske',format_version:1,exported_at:new Date().toISOString(),exported_by:{user_id:req.user.sub,email:req.user.email||null},export_reason:reason,conversation,messages};
+ const archiveId=randomUUID();
+ const payload={document_type:'PonudiMi — arhiva privatne prepiske',format_version:1,archive_id:archiveId,exported_at:new Date().toISOString(),exported_by:{user_id:req.user.sub,email:req.user.email||null},export_reason:reason,conversation,messages};
  const canonical=JSON.stringify(payload);
  const sha256=createHash('sha256').update(canonical,'utf8').digest('hex');
  const document={...payload,integrity:{algorithm:'SHA-256',hash:sha256,hash_scope:'SHA-256 nad UTF-8 bajtovima JSON objekta bez ovog integrity polja; proverava integritet izvezenog sadržaja.'}};
- await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_export_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/export',conversationId,JSON.stringify({conversation_id:conversationId,message_count:messages.length,reason,sha256})]);
- const filename='ponudimi-prepiska-'+conversationId+'.json';
+ const filename='ponudimi-prepiska-'+conversationId+'-'+archiveId+'.json';
+ await ensureAdminMessageArchives();
+ await pool.query('INSERT INTO admin_message_archives(id,conversation_id,file_name,document,sha256,message_count,created_by,created_by_email,export_reason) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9)',
+  [archiveId,conversationId,filename,JSON.stringify(document),sha256,messages.length,req.user.sub,req.user.email||null,reason]);
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_export_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/export',conversationId,JSON.stringify({archive_id:archiveId,conversation_id:conversationId,message_count:messages.length,reason,sha256})]);
  res.set({'Cache-Control':'private, no-store','Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="'+filename+'"'}).send(JSON.stringify(document,null,2));
+}));
+app.get('/api/admin/message-archives',auth,admin,asyncRoute(async(req,res)=>{
+ await ensureAdminMessageArchives();
+ const result=await pool.query(`SELECT a.id,a.conversation_id,a.file_name,a.sha256,a.message_count,a.created_by_email,a.export_reason,a.created_at,
+  CASE WHEN a.document->'conversation'->>'listing_type'='ponude' THEN 'Ponuda' WHEN a.document->'conversation'->>'listing_type'='zahtevi' THEN 'Zahtev' ELSE 'Razgovor' END AS listing_type,
+  a.document->'conversation'->>'listing_title' AS listing_title,
+  a.document->'conversation'->>'buyer_name' AS buyer_name,
+  a.document->'conversation'->>'seller_name' AS seller_name
+  FROM admin_message_archives a ORDER BY a.created_at DESC LIMIT 300`);
+ res.set('Cache-Control','private, no-store').json({data:result.rows});
+}));
+app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID arhive nije ispravan.'});
+ await ensureAdminMessageArchives();
+ const result=await pool.query('SELECT file_name,document FROM admin_message_archives WHERE id=$1',[req.params.id]);
+ if(!result.rows[0])return res.status(404).json({error:'Arhiva nije pronađena.'});
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_download_message_archive','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/message-archives/:id/download',req.params.id,JSON.stringify({archive_id:req.params.id})]);
+ res.set({'Cache-Control':'private, no-store','Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="'+String(result.rows[0].file_name).replace(/["\\\\]/g,'')+'"'}).send(JSON.stringify(result.rows[0].document,null,2));
+}));
+app.delete('/api/admin/message-archives/:id',auth,admin,asyncRoute(async(req,res)=>{
+ if(!validUuid(req.params.id))return res.status(400).json({error:'ID arhive nije ispravan.'});
+ const reason=String(req.body?.reason||'').trim().slice(0,500);
+ if(reason.length<10)return res.status(400).json({error:'Za brisanje arhive navedite razlog od najmanje 10 karaktera.'});
+ await ensureAdminMessageArchives();
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const archive=await client.query('SELECT id,conversation_id,file_name,sha256,message_count FROM admin_message_archives WHERE id=$1 FOR UPDATE',[req.params.id]);
+  if(!archive.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Arhiva nije pronađena.'});}
+  await client.query('DELETE FROM admin_message_archives WHERE id=$1',[req.params.id]);
+  await client.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_delete_message_archive','DELETE',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/message-archives/:id',req.params.id,JSON.stringify({...archive.rows[0],reason})]);
+  await client.query('COMMIT');
+  res.json({ok:true,message:'Izvezena arhiva je trajno obrisana.'});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
 }));
 app.delete('/api/admin/messages/:id/message/:messageId',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id,messageId=req.params.messageId;
