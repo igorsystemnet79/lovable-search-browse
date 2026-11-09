@@ -27,7 +27,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "Pravilnik", "APR firme", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "Pravilnik", "APR firme", "Poslovni paketi", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -53,6 +53,7 @@ function AdminPage() {
         {tab === "Poruke" && <Poruke />}
         {tab === "Pravilnik" && <PlatformRulesEditor />}
         {tab === "APR firme" && <Apr />}
+        {tab === "Poslovni paketi" && <AdminPoslovniPaketi />}
         {tab === "Platforma" && <PlatformSettings />}
         {tab === "Obaveštenja" && <AdminObavestenja />}
         {tab === "Evidencija aktivnosti" && <EvidencijaAktivnosti />}
@@ -683,6 +684,191 @@ function EvidencijaAktivnosti() {
         <button type="button" className={small} disabled={offset === 0 || busy} onClick={() => setOffset(v => Math.max(0, v - limit))}>Prethodna</button>
         <span className="text-xs text-muted-foreground">{total ? offset + 1 : 0}–{Math.min(offset + limit, total)} od {total}</span>
         <button type="button" className={small} disabled={offset + limit >= total || busy} onClick={() => setOffset(v => v + limit)}>Sledeća</button>
+      </div>
+    </section>
+  );
+}
+
+
+type PaketAdmin = {
+  id: string; user_id: string; package_code: string; package_name: string; price_eur: number;
+  starts_at: string; ends_at: string; status: string; email: string; ime: string | null;
+  prezime: string | null; naziv_firme: string | null; pib: string | null;
+  payment_count: number; paid_total: number;
+};
+type ProfilPravnogLica = { id: string; email: string; ime: string | null; prezime: string | null; naziv_firme: string | null; pib: string | null; tip_lica: string };
+
+function AdminPoslovniPaketi() {
+  const [rows, setRows] = useState<PaketAdmin[]>([]);
+  const [companies, setCompanies] = useState<ProfilPravnogLica[]>([]);
+  const [status, setStatus] = useState("");
+  const [filter, setFilter] = useState("");
+  const [selectedUser, setSelectedUser] = useState("");
+  const [plan, setPlan] = useState("monthly");
+  const [amount, setAmount] = useState("10");
+  const [paymentMethod, setPaymentMethod] = useState("bank_transfer");
+  const [paymentReference, setPaymentReference] = useState("");
+  const [notes, setNotes] = useState("");
+  const [paymentsFor, setPaymentsFor] = useState<string | null>(null);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [busy, setBusy] = useState(false);
+  const [reminderBusy, setReminderBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const token = () => {
+    try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; }
+    catch { return ""; }
+  };
+  const headers = () => ({ Authorization: `Bearer ${token()}` });
+  const plans = [
+    { code: "monthly", label: "Mesečni paket", price: 10 },
+    { code: "quarterly", label: "Tromesečni paket", price: 20 },
+    { code: "semiannual", label: "Šestomesečni paket", price: 50 },
+    { code: "annual_premium", label: "Premium godišnji paket", price: 100 },
+  ];
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const params = new URLSearchParams();
+      if (status) params.set("status", status);
+      if (filter.trim()) params.set("q", filter.trim());
+      const [packageResponse, profileResponse] = await Promise.all([
+        fetch("/api/admin/packages?" + params.toString(), { cache: "no-store", headers: headers() }),
+        fetch("/api/admin/profiles", { cache: "no-store", headers: headers() }),
+      ]);
+      const packageData = await packageResponse.json().catch(() => ({}));
+      const profileData = await profileResponse.json().catch(() => ({}));
+      if (!packageResponse.ok) throw new Error(packageData.error || "Paketi nisu dostupni.");
+      if (!profileResponse.ok) throw new Error(profileData.error || "Spisak firmi nije dostupan.");
+      setRows(packageData.data || []);
+      setCompanies((Array.isArray(profileData) ? profileData : []).filter((p: ProfilPravnogLica) => p.tip_lica === "pravno"));
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju paketa."); }
+    finally { setBusy(false); }
+  }, [status, filter]);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const selected = plans.find(p => p.code === plan);
+    if (selected) setAmount(String(selected.price));
+  }, [plan]);
+
+  async function assignPackage() {
+    if (!selectedUser) { setError("Izaberi pravno lice."); return; }
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const payload: Record<string, unknown> = { package_code: plan, notes: notes.trim() };
+      if (amount.trim() !== "") payload.amount_paid_eur = Number(amount);
+      if (paymentMethod) payload.payment_method = paymentMethod;
+      if (paymentReference.trim()) payload.payment_reference = paymentReference.trim();
+      const response = await fetch(`/api/admin/packages/${encodeURIComponent(selectedUser)}`, {
+        method: "POST", headers: { ...headers(), "Content-Type": "application/json" }, body: JSON.stringify(payload),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Dodela paketa nije uspela.");
+      setNotice("Paket je uspešno aktiviran.");
+      setSelectedUser(""); setPaymentReference(""); setNotes("");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Dodela paketa nije uspela."); }
+    finally { setBusy(false); }
+  }
+
+  async function showPayments(row: PaketAdmin) {
+    setPaymentsFor(row.id); setPayments([]); setError("");
+    try {
+      const response = await fetch(`/api/admin/packages/${encodeURIComponent(row.id)}/payments`, { cache: "no-store", headers: headers() });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Istorija uplata nije dostupna.");
+      setPayments(data.data || []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju uplata."); }
+  }
+
+  async function runReminders() {
+    if (!confirm("Pokrenuti proveru paketa koji ističu u narednih 10 dana? Korisnicima će biti poslata obaveštenja.")) return;
+    setReminderBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/admin/packages/reminders/run", { method: "POST", headers: headers() });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Provera podsetnika nije uspela.");
+      setNotice(`Provera završena. Obaveštenja: ${Number(data.reminders_processed || 0)} · Istekli paketi: ${Number(data.expired || 0)}.`);
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Provera podsetnika nije uspela."); }
+    finally { setReminderBusy(false); }
+  }
+
+  const statusLabel = (value: string) => value === "active" ? "Aktivan" : value === "expired" ? "Istekao" : value === "cancelled" ? "Otkazan" : value === "pending" ? "Na čekanju" : value;
+  return (
+    <section className="space-y-5">
+      <div>
+        <h2 className="text-xl font-semibold">Poslovni paketi i uplate</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Dodela paketa pravnim licima, praćenje rokova i evidencija uplata. Cene paketa određuje server.</p>
+      </div>
+      <div className="rounded-2xl bg-surface p-4 shadow-card sm:p-5">
+        <h3 className="font-semibold">Aktiviraj paket firmi</h3>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <label className="text-sm font-medium">Pravno lice
+            <select className={inputCls + " mt-1 w-full"} value={selectedUser} onChange={e => setSelectedUser(e.target.value)}>
+              <option value="">Izaberi firmu...</option>
+              {companies.map(c => <option key={c.id} value={c.id}>{c.naziv_firme || [c.ime, c.prezime].filter(Boolean).join(" ") || c.email} · {c.email}{c.pib ? ` · PIB ${c.pib}` : ""}</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Paket
+            <select className={inputCls + " mt-1 w-full"} value={plan} onChange={e => setPlan(e.target.value)}>
+              {plans.map(p => <option key={p.code} value={p.code}>{p.label} — {p.price} €</option>)}
+            </select>
+          </label>
+          <label className="text-sm font-medium">Evidentirana uplata (EUR)
+            <input className={inputCls + " mt-1 w-full"} type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Ostaviti prazno ako nije uplaćeno" />
+          </label>
+          <label className="text-sm font-medium">Način plaćanja
+            <select className={inputCls + " mt-1 w-full"} value={paymentMethod} onChange={e => setPaymentMethod(e.target.value)}>
+              <option value="bank_transfer">Uplata na račun</option><option value="card">Platna kartica</option><option value="cash">Gotovina</option><option value="other">Drugo</option>
+            </select>
+          </label>
+          <label className="text-sm font-medium sm:col-span-2">Poziv na broj / referenca uplate
+            <input className={inputCls + " mt-1 w-full"} maxLength={120} value={paymentReference} onChange={e => setPaymentReference(e.target.value)} placeholder="Opcionalno" />
+          </label>
+          <label className="text-sm font-medium sm:col-span-2">Interna napomena
+            <textarea className={inputCls + " mt-1 w-full"} rows={2} maxLength={500} value={notes} onChange={e => setNotes(e.target.value)} placeholder="Opcionalno" />
+          </label>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy || !selectedUser || (amount.trim() !== "" && (!Number.isFinite(Number(amount)) || Number(amount) < 0))} onClick={assignPackage}>{busy ? "Čuvanje..." : "Aktiviraj paket"}</button>
+          <button type="button" className={small} onClick={() => { setSelectedUser(""); setPaymentReference(""); setNotes(""); }}>Očisti</button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="w-full max-w-sm"><ClearableSearchInput className={inputCls} placeholder="Pretraga firme ili e-maila" ariaLabel="Pretraga poslovnih paketa" value={filter} onChange={setFilter} /></div>
+        <select className={inputCls + " w-auto"} value={status} onChange={e => setStatus(e.target.value)}>
+          <option value="">Svi statusi</option><option value="active">Aktivni</option><option value="expired">Istekli</option><option value="cancelled">Otkazani</option><option value="pending">Na čekanju</option>
+        </select>
+        <button type="button" className={small} onClick={load} disabled={busy}>Osveži</button>
+        <button type="button" className={small} onClick={runReminders} disabled={reminderBusy}>{reminderBusy ? "Provera..." : "Pokreni proveru isteka"}</button>
+      </div>
+      {notice && <p role="status" className="text-sm font-medium text-green-700">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <p className="text-sm text-muted-foreground">Ukupno prikazanih paketa: {rows.length} · Registrovanih pravnih lica: {companies.length}</p>
+      <div className="space-y-3">
+        {rows.map(row => (
+          <article key={row.id} className="rounded-2xl bg-surface p-4 shadow-card">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="text-sm">
+                <p className="font-semibold">{row.naziv_firme || [row.ime, row.prezime].filter(Boolean).join(" ") || "Pravno lice"}</p>
+                <p className="text-muted-foreground">{row.email} {row.pib ? `· PIB ${row.pib}` : ""}</p>
+                <p className="mt-1 font-medium">{row.package_name} · {Number(row.price_eur).toLocaleString("sr-RS")} €</p>
+                <p className="text-xs text-muted-foreground">Važi: {new Date(row.starts_at).toLocaleDateString("sr-RS")} – {new Date(row.ends_at).toLocaleDateString("sr-RS")} · Uplate: {row.payment_count} · Evidentirano: {Number(row.paid_total || 0).toLocaleString("sr-RS")} €</p>
+                <p className={row.status === "active" ? "mt-1 text-xs font-semibold text-green-700" : "mt-1 text-xs font-semibold text-muted-foreground"}>{statusLabel(row.status)}</p>
+              </div>
+              <button type="button" className={small} onClick={() => showPayments(row)}>Istorija uplata</button>
+            </div>
+            {paymentsFor === row.id && (
+              <div className="mt-4 rounded-xl border border-input p-3">
+                <div className="mb-2 flex items-center justify-between gap-2"><h4 className="text-sm font-semibold">Istorija uplata</h4><button type="button" className={small} onClick={() => setPaymentsFor(null)}>Zatvori</button></div>
+                {payments.length ? <div className="overflow-x-auto"><table className="w-full min-w-[520px] text-left text-xs"><thead><tr className="border-b border-input text-muted-foreground"><th className="p-2">Datum</th><th className="p-2">Iznos</th><th className="p-2">Način</th><th className="p-2">Referenca</th><th className="p-2">Status</th></tr></thead><tbody>{payments.map(payment => <tr key={payment.id} className="border-b border-input"><td className="p-2">{payment.paid_at ? new Date(payment.paid_at).toLocaleString("sr-RS") : new Date(payment.created_at).toLocaleString("sr-RS")}</td><td className="p-2">{Number(payment.amount_eur).toLocaleString("sr-RS")} €</td><td className="p-2">{payment.payment_method || "—"}</td><td className="p-2">{payment.payment_reference || "—"}</td><td className="p-2">{payment.status}</td></tr>)}</tbody></table></div> : <p className="text-xs text-muted-foreground">Nema evidentiranih uplata za ovaj paket.</p>}
+              </div>
+            )}
+          </article>
+        ))}
+        {!busy && rows.length === 0 && <p className="rounded-xl bg-surface p-5 text-sm text-muted-foreground">Nema paketa za izabrane filtere. Paket možeš dodeliti firmi iz gornjeg dela.</p>}
       </div>
     </section>
   );
