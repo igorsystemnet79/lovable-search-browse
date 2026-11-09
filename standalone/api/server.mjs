@@ -204,12 +204,13 @@ app.delete('/api/admin/images/:imageId',auth,admin,asyncRoute(async(req,res)=>{
  const found=await pool.query('SELECT * FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
  if(!found.rows[0])return res.status(404).json({error:'Fotografija nije pronađena.'});
  const image=found.rows[0];
+ await pool.query('DELETE FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
  if(image.storage_path){
   const parts=String(image.storage_path).split('/').filter(Boolean);
   if(parts[0]==='uploads')parts.shift();
-  await removeImage(parts.join('/'));
+  try { await removeImage(parts.join('/')); }
+  catch(error) { console.error('Fotografija je uklonjena iz oglasa, ali fajl nije očišćen:',error); }
  }
- await pool.query('DELETE FROM slike_oglasa WHERE id=$1',[req.params.imageId]);
  res.json({ok:true});
 }));
 
