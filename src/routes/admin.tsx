@@ -51,7 +51,8 @@ function AdminPage() {
         {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
         {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
-        {tab === "Platforma" && <PlatformSettings />}\n        {tab === "Evidencija aktivnosti" && <EvidencijaAktivnosti />}
+        {tab === "Platforma" && <PlatformSettings />}
+        {tab === "Evidencija aktivnosti" && <EvidencijaAktivnosti />}
       </>
     );
 
