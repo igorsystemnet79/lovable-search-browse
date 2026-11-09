@@ -139,8 +139,13 @@ app.use((req,res,next)=>{
  if(!['POST','PUT','PATCH','DELETE'].includes(method)||req.path.startsWith('/api/auth/'))return next();
  res.once('finish',()=>{
   const actor=req.user;if(!actor?.sub)return;
-  const route=String(req.path||'/').slice(0,300),targetId=String(req.params?.id||req.params?.imageId||'').slice(0,100)||null;
+  const route=String(req.path||'/').slice(0,300);
+  const targetId=String(req.params?.id||req.params?.imageId||req.originalUrl.match(/\\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1]||'').slice(0,100)||null;
   const action=({POST:'kreiranje',PUT:'izmena',PATCH:'izmena',DELETE:'brisanje'})[method]+' · '+route;
+  const allowedFields=new Set(['naslov','opis','kategorija','lokacija','cena','budzet','valuta','zavrseno','pauziran','istaknuto','moderation_status','status','blokiran','firma_verifikovana','ime','prezime','grad','adresa','naziv_firme','pib','maintenance_enabled','maintenance_message','sadrzaj','message','enabled','role']);
+  const source=req.body?.values && typeof req.body.values==='object' ? req.body.values : req.body||{};
+  const safeValues={};
+  for(const [key,value] of Object.entries(source)){if(!allowedFields.has(key)||value===null||['object','function'].includes(typeof value))continue;safeValues[key]=typeof value==='string'?value.slice(0,500):value;}
   const safeDetails={body_fields:Object.keys(source).filter(k=>allowedFields.has(k)).slice(0,40),submitted_values:safeValues};
   pool.query('INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
    [actor.sub,String(actor.email||'').slice(0,254)||null,action,method,route,targetId,res.statusCode,JSON.stringify(safeDetails)]
