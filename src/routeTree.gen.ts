@@ -138,6 +138,7 @@ export interface FileRoutesByTo {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/poruke': typeof PorukeRoute
   '/pravila': typeof PravilaRoute
   '/privatnost': typeof PrivatnostRoute
@@ -156,6 +157,7 @@ export interface FileRoutesById {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/poruke': typeof PorukeRoute
   '/pravila': typeof PravilaRoute
   '/privatnost': typeof PrivatnostRoute
