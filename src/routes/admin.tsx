@@ -726,7 +726,6 @@ function AdminPoslovniPaketi() {
     catch { return ""; }
   };
   const headers = () => ({ Authorization: `Bearer ${token()}` });
-  const plans = businessPackageOptions;
   const load = useCallback(async () => {
     setBusy(true); setError("");
     try {
@@ -748,7 +747,7 @@ function AdminPoslovniPaketi() {
   }, [status, filter]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
-    const selected = plans.find(p => p.code === plan);
+    const selected = businessPackageOptions.find(p => p.code === plan);
     if (selected) setAmount(String(selected.price));
   }, [plan]);
 
@@ -813,7 +812,7 @@ function AdminPoslovniPaketi() {
           </label>
           <label className="text-sm font-medium">Paket
             <select className={inputCls + " mt-1 w-full"} value={plan} onChange={e => setPlan(e.target.value)}>
-              {plans.map(p => <option key={p.code} value={p.code}>{p.label} — {p.price} €</option>)}
+              {businessPackageOptions.map(p => <option key={p.code} value={p.code}>{p.label} — {p.price} €</option>)}
             </select>
           </label>
           <label className="text-sm font-medium">Evidentirana uplata (EUR)
