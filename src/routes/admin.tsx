@@ -239,6 +239,7 @@ function Poruke() {
   const [selected, setSelected] = useState<any>(null);
   const [messages, setMessages] = useState<any[]>([]);
   const [filter, setFilter] = useState("");
+  const [accessReason, setAccessReason] = useState("");
   const [error, setError] = useState("");
   const token = () => { try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; } catch { return ""; } };
   const headers = () => ({ Authorization: `Bearer ${token()}` });
@@ -256,8 +257,9 @@ function Poruke() {
   useEffect(() => { load(); }, [load]);
   async function openThread(thread: any) {
     setSelected(thread);
+    if (accessReason.trim().length < 10) { setMessages([]); setError("Pre pregleda privatne prepiske unesite konkretan razlog (najmanje 10 karaktera), npr. broj prijave ili sumnju na zloupotrebu."); return; }
     try {
-      const r = await fetch(`/api/admin/messages/${thread.id}`, { cache: "no-store", headers: headers() });
+      const r = await fetch(`/api/admin/messages/${thread.id}?reason=${encodeURIComponent(accessReason.trim())}`, { cache: "no-store", headers: headers() });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || "Razgovor nije moguće otvoriti.");
       setMessages(data.messages || []);
@@ -267,10 +269,10 @@ function Poruke() {
     <div className="space-y-6">
       <section className="space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div><h2 className="text-lg font-semibold">Privatni razgovori korisnika</h2><p className="text-sm text-muted-foreground">Pregled svih razgovora između korisnika. Svako otvaranje razgovora se evidentira.</p></div>
+          <div><h2 className="text-lg font-semibold">Privatni razgovori korisnika</h2><p className="text-sm text-muted-foreground">Pregled svih razgovora između korisnika samo uz navođenje opravdanog razloga. Svaki pristup i razlog se trajno evidentiraju.</p></div>
           <button type="button" className={small} onClick={load}>Osveži</button>
         </div>
-        <div className="max-w-md"><ClearableSearchInput className={inputCls} placeholder="Pretraga po korisniku ili oglasu" ariaLabel="Pretraga razgovora" value={filter} onChange={setFilter} /></div>
+        <div className="grid max-w-3xl gap-2 sm:grid-cols-2"><ClearableSearchInput className={inputCls} placeholder="Pretraga po korisniku ili oglasu" ariaLabel="Pretraga razgovora" value={filter} onChange={setFilter} /><input className={inputCls} maxLength={500} placeholder="Razlog pregleda (obavezno, min. 10 karaktera)" aria-label="Razlog administratorskog pregleda" value={accessReason} onChange={e => setAccessReason(e.target.value)} /></div>
         {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         <div className="grid gap-3 lg:grid-cols-[minmax(260px,0.8fr)_minmax(0,1.2fr)]">
           <div className="max-h-[620px] space-y-2 overflow-y-auto">
