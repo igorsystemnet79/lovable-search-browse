@@ -374,12 +374,15 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  if(action==='select'){
    const orderSql=(orders||[]).filter(o=>columns.includes(o.column)).map(o=>`${ident(o.column)} ${o.ascending===false?'DESC':'ASC'}`).join(',');
    const lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500; const off=Number.isInteger(offset)?Math.max(0,Math.min(offset,10000000)):0;
-   const ownListingFilter=(filters||[]).some(f=>f.column==='user_id'&&f.op==='eq'&&f.value===userId);
-   const publicPauseFilter=(table==='ponude'||table==='zahtevi')&&!adminUser&&!ownListingFilter?' AND pauziran=false AND moderacija_blokirana=false':'';
-   const publicListingWhere=publicPauseFilter?(whereSql?publicPauseFilter:' WHERE pauziran=false AND moderacija_blokirana=false'):'';
+   const publicListing=(table==='ponude'||table==='zahtevi')&&!adminUser;
+   let publicListingWhere='';
+   if(publicListing){
+     if(userId){params.push(userId);const ownerParam='$'+params.length;publicListingWhere=whereSql?` AND ((pauziran=false AND moderacija_blokirana=false) OR user_id=${ownerParam})`:` WHERE ((pauziran=false AND moderacija_blokirana=false) OR user_id=${ownerParam})`;}
+     else publicListingWhere=whereSql?' AND pauziran=false AND moderacija_blokirana=false':' WHERE pauziran=false AND moderacija_blokirana=false';
+   }
    const sql=`SELECT * FROM ${ident(table)}${whereSql}${publicListingWhere}${orderSql?` ORDER BY ${orderSql}`:''} LIMIT ${lim} OFFSET ${off}`;
    const {rows}=await pool.query(sql,params); let data=(table==='ponude'||table==='zahtevi')?zastitiJavneKontakte(rows,Boolean(userId)):rows;
-   if(count==='exact'){const countWhere=whereSql?`${whereSql}${publicPauseFilter}`:publicPauseFilter?` WHERE pauziran=false AND moderacija_blokirana=false`:'';const countSql=`SELECT count(*)::int n FROM ${ident(table)}${countWhere}`;const counted=await pool.query(countSql,params);result={data,count:counted.rows[0].n};}else result={data};
+   if(count==='exact'){const countSql=`SELECT count(*)::int n FROM ${ident(table)}${whereSql}${publicListingWhere}`;const counted=await pool.query(countSql,params);result={data,count:counted.rows[0].n};}else result={data};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
    for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);}
