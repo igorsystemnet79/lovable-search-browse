@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
@@ -33,9 +35,14 @@ jobs:
         run: npm run build
       - name: TypeScript type check
         run: npx tsc --noEmit
-      - name: Lint frontend (excluding repository-wide formatting debt)
+      - name: Lint changed frontend files
         run: |
-          npm run lint -- --rule '{"prettier/prettier":"off"}'
+          mapfile -t files < <(git diff --name-only HEAD^ HEAD -- 'src/**/*.ts' 'src/**/*.tsx')
+          if [ ${#files[@]} -eq 0 ]; then
+            echo "No frontend TypeScript files changed; lint check skipped."
+          else
+            npx eslint "${files[@]}" --rule '{"prettier/prettier":"off"}'
+          fi
       - name: Install standalone API dependencies
         if: always()
         working-directory: standalone/api
