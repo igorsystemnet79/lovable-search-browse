@@ -138,36 +138,47 @@ const admin = asyncRoute(async (req,res,next) => {
 async function createUserNotification(userId,type,title,message,link=null,metadata={},dedupeKey=null){
  const pref=await pool.query('SELECT in_app_enabled,listing_updates,important_changes,new_offers,new_requests,email_enabled FROM notification_preferences WHERE user_id=$1',[userId]);
  const settings=pref.rows[0]||{in_app_enabled:true,listing_updates:true,important_changes:true,new_offers:false,new_requests:false,email_enabled:false};
- if(type==='listing_update'&&!settings.listing_updates)return;
- if(type==='platform'&&!settings.important_changes)return;
- if(type==='new_offer'&&!settings.new_offers)return;
- if(type==='new_request'&&!settings.new_requests)return;
+ if(type==='listing_update'&&!settings.listing_updates)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
+ if(type==='platform'&&!settings.important_changes)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
+ if(type==='new_offer'&&!settings.new_offers)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
+ if(type==='new_request'&&!settings.new_requests)return {inAppEnabled:settings.in_app_enabled,emailEnabled:settings.email_enabled,optedOut:true};
  const key=dedupeKey||randomUUID();
- let notificationId=null;
+ let inAppDelivered=false,emailDelivered=false;
  if(settings.in_app_enabled){
   const inserted=await pool.query('INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING RETURNING id',[userId,type,title,message,link,JSON.stringify(metadata),key]);
-  notificationId=inserted.rows[0]?.id||null;
+  inAppDelivered=!!inserted.rows[0]?.id;
+  if(!inAppDelivered){
+   const existing=await pool.query('SELECT id FROM user_notifications WHERE user_id=$1 AND dedupe_key=$2 LIMIT 1',[userId,key]);
+   inAppDelivered=!!existing.rows[0]?.id;
+  }
  }
  if(settings.email_enabled){
-  const claimed=await pool.query('INSERT INTO notification_email_deliveries(user_id,dedupe_key,notification_id) VALUES($1,$2,$3) ON CONFLICT(user_id,dedupe_key) DO NOTHING RETURNING id',[userId,key,notificationId]);
+  const claimed=await pool.query(`INSERT INTO notification_email_deliveries(user_id,dedupe_key,notification_id) VALUES($1,$2,$3)
+   ON CONFLICT(user_id,dedupe_key) DO UPDATE SET created_at=now()
+   WHERE notification_email_deliveries.sent_at IS NULL AND notification_email_deliveries.created_at<now()-interval '10 minutes'
+   RETURNING id`,[userId,key,null]);
   if(claimed.rows[0]){
    try{
     const recipient=await pool.query('SELECT email FROM users WHERE id=$1',[userId]);
     const email=recipient.rows[0]?.email;
-    if(email){
-     const transport=await mailTransport();
-     const base=new URL(process.env.PUBLIC_APP_URL||'http://localhost').origin;
-     const target=typeof link==='string'&&link.startsWith('/')?new URL(link,base).toString():base;
-     const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
-     await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — '+String(title).slice(0,120),text:String(message)+'\\n\\nOtvori PonudiMi: '+target,html:'<p>'+escapeHtml(message)+'</p><p><a href="'+escapeHtml(target)+'">Otvori PonudiMi</a></p>'});
-    }
+    if(!email)throw new Error('Korisnik nema e-mail adresu.');
+    const transport=await mailTransport();
+    const base=new URL(process.env.PUBLIC_APP_URL||'http://localhost').origin;
+    const target=typeof link==='string'&&link.startsWith('/')?new URL(link,base).toString():base;
+    const escapeHtml=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+    await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:email,subject:'PonudiMi — '+String(title).slice(0,120),text:String(message)+'\\n\\nOtvori PonudiMi: '+target,html:'<p>'+escapeHtml(message)+'</p><p><a href="'+escapeHtml(target)+'">Otvori PonudiMi</a></p>'});
     await pool.query('UPDATE notification_email_deliveries SET sent_at=now() WHERE id=$1',[claimed.rows[0].id]);
+    emailDelivered=true;
    }catch(error){
     await pool.query('DELETE FROM notification_email_deliveries WHERE id=$1',[claimed.rows[0].id]).catch(()=>{});
     console.error('E-mail obaveštenje nije poslato:',{code:error?.code||null,message:error?.message||'Nepoznata greška'});
    }
+  }else{
+   const existing=await pool.query('SELECT sent_at FROM notification_email_deliveries WHERE user_id=$1 AND dedupe_key=$2',[userId,key]);
+   emailDelivered=!!existing.rows[0]?.sent_at;
   }
  }
+ return {inAppEnabled:!!settings.in_app_enabled,emailEnabled:!!settings.email_enabled,inAppDelivered,emailDelivered,optedOut:!settings.in_app_enabled&&!settings.email_enabled};
 }
 async function notifyListingFollowers(table,listing,actorId){
  if(!listing?.id)return;
@@ -926,9 +937,12 @@ async function processPackageExpiryReminders(){
  let sent=0;
  for(const item of due.rows){
   const days=Math.max(0,Math.ceil((new Date(item.ends_at)-Date.now())/86400000));
-  await createUserNotification(item.user_id,'package_expiry','Ističe poslovni paket',`Paket „${item.package_name}“ ističe za ${days} dana. Produžite paket na vreme kako ne bi došlo do prekida.`,'/moj-nalog',{package_id:item.id,ends_at:item.ends_at},'package-expiry-10d:'+item.id);
-  await pool.query('UPDATE business_packages SET reminder_10d_sent_at=now(),updated_at=now() WHERE id=$1 AND reminder_10d_sent_at IS NULL',[item.id]);
-  sent++;
+  const delivery=await createUserNotification(item.user_id,'package_expiry','Ističe poslovni paket',`Paket „${item.package_name}“ ističe za ${days} dana. Produžite paket na vreme kako ne bi došlo do prekida.`,'/moj-nalog',{package_id:item.id,ends_at:item.ends_at},'package-expiry-10d:'+item.id);
+  const channelsSatisfied=delivery.optedOut||((!delivery.inAppEnabled||delivery.inAppDelivered)&&(!delivery.emailEnabled||delivery.emailDelivered));
+  if(channelsSatisfied){
+   await pool.query('UPDATE business_packages SET reminder_10d_sent_at=now(),updated_at=now() WHERE id=$1 AND reminder_10d_sent_at IS NULL',[item.id]);
+   sent++;
+  }
  }
  const expired=await pool.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE status='active' AND ends_at<=now()");
  return {reminders_processed:sent,expired:expired.rowCount};
