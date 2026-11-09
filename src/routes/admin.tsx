@@ -934,7 +934,8 @@ function AdminKorisnickePoruke() {
    const link=document.createElement("a");
    link.href=url;link.download=`ponudimi-prepiska-${selected.id}.json`;
    document.body.appendChild(link);link.click();link.remove();URL.revokeObjectURL(url);
-   setNotice("Arhiva je sačuvana u administraciji i preuzeta na uređaj. Sadrži vremenske oznake i SHA-256 kontrolni zbir.");\n   await loadArchives();
+   setNotice("Arhiva je sačuvana u administraciji i preuzeta na uređaj. Sadrži vremenske oznake i SHA-256 kontrolni zbir.");
+   await loadArchives();
   }catch(e){setError(e instanceof Error?e.message:"Greška pri izvozu prepiske.");}
   finally{setBusy(false);}
  }
