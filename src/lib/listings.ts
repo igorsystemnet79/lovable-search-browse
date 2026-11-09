@@ -24,6 +24,7 @@ export type Ponuda = {
 
 export type Zahtev = {
   id: string;
+  user_id?: string | null;
   naslov: string;
   opis: string | null;
   kategorija: string;
