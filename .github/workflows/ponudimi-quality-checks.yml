@@ -37,6 +37,7 @@ jobs:
         run: |
           npm run lint -- --rule '{"prettier/prettier":"off"}'
       - name: Install standalone API dependencies
+        if: always()
         working-directory: standalone/api
         run: npm install --no-audit --no-fund
       - name: Check standalone API syntax
