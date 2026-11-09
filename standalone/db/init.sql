@@ -281,6 +281,9 @@ END
 WHERE telefon_normalizovan IS NULL AND telefon IS NOT NULL;
 
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS email_confirmed_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pravila_prihvacena_at timestamptz;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS pravila_verzija integer;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS politika_privatnosti_potvrdjena_at timestamptz;
 UPDATE profiles p SET email_confirmed_at=u.email_confirmed_at FROM users u WHERE u.id=p.id AND p.email_confirmed_at IS DISTINCT FROM u.email_confirmed_at;
 
 -- The previous standalone registration stamped email_confirmed_at at account creation
