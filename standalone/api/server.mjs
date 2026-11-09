@@ -186,7 +186,7 @@ async function notifyNewListingSubscribers(table,listing,ownerId){
  const label=String(listing.naslov||'Novi oglas').slice(0,120);
  const message=`Objavljen je novi oglas: „${label}“.`;
  const link=isOffer?'/ponude':'/zahtevi';
- const subscribers=await pool.query(`SELECT user_id FROM notification_preferences WHERE ${flag} AND in_app_enabled AND user_id<>$1`,[ownerId]);
+ const subscribers=await pool.query(`SELECT user_id FROM notification_preferences WHERE ${flag} AND (in_app_enabled OR email_enabled) AND user_id<>$1`,[ownerId]);
  for(const subscriber of subscribers.rows){
   await createUserNotification(subscriber.user_id,type,title,message,link,{listing_id:listing.id,listing_type:table},type+':'+listing.id+':'+subscriber.user_id);
  }
