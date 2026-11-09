@@ -8,10 +8,10 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data } = ponudimi.auth.onAuthStateChange((_e, session) => {
+    const { data } = ponudimi.auth.onAuthStateChange((_e: string, session: { user?: User | null } | null) => {
       setUser(session?.user ?? null);
     });
-    ponudimi.auth.getSession().then(({ data }) => {
+    ponudimi.auth.getSession().then(({ data }: { data: { session: { user?: User | null } | null } }) => {
       setUser(data.session?.user ?? null);
       setLoading(false);
     });
