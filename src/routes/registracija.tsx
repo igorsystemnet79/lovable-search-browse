@@ -44,6 +44,7 @@ function Registracija() {
   const [prikaziLozinku, setPrikaziLozinku] = useState(false);
   const [prihvatioUslove, setPrihvatioUslove] = useState(false);
   const [potvrdioPunoletstvo, setPotvrdioPunoletstvo] = useState(false);
+  const [upoznatSaPrivatnoscu, setUpoznatSaPrivatnoscu] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function onSubmit(e: React.FormEvent) {
@@ -52,7 +53,7 @@ function Registracija() {
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
-    if (!prihvatioUslove || !potvrdioPunoletstvo) return setGreska("Prihvati pravila platforme i potvrdi da si punoletan.");
+    if (!prihvatioUslove || !upoznatSaPrivatnoscu || !potvrdioPunoletstvo) return setGreska("Prihvati pravila, potvrdi da si upoznat sa obaveštenjem o privatnosti i potvrdi punoletstvo.");
     if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
     if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.korisnicko_ime.trim())) return setGreska("Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.");
     if (f.grad.trim().length < 2) return setGreska("Mesto stanovanja je obavezno.");
@@ -78,6 +79,7 @@ function Registracija() {
             adresa: f.adresa.trim(),
             tip_lica: tip,
             prihvatio_uslove: prihvatioUslove,
+            upoznat_sa_privatnoscu: upoznatSaPrivatnoscu,
             potvrdio_punoletstvo: potvrdioPunoletstvo,
             ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
           },
@@ -156,6 +158,10 @@ function Registracija() {
           <label className="flex items-start gap-3">
             <input type="checkbox" required checked={prihvatioUslove} onChange={e=>setPrihvatioUslove(e.target.checked)} className="mt-1 size-4 shrink-0 accent-brand" />
             <span>Prihvatam <Link to="/pravila-platforme" target="_blank" className="font-semibold text-brand underline">Pravila platforme</Link> i potvrđujem da sam upoznat sa načinom korišćenja PonudiMi.</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input type="checkbox" required checked={upoznatSaPrivatnoscu} onChange={e=>setUpoznatSaPrivatnoscu(e.target.checked)} className="mt-1 size-4 shrink-0 accent-brand" />
+            <span>Upoznat sam sa <Link to="/politika-privatnosti" target="_blank" className="font-semibold text-brand underline">Obaveštenjem o privatnosti</Link> i načinom obrade podataka.</span>
           </label>
           <label className="flex items-start gap-3">
             <input type="checkbox" required checked={potvrdioPunoletstvo} onChange={e=>setPotvrdioPunoletstvo(e.target.checked)} className="mt-1 size-4 shrink-0 accent-brand" />
