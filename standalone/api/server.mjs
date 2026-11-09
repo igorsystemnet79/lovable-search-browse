@@ -693,12 +693,12 @@ app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRo
  const kind=req.body?.tip==='zahtev'?'zahtev':'ponuda';
  const table=kind==='ponuda'?'ponude':'zahtevi';
  const col=kind==='ponuda'?'ponuda_id':'zahtev_id';
- const own=await pool.query(\`SELECT id FROM \${table} WHERE id=$1 AND user_id=$2\`,[req.params.id,req.user.sub]);
+ const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);
  if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});
  let meta;
  try{meta=JSON.parse(String(req.body?.meta||'[]'));}catch{return res.status(400).json({error:'Spisak fotografija nije ispravan.'});}
  if(!Array.isArray(meta)||meta.length>7)return res.status(400).json({error:'Oglas može imati najviše 7 fotografija.'});
- const oldResult=await pool.query(\`SELECT * FROM slike_oglasa WHERE \${col}=$1 ORDER BY pozicija\`,[req.params.id]);
+ const oldResult=await pool.query(`SELECT * FROM slike_oglasa WHERE ${col}=$1 ORDER BY pozicija`,[req.params.id]);
  const oldById=new Map(oldResult.rows.map(row=>[String(row.id),row]));
  const keepIds=[],fileIndexes=new Set(),newItems=[];
  for(let position=0;position<meta.length;position++){
@@ -728,26 +728,26 @@ app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRo
   for(const item of newItems){
    if(item.type!=='file')continue;
    const file=req.files[item.fileIndex];
-   const key=\`\${req.user.sub}/\${randomUUID()}.jpg\`;
+   const key=`${req.user.sub}/${randomUUID()}.jpg`;
    const normalized=await normalizeImage(file.buffer);
    await saveImage(key,normalized,'image/jpeg');
    savedKeys.push(key);
-   item.storagePath=\`/uploads/\${key}\`;
+   item.storagePath=`/uploads/${key}`;
   }
   await client.query('BEGIN');
   const retained=keepIds;
   if(retained.length){
-   await client.query(\`DELETE FROM slike_oglasa WHERE \${col}=$1 AND NOT (id=ANY($2::uuid[]))\`,[req.params.id,retained]);
+   await client.query(`DELETE FROM slike_oglasa WHERE ${col}=$1 AND NOT (id=ANY($2::uuid[]))`,[req.params.id,retained]);
   }else{
-   await client.query(\`DELETE FROM slike_oglasa WHERE \${col}=$1\`,[req.params.id]);
+   await client.query(`DELETE FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);
   }
   for(const item of newItems){
    if(item.type==='existing'){
     await client.query('UPDATE slike_oglasa SET pozicija=$2 WHERE id=$1',[item.id,item.position]);
    }else if(item.type==='external'){
-    await client.query(\`INSERT INTO slike_oglasa(\${col},external_url,pozicija) VALUES($1,$2,$3)\`,[req.params.id,item.url,item.position]);
+    await client.query(`INSERT INTO slike_oglasa(${col},external_url,pozicija) VALUES($1,$2,$3)`,[req.params.id,item.url,item.position]);
    }else{
-    await client.query(\`INSERT INTO slike_oglasa(\${col},storage_path,pozicija) VALUES($1,$2,$3)\`,[req.params.id,item.storagePath,item.position]);
+    await client.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3)`,[req.params.id,item.storagePath,item.position]);
    }
   }
   await client.query('COMMIT');
@@ -762,7 +762,7 @@ app.put('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRo
   if(parts[0]==='uploads')parts.shift();
   if(parts.length)await removeImage(parts.join('/')).catch(error=>console.error('Neuspešno brisanje stare fotografije:',error.message));
  }
- const result=await pool.query(\`SELECT * FROM slike_oglasa WHERE \${col}=$1 ORDER BY pozicija\`,[req.params.id]);
+ const result=await pool.query(`SELECT * FROM slike_oglasa WHERE ${col}=$1 ORDER BY pozicija`,[req.params.id]);
  res.json(result.rows);
 }));
 
