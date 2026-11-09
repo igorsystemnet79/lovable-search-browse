@@ -16,7 +16,7 @@ type UserNotification = {
   link: string | null; read_at: string | null; created_at: string;
 };
 type NotificationPreferences = {
-  in_app_enabled: boolean; listing_updates: boolean; important_changes: boolean;
+  in_app_enabled: boolean; listing_updates: boolean; important_changes: boolean; new_offers: boolean; new_requests: boolean;
 };
 
 function NotificationsBell() {
@@ -25,7 +25,7 @@ function NotificationsBell() {
   const [items, setItems] = useState<UserNotification[]>([]);
   const [unread, setUnread] = useState(0);
   const [preferences, setPreferences] = useState<NotificationPreferences>({
-    in_app_enabled: true, listing_updates: true, important_changes: true,
+    in_app_enabled: true, listing_updates: true, important_changes: true, new_offers: false, new_requests: false,
   });
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -68,6 +68,8 @@ function NotificationsBell() {
       in_app_enabled: !!data.data.in_app_enabled,
       listing_updates: !!data.data.listing_updates,
       important_changes: !!data.data.important_changes,
+      new_offers: !!data.data.new_offers,
+      new_requests: !!data.data.new_requests,
     });
   }
   async function savePreferences(next: NotificationPreferences) {
@@ -99,6 +101,8 @@ function NotificationsBell() {
                 ["in_app_enabled", "Obaveštenja u platformi"],
                 ["listing_updates", "Izmene oglasa koje pratim"],
                 ["important_changes", "Važna obaveštenja platforme"],
+                ["new_offers", "Nove ponude"],
+                ["new_requests", "Novi zahtevi"],
               ] as const).map(([key, label]) => (
                 <label key={key} className="flex items-center justify-between gap-3">
                   <span>{label}</span>
