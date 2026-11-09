@@ -78,7 +78,7 @@ function MojiOglasi() {
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moji zahtevi</h2>
               {q.data?.zahtevi.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš postavljenih zahteva.</p>}
-              <ul className="mt-4 space-y-4">{q.data?.zahtevi.map((z) => <div key={z.id}><ZahtevItem zahtev={z} />{actions("zahtev", z, z.budzet)}</div>)}</ul>
+              <ul className="mt-4 space-y-4">{q.data?.zahtevi.map((z) => <div key={z.id}><ZahtevItem zahtev={z} hideFollow />{actions("zahtev", z, z.budzet)}</div>)}</ul>
             </section>
           </div>
         )}
