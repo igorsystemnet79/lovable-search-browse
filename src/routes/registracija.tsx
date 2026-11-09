@@ -37,7 +37,7 @@ function porukaGreske(error: unknown) {
 function Registracija() {
   const navigate = useNavigate();
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
-  const [f, setF] = useState({ ime: "", prezime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
+  const [f, setF] = useState({ ime: "", prezime: "", korisnicko_ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -51,6 +51,7 @@ function Registracija() {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
     if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
+    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.korisnicko_ime.trim())) return setGreska("Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.");
     if (f.grad.trim().length < 2) return setGreska("Mesto stanovanja je obavezno.");
     if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     if (tip === "pravno") {
@@ -68,6 +69,7 @@ function Registracija() {
           data: {
             ime: f.ime.trim(),
             prezime: f.prezime.trim(),
+            korisnicko_ime: f.korisnicko_ime.trim().toLowerCase(),
             telefon: f.telefon.trim(),
             grad: f.grad.trim(),
             adresa: f.adresa.trim(),
@@ -115,6 +117,8 @@ function Registracija() {
         )}
         <input className={inputCls} required maxLength={60} autoComplete="given-name" placeholder="Ime" value={f.ime} onChange={set("ime")} />
         <input className={inputCls} required maxLength={60} autoComplete="family-name" placeholder="Prezime" value={f.prezime} onChange={set("prezime")} />
+        <input className={inputCls} required minLength={3} maxLength={30} autoComplete="username" placeholder="Korisničko ime (3–30 znakova)" value={f.korisnicko_ime} onChange={set("korisnicko_ime")} />
+        <p className="-mt-2 text-xs text-muted-foreground">Dozvoljena su slova bez razmaka, brojevi, tačka, donja crta i crtica.</p>
         <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} required maxLength={60} autoComplete="address-level2" placeholder="Mesto stanovanja" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} maxLength={150} placeholder={tip === "pravno" ? "Adresa sedišta (ulica i broj)" : "Adresa stanovanja (ulica i broj)"} value={f.adresa} onChange={set("adresa")} />
