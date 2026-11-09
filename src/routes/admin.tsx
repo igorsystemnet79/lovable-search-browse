@@ -441,9 +441,16 @@ function Korisnici({ selfId }: { selfId: string }) {
     if (!pojmoviPretrage.length) return true;
     const profil = p as Profil & { username?: string; user_metadata?: Record<string, unknown>; metadata?: Record<string, unknown> };
     const korisnickoIme = String(p.korisnicko_ime || profil.username || profil.user_metadata?.username || profil.metadata?.username || "");
+    const statistika = aktivnost[p.id] ?? { ponude: 0, zahtevi: 0 };
+    const statusNaloga = p.blokiran ? "blokiran" : "aktivan";
+    const statusFirme = p.firma_verifikovana ? "firma verifikovana" : "firma nije verifikovana";
     const pretraziviTekst = normalizujPretragu(
-      [p.ime, p.prezime, p.email, korisnickoIme, p.naziv_firme, p.pib, p.telefon, p.grad, p.adresa]
-        .filter(Boolean)
+      [
+        p.id, p.ime, p.prezime, p.email, korisnickoIme, p.naziv_firme, p.pib,
+        p.telefon, p.grad, p.adresa, p.tip_lica, p.created_at, statusNaloga,
+        statusFirme, ...(uloge[p.id] ?? []), statistika.ponude, statistika.zahtevi,
+      ]
+        .filter((value) => value !== null && value !== undefined && value !== "")
         .join(" ")
     );
     // Svaka uneta reč mora da postoji u podacima, bez obzira na redosled.
