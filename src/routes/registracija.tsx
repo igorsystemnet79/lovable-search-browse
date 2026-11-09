@@ -37,6 +37,7 @@ function porukaGreske(error: unknown) {
 function Registracija() {
   const navigate = useNavigate();
   const [tip, setTip] = useState<"fizicko" | "pravno">("fizicko");
+  const [statusTrgovca, setStatusTrgovca] = useState<"trgovac" | "nije_trgovac" | "">("");
   const [f, setF] = useState({ ime: "", prezime: "", korisnicko_ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
   const [uspeh, setUspeh] = useState(false);
@@ -53,6 +54,7 @@ function Registracija() {
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
+    if (!statusTrgovca) return setGreska("Izaberi da li nastupaš kao trgovac ili privatni prodavac.");
     if (!prihvatioUslove || !upoznatSaPrivatnoscu || !potvrdioPunoletstvo) return setGreska("Prihvati pravila, potvrdi da si upoznat sa obaveštenjem o privatnosti i potvrdi punoletstvo.");
     if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
     if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.korisnicko_ime.trim())) return setGreska("Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.");
@@ -78,6 +80,7 @@ function Registracija() {
             grad: f.grad.trim(),
             adresa: f.adresa.trim(),
             tip_lica: tip,
+            status_trgovca: statusTrgovca,
             prihvatio_uslove: prihvatioUslove,
             upoznat_sa_privatnoscu: upoznatSaPrivatnoscu,
             potvrdio_punoletstvo: potvrdioPunoletstvo,
@@ -122,6 +125,15 @@ function Registracija() {
             <input className={inputCls} required inputMode="numeric" maxLength={9} placeholder="PIB (9 cifara)" value={f.pib} onChange={set("pib")} />
           </>
         )}
+        <div>
+          <label htmlFor="status-trgovca" className="mb-1 block text-sm font-medium">U kom svojstvu objavljuješ ponude?</label>
+          <select id="status-trgovca" required className={inputCls} value={statusTrgovca} onChange={e=>setStatusTrgovca(e.target.value as "trgovac" | "nije_trgovac" | "")}>
+            <option value="">Izaberi status prodavca</option>
+            <option value="trgovac">Kao trgovac — u okviru registrovane delatnosti</option>
+            <option value="nije_trgovac">Kao privatno lice — van poslovne delatnosti</option>
+          </select>
+          <p className="mt-1 text-xs text-muted-foreground">Ovaj status se prikazuje uz tvoje ponude i zasniva se na tvojoj izjavi.</p>
+        </div>
         <input className={inputCls} required maxLength={60} autoComplete="given-name" placeholder="Ime" value={f.ime} onChange={set("ime")} />
         <input className={inputCls} required maxLength={60} autoComplete="family-name" placeholder="Prezime" value={f.prezime} onChange={set("prezime")} />
         <input className={inputCls} required minLength={3} maxLength={30} autoComplete="username" placeholder="Korisničko ime (3–30 znakova)" value={f.korisnicko_ime} onChange={set("korisnicko_ime")} />
