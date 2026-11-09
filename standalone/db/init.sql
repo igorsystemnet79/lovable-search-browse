@@ -779,8 +779,10 @@ CREATE TABLE IF NOT EXISTS prihvatanja_uslova (
  verzija_pravila integer NOT NULL DEFAULT 1,
  verzija_obavestenja_privatnosti text NOT NULL DEFAULT 'nacrt-1.0',
  potvrdjeno_punoletstvo boolean NOT NULL CHECK (potvrdjeno_punoletstvo=true),
+ upoznat_sa_privatnoscu boolean NOT NULL CHECK (upoznat_sa_privatnoscu=true),
  prihvaceno_at timestamptz NOT NULL DEFAULT now(),
  ip_adresa text,
  user_agent text
 );
+ALTER TABLE prihvatanja_uslova ADD COLUMN IF NOT EXISTS upoznat_sa_privatnoscu boolean NOT NULL DEFAULT false;
 CREATE INDEX IF NOT EXISTS prihvatanja_uslova_user_idx ON prihvatanja_uslova(user_id,prihvaceno_at DESC);
