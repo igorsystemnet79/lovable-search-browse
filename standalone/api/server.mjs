@@ -237,6 +237,8 @@ app.use('/api',asyncRoute(async(req,res,next)=>{
  res.set('Cache-Control','no-store');return res.status(503).json({error:state.rows[0].message||'Platforma je privremeno na održavanju.',code:'MAINTENANCE_MODE',maintenance:true});
 }));
 
+app.use('/api/messages',rateLimit({windowMs:60*1000,limit:60,standardHeaders:true,legacyHeaders:false}));
+app.use('/api/admin/messages',rateLimit({windowMs:60*1000,limit:60,standardHeaders:true,legacyHeaders:false}));
 const messageName = async id => {
  const r=await pool.query("SELECT u.email,COALESCE(NULLIF(BTRIM(concat_ws(' ',p.ime,p.prezime)),''),NULLIF(p.korisnicko_ime,''),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1",[id]);
  return r.rows[0]||{email:null,display_name:'Korisnik'};
@@ -280,7 +282,7 @@ app.get('/api/messages/:id',auth,asyncRoute(async(req,res)=>{
  const client=await pool.connect();
  try{
   await client.query('BEGIN');
-  await client.query('UPDATE message_messages SET read_at=now() WHERE conversation_id=$1 AND sender_id<>$2 AND read_at IS NULL',[req.params.id,req.user.sub]);
+  await client.query('UPDATE message_messages SET read_at=now() WHERE conversation_id=$1 AND (sender_id<>$2 OR EXISTS (SELECT 1 FROM message_conversations c WHERE c.id=$1 AND c.buyer_id=c.seller_id)) AND read_at IS NULL',[req.params.id,req.user.sub]);
   const r=await client.query('SELECT id,sender_id,body,created_at,read_at FROM message_messages WHERE conversation_id=$1 ORDER BY created_at,id',[req.params.id]);
   await client.query('COMMIT');res.set('Cache-Control','private, no-store');res.json({messages:r.rows});
  }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
