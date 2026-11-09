@@ -53,7 +53,7 @@ export function PonudaItem({ ponuda, hideFollow, maskContacts = false }: { ponud
   );
 }
 
-export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; maskContacts?: boolean }) {
+export function ZahtevItem({ zahtev, maskContacts = false, hideFollow = false }: { zahtev: Zahtev; maskContacts?: boolean; hideFollow?: boolean }) {
   return (
     <li className={`rounded-xl border border-border bg-surface px-4 py-3 shadow-card transition-transform hover:-translate-y-0.5 ${zahtev.zavrseno ? "opacity-70" : ""}`}>
       <Link to="/oglas/$kind/$id" params={{ kind: "zahtev", id: zahtev.id }} className="font-medium hover:text-brand hover:underline">{zahtev.naslov}</Link>
@@ -73,7 +73,7 @@ export function ZahtevItem({ zahtev, maskContacts = false }: { zahtev: Zahtev; m
         ) : <p>{zahtev.kontakt_ime}{zahtev.telefon && <> · <a className="text-brand hover:underline" href={`tel:${zahtev.telefon.replace(/[^+0-9]/g, "")}`}>{zahtev.telefon}</a></>}</p>}
       </div>}
       <StatusIzmene id={zahtev.id} zavrseno={zahtev.zavrseno} updatedAt={zahtev.updated_at} />
-      <FollowButton zahtev={zahtev} />
+      {!hideFollow && <FollowButton zahtev={zahtev} />}
     </li>
   );
 }
