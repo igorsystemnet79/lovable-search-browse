@@ -514,7 +514,10 @@ app.get('/api/auth/google/callback', asyncRoute(async (req,res) => {
 }));
 
 app.post('/api/auth/register',asyncRoute(async(req,res)=>{
- const {email,password,metadata={}}=req.body||{},e=String(email||'').trim().toLowerCase();
+ const body=req.body&&typeof req.body==='object'&&!Array.isArray(req.body)?req.body:{};
+ const {email,password}=body;
+ const metadata=body.metadata&&typeof body.metadata==='object'&&!Array.isArray(body.metadata)?body.metadata:{};
+ const e=String(email||'').trim().toLowerCase();
  const first=String(metadata.ime||'').trim(),last=String(metadata.prezime||'').trim(),city=String(metadata.grad||'').trim(),phone=normalizePhone(metadata.telefon);
  if(e.length>254||!/^\S+@\S+\.\S+$/.test(e)||!passwordIsValid(password))return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera (najviše 72 bajta).'});
  if(first.length<2||first.length>60||last.length<2||last.length>60)return res.status(400).json({error:'Ime i prezime su obavezni.'});
