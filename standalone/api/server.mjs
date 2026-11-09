@@ -867,7 +867,7 @@ app.get('/api/packages/me',auth,asyncRoute(async(req,res)=>{
  const result=await pool.query(`SELECT id,package_code,package_name,price_eur,starts_at,ends_at,status,
   GREATEST(0,CEIL(EXTRACT(EPOCH FROM (ends_at-now()))/86400))::int AS days_remaining
   FROM business_packages WHERE user_id=$1 AND status='active' AND starts_at<=now() AND ends_at>now()
-  ORDER BY ends_at DESC LIMIT 1`,[req.user.sub]);
+  ORDER BY starts_at DESC,ends_at DESC LIMIT 1`,[req.user.sub]);
  res.set('Cache-Control','private, no-store').json({data:result.rows[0]||null});
 }));
 app.get('/api/admin/packages',auth,admin,asyncRoute(async(req,res)=>{
@@ -897,21 +897,25 @@ app.post('/api/admin/packages/:userId',auth,admin,asyncRoute(async(req,res)=>{
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
-  await c.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE user_id=$1 AND status='active'",[userId]);
+  if(startsAt<=new Date()) await c.query("UPDATE business_packages SET status='expired',updated_at=now() WHERE user_id=$1 AND status='active'",[userId]);
   const inserted=await c.query("INSERT INTO business_packages(user_id,package_code,package_name,price_eur,starts_at,ends_at,status,granted_by,notes) VALUES($1,$2,$3,$4,$5,$6,'active',$7,$8) RETURNING *",[userId,req.body.package_code,plan.name,plan.price,startsAt.toISOString(),endsAt.toISOString(),req.user.sub,String(req.body?.notes||'').trim().slice(0,500)||null]);
   const payment=Number(req.body?.amount_paid_eur);
   if(Number.isFinite(payment)&&payment>=0){
    await c.query("INSERT INTO business_package_payments(package_id,user_id,amount_eur,currency,payment_method,payment_reference,status,paid_at,recorded_by,notes) VALUES($1,$2,$3,'EUR',$4,$5,'recorded',now(),$6,$7)",[inserted.rows[0].id,userId,payment,String(req.body?.payment_method||'').slice(0,80)||null,String(req.body?.payment_reference||'').slice(0,120)||null,req.user.sub,String(req.body?.payment_notes||'').slice(0,500)||null]);
   }
   await c.query('COMMIT');
-  await createUserNotification(userId,'platform','Aktiviran poslovni paket',`Aktiviran je paket ${plan.name}, koji važi do ${endsAt.toLocaleDateString('sr-RS',{timeZone:'Europe/Belgrade'})}.`,'/moj-nalog',{package_id:inserted.rows[0].id},'package-start:'+inserted.rows[0].id);
+  try {
+   await createUserNotification(userId,'platform','Aktiviran poslovni paket',`Aktiviran je paket ${plan.name}, koji važi do ${endsAt.toLocaleDateString('sr-RS',{timeZone:'Europe/Belgrade'})}.`,'/moj-nalog',{package_id:inserted.rows[0].id},'package-start:'+inserted.rows[0].id);
+  } catch(notificationError) {
+   console.error('Paket je aktiviran, ali obaveštenje nije poslato:',notificationError?.message||'Nepoznata greška');
+  }
   res.status(201).json({data:inserted.rows[0]});
- }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 }));
 app.post('/api/admin/packages/reminders/run',auth,admin,asyncRoute(async(_req,res)=>{
  const due=await pool.query(`SELECT bp.id,bp.user_id,bp.package_name,bp.ends_at,u.email
   FROM business_packages bp JOIN users u ON u.id=bp.user_id
-  WHERE bp.status='active' AND bp.ends_at>now() AND bp.ends_at<=now()+interval '10 days'
+  WHERE bp.status='active' AND bp.starts_at<=now() AND bp.ends_at>now() AND bp.ends_at<=now()+interval '10 days'
    AND bp.reminder_10d_sent_at IS NULL ORDER BY bp.ends_at ASC LIMIT 500`);
  let sent=0;
  for(const item of due.rows){
