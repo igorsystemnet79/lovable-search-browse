@@ -22,6 +22,8 @@ import { Route as ResetLozinkeRouteImport } from './routes/reset-lozinke'
 import { Route as ZahteviRouteImport } from './routes/zahtevi'
 import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 import { Route as OglasKindIdRouteImport } from './routes/oglas.$kind.$id'
+import { Route as KriterijumiRangiranjaRouteImport } from './routes/kriterijumi-rangiranja'
+import { Route as PolitikaPrivatnostiRouteImport } from './routes/politika-privatnosti'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -88,6 +90,16 @@ const OglasKindIdRoute = OglasKindIdRouteImport.update({
   path: '/oglas/$kind/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const KriterijumiRangiranjaRoute = KriterijumiRangiranjaRouteImport.update({
+  id: '/kriterijumi-rangiranja',
+  path: '/kriterijumi-rangiranja',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PolitikaPrivatnostiRoute = PolitikaPrivatnostiRouteImport.update({
+  id: '/politika-privatnosti',
+  path: '/politika-privatnosti',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -105,6 +117,8 @@ export interface FileRoutesByFullPath {
   '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
+  '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
+  '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -119,6 +133,8 @@ export interface FileRoutesByTo {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
+  '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,6 +150,8 @@ export interface FileRoutesById {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
+  '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -151,6 +169,8 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/kriterijumi-rangiranja'
+    | '/politika-privatnosti'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -197,6 +217,8 @@ export interface RootRouteChildren {
   ZahteviRoute: typeof ZahteviRoute
   KategorijaSlugRoute: typeof KategorijaSlugRoute
   OglasKindIdRoute: typeof OglasKindIdRoute
+  KriterijumiRangiranjaRoute: typeof KriterijumiRangiranjaRoute
+  PolitikaPrivatnostiRoute: typeof PolitikaPrivatnostiRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -292,6 +314,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OglasKindIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/kriterijumi-rangiranja': {
+      id: '/kriterijumi-rangiranja'
+      path: '/kriterijumi-rangiranja'
+      fullPath: '/kriterijumi-rangiranja'
+      preLoaderRoute: typeof KriterijumiRangiranjaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/politika-privatnosti': {
+      id: '/politika-privatnosti'
+      path: '/politika-privatnosti'
+      fullPath: '/politika-privatnosti'
+      preLoaderRoute: typeof PolitikaPrivatnostiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -309,6 +345,8 @@ const rootRouteChildren: RootRouteChildren = {
   ZahteviRoute: ZahteviRoute,
   KategorijaSlugRoute: KategorijaSlugRoute,
   OglasKindIdRoute: OglasKindIdRoute,
+  KriterijumiRangiranjaRoute: KriterijumiRangiranjaRoute,
+  PolitikaPrivatnostiRoute: PolitikaPrivatnostiRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
