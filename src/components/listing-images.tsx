@@ -33,6 +33,8 @@ export function ListingImages({
   disabled?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const latestValue = useRef(value);
+  latestValue.current = value;
   const [url, setUrl] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,7 +114,9 @@ export function ListingImages({
   }
 
   useEffect(() => () => {
-    value.forEach((photo) => { if (photo.file && photo.preview.startsWith("blob:")) URL.revokeObjectURL(photo.preview); });
+    latestValue.current.forEach((photo) => {
+      if (photo.file && photo.preview.startsWith("blob:")) URL.revokeObjectURL(photo.preview);
+    });
   }, []);
 
   return (
