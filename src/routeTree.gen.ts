@@ -22,6 +22,7 @@ import { Route as ResetLozinkeRouteImport } from './routes/reset-lozinke'
 import { Route as ZahteviRouteImport } from './routes/zahtevi'
 import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 import { Route as OglasKindIdRouteImport } from './routes/oglas.$kind.$id'
+import { Route as PorukeRouteImport } from './routes/poruke'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -81,6 +82,11 @@ const ZahteviRoute = ZahteviRouteImport.update({
 const KategorijaSlugRoute = KategorijaSlugRouteImport.update({
   id: '/kategorija/$slug',
   path: '/kategorija/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PorukeRoute = PorukeRouteImport.update({
+  id: '/poruke',
+  path: '/poruke',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OglasKindIdRoute = OglasKindIdRouteImport.update({
@@ -151,6 +157,7 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/poruke'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -166,6 +173,7 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/poruke'
   id:
     | '__root__'
     | '/'
@@ -181,6 +189,7 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/poruke'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -197,6 +206,7 @@ export interface RootRouteChildren {
   ZahteviRoute: typeof ZahteviRoute
   KategorijaSlugRoute: typeof KategorijaSlugRoute
   OglasKindIdRoute: typeof OglasKindIdRoute
+  PorukeRoute: typeof PorukeRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -285,6 +295,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KategorijaSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/poruke': {
+      id: '/poruke'
+      path: '/poruke'
+      fullPath: '/poruke'
+      preLoaderRoute: typeof PorukeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/oglas/$kind/$id': {
       id: '/oglas/$kind/$id'
       path: '/oglas/$kind/$id'
@@ -309,6 +326,7 @@ const rootRouteChildren: RootRouteChildren = {
   ZahteviRoute: ZahteviRoute,
   KategorijaSlugRoute: KategorijaSlugRoute,
   OglasKindIdRoute: OglasKindIdRoute,
+  PorukeRoute: PorukeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
