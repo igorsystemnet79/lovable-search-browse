@@ -133,6 +133,21 @@ const admin = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
  next();
 });
+// Audit authenticated write operations without persisting submitted values or secrets.
+app.use((req,res,next)=>{
+ const method=String(req.method||'').toUpperCase();
+ if(!['POST','PUT','PATCH','DELETE'].includes(method)||req.path.startsWith('/api/auth/'))return next();
+ res.once('finish',()=>{
+  const actor=req.user;if(!actor?.sub)return;
+  const route=String(req.path||'/').slice(0,300),targetId=String(req.params?.id||req.params?.imageId||'').slice(0,100)||null;
+  const action=({POST:'kreiranje',PUT:'izmena',PATCH:'izmena',DELETE:'brisanje'})[method]+' · '+route;
+  const safeDetails={body_fields:Object.keys(req.body||{}).filter(k=>!/password|token|secret|key|authorization|cookie|code/i.test(k)).slice(0,40)};
+  pool.query('INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,$3,$4,$5,$6,$7,$8)',
+   [actor.sub,String(actor.email||'').slice(0,254)||null,action,method,route,targetId,res.statusCode,JSON.stringify(safeDetails)]
+  ).catch(error=>console.error('Evidencija aktivnosti nije sačuvana:',{code:error.code,message:error.message}));
+ });
+ next();
+});
 const encryptionKey = () => {
  const raw=String(process.env.ADMIN_2FA_ENCRYPTION_KEY||'').trim();
  if(!/^[a-f0-9]{64}$/i.test(raw)) throw Object.assign(new Error('Serverski ključ za zaštitu Authenticator podataka nije podešen u Renderu.'),{status:503});
@@ -1034,6 +1049,20 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  }catch(e){await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,0,false,$2)',[req.user.sub,e.message]);throw e;}
 }));
 
+
+app.get('/api/admin/audit-log',auth,admin,asyncRoute(async(req,res)=>{
+ const limit=Math.min(500,Math.max(1,Number.parseInt(req.query.limit||'100',10)||100)),offset=Math.max(0,Number.parseInt(req.query.offset||'0',10)||0);
+ const actor=String(req.query.actor||'').trim().slice(0,254),action=String(req.query.action||'').trim().slice(0,120),from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();
+ const result=await pool.query(`SELECT a.id,a.actor_id,a.actor_email,a.action,a.http_method,a.route,a.target_id,a.response_status,a.details,a.created_at,count(*) OVER()::int AS total FROM admin_audit_log a WHERE ($1='' OR coalesce(a.actor_email,'') ILIKE '%'||$1||'%') AND ($2='' OR a.action ILIKE '%'||$2||'%') AND ($3::date IS NULL OR a.created_at >= $3::date) AND ($4::date IS NULL OR a.created_at < ($4::date + interval '1 day')) ORDER BY a.created_at DESC LIMIT $5 OFFSET $6`,[actor,action,from||null,to||null,limit,offset]);
+ res.set('Cache-Control','no-store');res.json({data:result.rows,total:result.rows[0]?.total||0,limit,offset});
+}));
+app.get('/api/admin/audit-log/export',auth,admin,asyncRoute(async(req,res)=>{
+ const actor=String(req.query.actor||'').trim().slice(0,254),action=String(req.query.action||'').trim().slice(0,120),from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();
+ const result=await pool.query(`SELECT actor_email,action,http_method,route,target_id,response_status,created_at FROM admin_audit_log WHERE ($1='' OR coalesce(actor_email,'') ILIKE '%'||$1||'%') AND ($2='' OR action ILIKE '%'||$2||'%') AND ($3::date IS NULL OR created_at >= $3::date) AND ($4::date IS NULL OR created_at < ($4::date + interval '1 day')) ORDER BY created_at DESC LIMIT 10000`,[actor,action,from||null,to||null]);
+ const cell=value=>'"'+String(value??'').replace(/"/g,'""')+'"',lines=[['Korisnik','Aktivnost','Metod','Putanja','ID cilja','HTTP status','Datum i vreme'].map(cell).join(',')];
+ for(const row of result.rows)lines.push([row.actor_email,row.action,row.http_method,row.route,row.target_id,row.response_status,new Date(row.created_at).toISOString()].map(cell).join(','));
+ res.setHeader('Content-Type','text/csv; charset=utf-8');res.setHeader('Content-Disposition','attachment; filename="ponudimi-evidencija-aktivnosti.csv"');res.send('\uFEFF'+lines.join('\r\n'));
+}));
 app.use((err,req,res,_next)=>{
  const code = err?.code;
  const transientDbCodes = new Set(['08000','08003','08006','08001','57P01','57P02','57P03','53300','53400']);
