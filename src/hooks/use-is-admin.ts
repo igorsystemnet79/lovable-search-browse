@@ -9,7 +9,7 @@ export function useIsAdmin() {
   useEffect(() => {
     if (loading) return;
     if (!user) { setIsAdmin(false); setChecked(true); return; }
-    ponudimi.rpc("has_role", { _user_id: user.id, _role: "admin" }).then(({ data }) => {
+    ponudimi.rpc("has_role", { _user_id: user.id, _role: "admin" }).then(({ data }: { data: unknown }) => {
       setIsAdmin(!!data);
       setChecked(true);
     });
