@@ -51,6 +51,7 @@ function Praceni() {
                   <strong className={promenaCene(f.pocetni_budzet, f.zahtevi.budzet) === "pala" ? "text-brand" : ""}>{budgetLabel[promenaCene(f.pocetni_budzet, f.zahtevi.budzet)]}</strong>
                 </p>
               </>}
+              {!f.ponude && !f.zahtevi && <p className="rounded-xl border border-border p-4 text-sm text-muted-foreground">Objava koju si pratio/la više nije dostupna.</p>}
             </div>
           ))}
         </ul>
