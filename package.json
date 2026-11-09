@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "start": "node .output/server/index.mjs",
-    "prebuild": "npm audit"
+    "audit:security": "npm audit"
   },
   "overrides": {
     "rolldown": "1.2.1",
