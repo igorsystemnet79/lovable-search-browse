@@ -71,8 +71,7 @@ function PretragaPage() {
         <div className="mt-6">
           <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced />
         </div>
-
-
+        <p className="mt-3 text-right text-xs text-muted-foreground"><Link to="/kriterijumi-rangiranja" className="font-medium text-brand hover:underline">Kako se rangiraju rezultati pretrage?</Link></p>
 
         {isError && !authLoading ? (
           <p className="mt-8 text-sm text-destructive">
