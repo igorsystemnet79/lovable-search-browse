@@ -203,9 +203,9 @@ export async function ucitajSlikeOglasa(kind: "ponuda" | "zahtev", id: string): 
   const rows = (data ?? []) as Array<{ id: string; storage_path: string | null; external_url: string | null }>;
   return rows.map((row) => {
     const path = row.storage_path;
-    const external = row.external_url as string | null;
+    const external = row.external_url;
     const preview = external ?? (path ? ponudimi.storage.from("slike-oglasa").getPublicUrl(path).data.publicUrl : "");
-    return { id: row.id as string, preview, externalUrl: external ?? undefined, storagePath: path ?? undefined };
+    return { id: row.id, preview, ...(external ? { externalUrl: external } : {}), ...(path ? { storagePath: path } : {}) };
   });
 }
 
