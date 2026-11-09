@@ -48,7 +48,25 @@ export type AprSyncRow = {
   created_at: string;
 };
 
+export type BusinessPackageRow = {
+  id: string;
+  user_id: string;
+  paket: "mesecni" | "tromesecni" | "sestomesecni" | "godisnji";
+  cena_eur: number;
+  status: "na_cekanju" | "aktivan" | "istekao" | "otkazan";
+  status_uplate: "ceka_uplatu" | "placeno" | "oslobodjeno";
+  vazi_od: string;
+  vazi_do: string;
+  napomena: string | null;
+  referenca_uplate: string | null;
+  kreirao_id: string | null;
+  email_podsetnik_poslat_at: string | null;
+  email_podsetnik_greska: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Tables<Name extends "profiles" | "poruke_podrske" | "apr_firme" | "apr_sinhronizacije" | "paketi_firmi"> =
   Name extends "profiles" ? ProfileRow :
   Name extends "poruke_podrske" ? SupportMessageRow :
-  Name extends "apr_firme" ? AprFirmRow : AprSyncRow;
+  Name extends "apr_firme" ? AprFirmRow : Name extends "apr_sinhronizacije" ? AprSyncRow : BusinessPackageRow;
