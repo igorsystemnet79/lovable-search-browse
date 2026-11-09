@@ -20,6 +20,8 @@ Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotogr
 
 Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni `localhost` koristi se HTTP.
 
+Frontend podrazumevano koristi isti domen za API (Caddy prosleđuje `/api/*` na API servis). U `.env` ostavi `VITE_API_ORIGIN` praznim za standardnu samostalnu instalaciju. Popuni ga samo ako API namerno hostuješ na drugoj HTTPS adresi, pa ponovo izgradi web servis. `API_INTERNAL_URL` je interna Docker adresa koju koristi server-side deo aplikacije; nemoj je menjati za standardni Compose raspored.
+
 ## Registracija i podaci korisnika
 
 Registracija traži ime, prezime i jedinstveno korisničko ime (3–30 znakova; slova, brojevi, tačka, donja crta ili crtica). Korisničko ime se čuva malim slovima i proverava se njegova jedinstvenost. Lozinke se čuvaju isključivo kao bcrypt hash i nikada nisu vidljive administratoru. U administratorskoj tabeli prikazuje se maskirana oznaka i objašnjenje zaštite lozinke.
