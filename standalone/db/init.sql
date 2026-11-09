@@ -770,3 +770,17 @@ CREATE TABLE IF NOT EXISTS paketi_firmi (
 CREATE INDEX IF NOT EXISTS paketi_firmi_user_idx ON paketi_firmi(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS paketi_firmi_aktivni_istek_idx ON paketi_firmi(status,vazi_do) WHERE status='aktivan';
 CREATE UNIQUE INDEX IF NOT EXISTS paketi_firmi_jedan_aktivan_po_firmi ON paketi_firmi(user_id) WHERE status='aktivan';
+
+
+-- Evidencija prihvatanja pravila, obaveštenja o privatnosti i potvrde punoletstva.
+CREATE TABLE IF NOT EXISTS prihvatanja_uslova (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ verzija_pravila integer NOT NULL DEFAULT 1,
+ verzija_obavestenja_privatnosti text NOT NULL DEFAULT 'nacrt-1.0',
+ potvrdjeno_punoletstvo boolean NOT NULL CHECK (potvrdjeno_punoletstvo=true),
+ prihvaceno_at timestamptz NOT NULL DEFAULT now(),
+ ip_adresa text,
+ user_agent text
+);
+CREATE INDEX IF NOT EXISTS prihvatanja_uslova_user_idx ON prihvatanja_uslova(user_id,prihvaceno_at DESC);
