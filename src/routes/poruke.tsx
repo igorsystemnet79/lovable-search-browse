@@ -16,7 +16,7 @@ function PorukePage(){
  const headers=()=>{let token="";try{token=JSON.parse(localStorage.getItem("ponudimi_session")||"null")?.access_token||"";}catch{}return {Authorization:`Bearer ${token}`,"Content-Type":"application/json"};};
  const loadThreads=useCallback(async()=>{try{const r=await fetch("/api/messages",{cache:"no-store",headers:headers()});const d=await r.json();if(!r.ok)throw Error(d.error||"Poruke nisu dostupne.");setThreads(d.data||[]);try{setUserId(JSON.parse(localStorage.getItem("ponudimi_session")||"null")?.user?.id||"");}catch{}if(!selected&&d.data?.[0])setSelected(d.data[0].id);setError("");}catch(e){setError(e instanceof Error?e.message:"Greška pri učitavanju.");}},[selected]);
  const loadMessages=useCallback(async(id:string)=>{try{const r=await fetch(`/api/messages/${id}`,{cache:"no-store",headers:headers()});const d=await r.json();if(!r.ok)throw Error(d.error||"Razgovor nije dostupan.");setMessages(d.messages||[]);}catch(e){setError(e instanceof Error?e.message:"Greška.");}},[]);
- useEffect(()=>{if(!loading&&!user)navigate({to:"/prijava",search:{redirect:"/poruke"}});},[loading,user,navigate]);
+ useEffect(()=>{if(!loading&&!user)navigate({to:"/prijava"});},[loading,user,navigate]);
  useEffect(()=>{if(razgovor)setSelected(razgovor);},[razgovor]);
  useEffect(()=>{if(user)loadThreads();},[user,loadThreads]);useEffect(()=>{if(selected&&user)loadMessages(selected);},[selected,user,loadMessages]);
  useEffect(()=>{if(!selected||!user)return;const timer=window.setInterval(()=>{loadMessages(selected);loadThreads();},15000);return()=>window.clearInterval(timer);},[selected,user,loadMessages,loadThreads]);
