@@ -1,7 +1,7 @@
 PONUDIMI — RAZVOJ I PODEŠAVANJA
 Glavni tehnički dnevnik i uputstvo za samostalnu instalaciju
 
-Verzija dokumenta: 1.0
+Verzija dokumenta: 1.0.1
 Datum provere i dopune: 09.11.2026.
 Vreme provere: 09:35, Europe/Belgrade
 Status: POČETNA GLAVNA VERZIJA — dokumentovanje je završeno; samostalna Docker instalacija još nije potvrđena.
@@ -152,6 +152,8 @@ Tehnologije:
 - QRCode i kriptografske funkcije za postojeću, trenutno isključenu TOTP funkcionalnost
 
 API se pokreće komandom npm start iz standalone/api, odnosno node server.mjs.
+
+Napomena za lokalni razvoj: server.mjs ne učitava .env preko dotenv biblioteke. Docker Compose sam čita standalone/.env, a Render dobija promenljive iz Dashboard-a. Ako se API pokreće direktno komandom node server.mjs van Docker-a, promenljive moraju prethodno biti prosleđene kroz shell ili hosting okruženje.
 
 3.3. Samostalna Docker arhitektura — planirani raspored
 
@@ -420,7 +422,7 @@ PONUDIMI_API_ORIGIN
 Gde: Vite build okruženje, koristi se u vite.config.ts za Nitro proxy pravila.
 Obavezno: nije posebno označeno kao obavezno jer postoji podrazumevana Render API adresa.
 Trenutna podrazumevana vrednost u vite.config.ts: https://ponudimi-test-api.onrender.com
-Promena na novom serveru: treba je uskladiti sa internim API adresiranjem, ali sama promena ove promenljive trenutno nije dovoljna za browser klijenta.
+Promena na novom serveru: treba je uskladiti sa internim API adresiranjem, ali sama promena ove promenljive trenutno nije dovoljna za browser klijenta. Vite konfiguracija čita process.env tokom učitavanja konfiguracije; promenljivu postaviti u build okruženju/Render Environment, ne pretpostavljati da će je Vite automatski preuzeti iz .env u toj fazi.
 
 API_INTERNAL_URL
 Gde: web servis u standalone/docker-compose.yml; koristi se u SSR putanji standalone klijenta.
@@ -767,7 +769,7 @@ Pregled trenutnog main fajla src/routes/index.tsx potvrđuje da je preko hero fo
 bg-gradient-to-r from-brand/90 via-brand/60 to-transparent
 Dakle, ranije uklanjanje teškog gradijenta nije konačno stanje. Hero fotografija je JPG, ali se preko nje ponovo prikazuje tamni gradijent. Ovo treba uzeti u obzir pri proveri Android prikaza i uskladiti sa zaključanim dizajnerskim zahtevom da se fotografija ne zatamnjuje neodobrenim CSS slojem.
 
-Nije izvršena fizička provera na Android telefonu, iPhone uređaju ili laptopu tokom ove dokumentacione provere. CSS postojanje nije isto što i potvrđen prikaz na stvarnom uređaju.
+Projekat je web aplikacija sa PWA elementima (manifest, viewport i mobilni meta podaci); nije potvrđen zaseban native Android/iOS projekat ili binarna aplikacija. Nije izvršena fizička provera na Android telefonu, iPhone uređaju ili laptopu tokom ove dokumentacione provere. CSS postojanje nije isto što i potvrđen prikaz na stvarnom uređaju.
 
 ===============================================================================
 10. DODATNE FUNKCIONALNOSTI I COMMIT DNEVNIK
@@ -1331,7 +1333,7 @@ PRIORITET 4 — funkcionalnosti i završna provera
 18. DNEVNIK OVE DOPUNE
 ===============================================================================
 
-09.11.2026. — verzija 1.0
+09.11.2026. — verzija 1.0.1
 - Proveren GitHub repozitorijum igorsystemnet79/lovable-search-browse.
 - Proverena podrazumevana grana main i lista postojećih grana.
 - Potvrđeno da Render frontend koristi main, a API koristi deploy/ponudimi-standalone.
@@ -1344,6 +1346,7 @@ PRIORITET 4 — funkcionalnosti i završna provera
 - Pronađeno neslaganje između reset UI minimuma 6 i API minimuma 8 karaktera.
 - Pronađeno neslaganje između README-a i trenutnog načina dodele admin uloge.
 - Dokument je sačuvan na dokumentacionoj grani docs/ponudimi-prirucnik, odvojenoj od Render deployment grana.
+- Dopunjena je napomena o .env učitavanju pri direktnom Node pokretanju, build-time PONUDIMI_API_ORIGIN promenljivoj i PWA/web statusu aplikacije.
 - Nije menjan aplikacioni kod, baza, korisnički nalozi, oglasi, produkciona podešavanja niti je pokrenut deploy.
 
 KRAJ DOKUMENTA
