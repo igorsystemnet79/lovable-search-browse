@@ -275,7 +275,7 @@ function Poruke() {
             {threads.map(t => <button type="button" key={t.id} onClick={() => openThread(t)} className={`w-full rounded-xl border p-3 text-left text-sm ${selected?.id === t.id ? "border-brand bg-brand/5" : "border-input bg-surface"}`}>
               <p className="font-semibold">{t.buyer_name} ↔ {t.seller_name}</p>
               <p className="text-xs text-muted-foreground">{t.listing_type === "ponude" ? "Ponuda" : "Zahtev"}: {t.listing_title || "Oglas nije dostupan"} · {t.message_count} por.</p>
-              <p className="mt-1 line-clamp-2">{t.last_message || "Nema poruka"}</p>
+              <p className="mt-1 text-xs text-muted-foreground">Otvori razgovor za pregled sadržaja poruka</p>
               <p className="mt-1 text-xs text-muted-foreground">{t.last_message_at ? new Date(t.last_message_at).toLocaleString("sr-RS") : ""}</p>
             </button>)}
             {!threads.length && <p className="rounded-xl bg-surface p-4 text-sm text-muted-foreground">Još nema privatnih razgovora.</p>}
