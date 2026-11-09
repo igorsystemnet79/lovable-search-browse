@@ -1,5 +1,7 @@
 FROM node:22-alpine AS build
 WORKDIR /app
+ARG VITE_API_ORIGIN=
+ENV VITE_API_ORIGIN=$VITE_API_ORIGIN
 COPY package.json ./
 RUN npm install
 COPY . .
