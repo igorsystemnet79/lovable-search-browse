@@ -5,7 +5,7 @@ import viteReact from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
-const apiOrigin = (process.env.PONUDIMI_API_ORIGIN || "https://ponudimi-test-api.onrender.com").replace(/\/$/, "");
+const apiOrigin = (process.env["PONUDIMI_API_ORIGIN"] || "https://ponudimi-test-api.onrender.com").replace(/\/$/, "");
 
 export default defineConfig({
   plugins: [
