@@ -140,7 +140,7 @@ app.use((req,res,next)=>{
  res.once('finish',()=>{
   const actor=req.user;if(!actor?.sub)return;
   const route=String(req.path||'/').slice(0,300);
-  const targetId=String(req.params?.id||req.params?.imageId||req.originalUrl.match(/\\/([0-9a-f-]{36})(?:[/?]|$)/i)?.[1]||'').slice(0,100)||null;
+  const targetId=String(req.params?.id||req.params?.imageId||req.originalUrl.split('?')[0].split('/').find(part=>/^[0-9a-f-]{36}$/i.test(part))||'').slice(0,100)||null;
   const action=({POST:'kreiranje',PUT:'izmena',PATCH:'izmena',DELETE:'brisanje'})[method]+' · '+route;
   const allowedFields=new Set(['naslov','opis','kategorija','lokacija','cena','budzet','valuta','zavrseno','pauziran','istaknuto','moderation_status','status','blokiran','firma_verifikovana','ime','prezime','grad','adresa','naziv_firme','pib','maintenance_enabled','maintenance_message','sadrzaj','message','enabled','role']);
   const source=req.body?.values && typeof req.body.values==='object' ? req.body.values : req.body||{};
