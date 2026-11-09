@@ -1304,7 +1304,7 @@ app.post('/api/messages/start',auth,asyncRoute(async(req,res)=>{
  if(!listing.rows[0])return res.status(404).json({error:'Oglas nije pronađen ili više nije aktivan.'});
  const sellerId=listing.rows[0].user_id;
  if(!sellerId)return res.status(400).json({error:'Za ovaj oglas nije moguće poslati privatnu poruku.'});
- if(sellerId===req.user.sub)return res.status(400).json({error:'Ne možete poslati poruku na sopstveni oglas.'});
+ // Self-messaging is enabled for account owners to test their private inbox and notifications.
  const conv=await pool.query(`INSERT INTO message_conversations(listing_type,listing_id,buyer_id,seller_id) VALUES($1,$2,$3,$4)
   ON CONFLICT(listing_type,listing_id,buyer_id,seller_id) DO UPDATE SET updated_at=now() RETURNING id`,[listingType,listingId,req.user.sub,sellerId]);
  const conversationId=conv.rows[0].id;
