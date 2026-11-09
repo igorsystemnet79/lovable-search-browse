@@ -36,7 +36,7 @@ Stranica „Obaveštenje o privatnosti“ je radna verzija. Pre javnog puštanja
 
 Pri registraciji korisnik se izjašnjava da li ponude objavljuje kao trgovac u okviru registrovane delatnosti ili kao privatno lice. Status se čuva na profilu, prenosi na ponude i prikazuje uz ponudu. Administrator može da ispravi status, a izmena se prenosi na postojeće ponude. Za postojeće naloge status ostaje „nije potvrđen“ dok ga korisnik/administrator ne utvrdi.
 
-Stranica „Kriterijumi rangiranja“ objašnjava parametre pretrage: najnovije, najstarije, cena/budžet rastuće i opadajuće. Filteri ključne reči, lokacije, kategorije, raspona cene i valute određuju skup rezultata. Istaknute ponude prikazuju se odvojeno i ne menjaju redosled standardne pretrage.
+Stranica „Kriterijumi rangiranja“ objašnjava parametre pretrage: najnovije, najstarije, cena/budžet rastuće i opadajuće. Filteri ključne reči, lokacije, kategorije, raspona cene i valute određuju skup rezultata. Istaknute ponude prikazuju se odvojeno i ne menjaju redosled standardne pretrage. Uz svaku ponudu postoji i link ka obaveštenju koje objašnjava status prodavca i podelu obaveza između prodavca i platforme.
 
 Ovo su tehničke funkcije za transparentnost onlajn tržišta. Pre javnog puštanja potrebno je pravno proveriti klasifikaciju trgovca za različite tipove korisnika, raspodelu obaveza između platforme i prodavca, informacije pre zaključenja ugovora i postupak za reklamacije/prijave.
 
