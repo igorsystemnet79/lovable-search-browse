@@ -22,6 +22,12 @@ export function SiteFooter() {
           </div>
         </div>
 
+        <div className="flex flex-wrap items-center gap-4 text-sm text-brand-foreground/80">
+          <Link to="/pravila" className="underline-offset-4 hover:underline">Pravilnik o ponašanju</Link>
+          <Link to="/privatnost" className="underline-offset-4 hover:underline">Politika privatnosti</Link>
+          <Link to="/podrska" className="underline-offset-4 hover:underline">Podrška</Link>
+        </div>
+
         <Button
           asChild
           className="h-auto rounded-full bg-highlight px-6 py-3 font-semibold text-highlight-foreground transition-opacity hover:bg-highlight hover:opacity-90"
