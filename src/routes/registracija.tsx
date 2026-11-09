@@ -42,6 +42,8 @@ function Registracija() {
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prikaziLozinku, setPrikaziLozinku] = useState(false);
+  const [prihvatioUslove, setPrihvatioUslove] = useState(false);
+  const [potvrdioPunoletstvo, setPotvrdioPunoletstvo] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
 
   async function onSubmit(e: React.FormEvent) {
@@ -50,6 +52,7 @@ function Registracija() {
     const email = f.email.trim().toLowerCase();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) return setGreska("Unesi ispravnu email adresu.");
     if (f.lozinka.length < 8) return setGreska("Lozinka mora imati najmanje 8 karaktera.");
+    if (!prihvatioUslove || !potvrdioPunoletstvo) return setGreska("Prihvati pravila platforme i potvrdi da si punoletan.");
     if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
     if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.korisnicko_ime.trim())) return setGreska("Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.");
     if (f.grad.trim().length < 2) return setGreska("Mesto stanovanja je obavezno.");
@@ -74,6 +77,8 @@ function Registracija() {
             grad: f.grad.trim(),
             adresa: f.adresa.trim(),
             tip_lica: tip,
+            prihvatio_uslove: prihvatioUslove,
+            potvrdio_punoletstvo: potvrdioPunoletstvo,
             ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
           },
         },
@@ -146,6 +151,17 @@ function Registracija() {
               </svg>
             )}
           </button>
+        </div>
+        <div className="space-y-3 rounded-xl border border-input bg-surface p-3 text-sm">
+          <label className="flex items-start gap-3">
+            <input type="checkbox" required checked={prihvatioUslove} onChange={e=>setPrihvatioUslove(e.target.checked)} className="mt-1 size-4 shrink-0 accent-brand" />
+            <span>Prihvatam <Link to="/pravila-platforme" target="_blank" className="font-semibold text-brand underline">Pravila platforme</Link> i potvrđujem da sam upoznat sa načinom korišćenja PonudiMi.</span>
+          </label>
+          <label className="flex items-start gap-3">
+            <input type="checkbox" required checked={potvrdioPunoletstvo} onChange={e=>setPotvrdioPunoletstvo(e.target.checked)} className="mt-1 size-4 shrink-0 accent-brand" />
+            <span>Potvrđujem da imam najmanje 18 godina i da podatke unosim istinito i u svoje ime.</span>
+          </label>
+          <p className="text-xs leading-5 text-muted-foreground">Datum i verzija prihvaćenih pravila, potvrda punoletstva i tehnički podaci o registraciji beleže se radi evidencije prihvatanja. Obaveštenje o privatnosti mora biti dovršeno pre javnog puštanja platforme.</p>
         </div>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
