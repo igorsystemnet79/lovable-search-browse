@@ -1272,7 +1272,9 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
 
 function validUuid(value){return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value||''));}
 async function notifyMessageRecipient(userId,conversationId,senderId){
- const sender=await pool.query('SELECT coalesce(nullif(p.ime,\'\'),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[senderId]);
+ // Ne šalji obaveštenje korisniku kada šalje poruku samom sebi (test razgovor).
+ if(String(userId)===String(senderId)) return {skipped:true,reason:'self_message'};
+ const sender=await pool.query('SELECT coalesce(nullif(p.ime,\\'\\'),u.email) AS display_name FROM users u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1',[senderId]);
  const name=String(sender.rows[0]?.display_name||'Korisnik').slice(0,100);
  await createUserNotification(userId,'reply','Nova poruka',name+' ti je poslao/la poruku.','/poruke',{conversation_id:conversationId},'message:'+conversationId+':'+randomUUID());
 }
