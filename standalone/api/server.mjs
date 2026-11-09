@@ -133,6 +133,25 @@ const admin = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
  next();
 });
+
+async function createUserNotification(userId,type,title,message,link=null,metadata={},dedupeKey=null){
+ const pref=await pool.query('SELECT in_app_enabled,listing_updates,important_changes FROM notification_preferences WHERE user_id=$1',[userId]);
+ const settings=pref.rows[0];
+ if(settings&&!settings.in_app_enabled)return;
+ if(type==='listing_update'&&settings&&!settings.listing_updates)return;
+ if(type==='platform'&&settings&&!settings.important_changes)return;
+ await pool.query('INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING',[userId,type,title,message,link,JSON.stringify(metadata),dedupeKey]);
+}
+async function notifyListingFollowers(table,listing,actorId){
+ if(!listing?.id)return;
+ const isOffer=table==='ponude',followColumn=isOffer?'ponuda_id':'zahtev_id';
+ const type=isOffer?'listing_update':'listing_update';
+ const title=isOffer?'Praćena ponuda je izmenjena':'Praćeni zahtev je izmenjen';
+ const label=String(listing.naslov||'Oglas').slice(0,120);
+ const message=`Izmenjeni su podaci oglasa „${label}“ koji pratiš.`;
+ const followers=await pool.query(`SELECT f.user_id FROM pracenja f LEFT JOIN notification_preferences n ON n.user_id=f.user_id WHERE f.${followColumn}=$1 AND f.user_id<>$2 AND COALESCE(n.in_app_enabled,true) AND COALESCE(n.listing_updates,true)`,[listing.id,actorId]);
+ for(const follower of followers.rows) await createUserNotification(follower.user_id,type,title,message,'/praceni-oglasi',{listing_id:listing.id,listing_type:table},randomUUID());
+}
 // Audit authenticated write operations, storing only a whitelist of non-secret fields.
 app.use((req,res,next)=>{
  const method=String(req.method||'').toUpperCase();
@@ -396,6 +415,41 @@ app.use(asyncRoute(async(req,res,next)=>{
 }));
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
+
+app.get('/api/notifications',auth,asyncRoute(async(req,res)=>{
+ const limit=Math.min(100,Math.max(1,Number.parseInt(req.query.limit||'30',10)||30));
+ await pool.query('INSERT INTO notification_preferences(user_id) VALUES($1) ON CONFLICT(user_id) DO NOTHING',[req.user.sub]);
+ const [items,count]=await Promise.all([
+  pool.query('SELECT id,type,title,message,link,metadata,read_at,created_at FROM user_notifications WHERE user_id=$1 ORDER BY created_at DESC LIMIT $2',[req.user.sub,limit]),
+  pool.query('SELECT count(*)::int AS unread FROM user_notifications WHERE user_id=$1 AND read_at IS NULL',[req.user.sub])
+ ]);
+ res.set('Cache-Control','private, no-store').json({data:items.rows,unread:count.rows[0].unread});
+}));
+app.patch('/api/notifications/:id/read',auth,asyncRoute(async(req,res)=>{
+ const result=await pool.query('UPDATE user_notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING id,read_at',[req.params.id,req.user.sub]);
+ if(!result.rows[0])return res.status(404).json({error:'Obaveštenje nije pronađeno.'});
+ res.json({data:result.rows[0]});
+}));
+app.post('/api/notifications/read-all',auth,asyncRoute(async(req,res)=>{
+ const result=await pool.query('UPDATE user_notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL',[req.user.sub]);
+ res.json({ok:true,updated:result.rowCount});
+}));
+app.get('/api/notifications/preferences',auth,asyncRoute(async(req,res)=>{
+ const result=await pool.query('INSERT INTO notification_preferences(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET user_id=EXCLUDED.user_id RETURNING in_app_enabled,listing_updates,important_changes,email_enabled,updated_at',[req.user.sub]);
+ res.json({data:result.rows[0]});
+}));
+app.put('/api/notifications/preferences',auth,asyncRoute(async(req,res)=>{
+ const b=req.body||{};
+ for(const key of ['in_app_enabled','listing_updates','important_changes','email_enabled'])if(typeof b[key]!=='boolean')return res.status(400).json({error:'Podešavanja obaveštenja nisu ispravna.'});
+ const result=await pool.query(`INSERT INTO notification_preferences(user_id,in_app_enabled,listing_updates,important_changes,email_enabled,updated_at) VALUES($1,$2,$3,$4,$5,now()) ON CONFLICT(user_id) DO UPDATE SET in_app_enabled=EXCLUDED.in_app_enabled,listing_updates=EXCLUDED.listing_updates,important_changes=EXCLUDED.important_changes,email_enabled=EXCLUDED.email_enabled,updated_at=now() RETURNING in_app_enabled,listing_updates,important_changes,email_enabled,updated_at`,[req.user.sub,b.in_app_enabled,b.listing_updates,b.important_changes,b.email_enabled]);
+ res.json({data:result.rows[0]});
+}));
+app.post('/api/admin/notifications/broadcast',auth,admin,asyncRoute(async(req,res)=>{
+ const title=String(req.body?.title||'').trim().slice(0,120),message=String(req.body?.message||'').trim().slice(0,500),link=String(req.body?.link||'').trim().slice(0,300)||null;
+ if(!title||!message)return res.status(400).json({error:'Naslov i tekst obaveštenja su obavezni.'});
+ const result=await pool.query(`INSERT INTO user_notifications(user_id,type,title,message,link,metadata) SELECT u.id,'platform',$1,$2,$3,jsonb_build_object('sent_by',$4::text) FROM users u LEFT JOIN notification_preferences n ON n.user_id=u.id WHERE COALESCE(n.in_app_enabled,true) AND COALESCE(n.important_changes,true) RETURNING id`,[title,message,link,req.user.sub]);
+ res.status(201).json({ok:true,sent:result.rowCount});
+}));
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
 // Google OAuth 2.0: links only to an existing PonudiMi account with the same verified email.
@@ -566,7 +620,7 @@ app.get('/api/ponude',optionalAuth,asyncRoute(async(req,res)=>{const q=String(re
 app.get('/api/zahtevi',optionalAuth,asyncRoute(async(req,res)=>{const q=String(req.query.q||'').trim();const loc=String(req.query.lokacija||'').trim();const {rows}=await pool.query(`SELECT * FROM zahtevi WHERE NOT pauziran AND moderation_status='visible' AND ($1='' OR unaccent(lower(concat_ws(' ',naslov,opis,kategorija,lokacija))) LIKE '%'||unaccent(lower($1))||'%') AND ($2='' OR lower(lokacija) LIKE '%'||lower($2)||'%') ORDER BY created_at DESC LIMIT 200`,[q,loc]);res.json(await attachListingOwnerData('zahtevi',rows,Boolean(req.user)));}));
 for (const [table,amount] of [['ponude','cena'],['zahtevi','budzet']]) {
  app.post(`/api/${table}`,auth,asyncRoute(async(req,res)=>{const b=req.body||{};const required=['naslov','kategorija','lokacija'];if(required.some(k=>!String(b[k]||'').trim())||String(b.naslov).length>150||String(b.opis||'').length>3000)return res.status(400).json({error:'Proveri obavezna polja oglasa.'});const {rows}=await pool.query(`INSERT INTO ${table}(naslov,opis,kategorija,lokacija,${amount},valuta,emoji,user_id,kontakt_ime,telefon) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING *`,[b.naslov,b.opis||null,b.kategorija,b.lokacija,b[amount]??null,b.valuta||'EUR',b.emoji||null,req.user.sub,b.kontakt_ime||null,b.telefon||null]);res.status(201).json(rows[0]);}));
- app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno','pauziran'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});res.json(rows[0]);}));
+ app.patch(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const allowed=['naslov','opis','kategorija','lokacija',amount,'valuta','kontakt_ime','telefon','zavrseno','pauziran'];const b=req.body||{};const keys=Object.keys(b).filter(k=>allowed.includes(k));if(!keys.length)return res.status(400).json({error:'Nema izmena.'});const vals=keys.map(k=>b[k]);vals.push(req.params.id,req.user.sub);const sets=keys.map((k,i)=>`${k}=$${i+1}`).join(',');const {rows}=await pool.query(`UPDATE ${table} SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,vals);if(!rows[0])return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});await notifyListingFollowers(table,rows[0],req.user.sub);res.json(rows[0]);}));
  app.delete(`/api/${table}/:id`,auth,asyncRoute(async(req,res)=>{const owned=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!owned.rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});const keys=await listingStorageKeys(table,[req.params.id]);const {rowCount}=await pool.query(`DELETE FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!rowCount)return res.status(404).json({error:'Oglas nije pronađen ili nije vaš.'});await removeStoredImages(keys);res.json({ok:true});}));
 }
 app.post('/api/oglasi/:id/slike',auth,memoryUpload.array('fotografije',7),asyncRoute(async(req,res)=>{const kind=req.body.tip==='zahtev'?'zahtev':'ponuda';const table=kind==='ponuda'?'ponude':'zahtevi';const col=kind==='ponuda'?'ponuda_id':'zahtev_id';const own=await pool.query(`SELECT id FROM ${table} WHERE id=$1 AND user_id=$2`,[req.params.id,req.user.sub]);if(!own.rows.length)return res.status(404).json({error:'Oglas nije pronađen.'});if(!req.files?.length)return res.status(400).json({error:'Izaberite najmanje jednu fotografiju u JPG, PNG ili WebP formatu.'});const old=await pool.query(`SELECT count(*)::int n FROM slike_oglasa WHERE ${col}=$1`,[req.params.id]);if(old.rows[0].n+req.files.length>7)return res.status(400).json({error:'Najviše 7 fotografija po oglasu.'});const out=[];const saved=[];try{for(const [i,file] of req.files.entries()){const key=`${req.user.sub}/${randomUUID()}.jpg`;const normalized=await normalizeImage(file.buffer);await saveImage(key,normalized,'image/jpeg');saved.push(key);const inserted=await pool.query(`INSERT INTO slike_oglasa(${col},storage_path,pozicija) VALUES($1,$2,$3) RETURNING *`,[req.params.id,`/uploads/${key}`,old.rows[0].n+i]);out.push(inserted.rows[0]);}}catch(error){for(const key of saved){try{await removeImage(key);}catch(cleanupError){console.error('Neuspešno čišćenje nepotpune fotografije:',cleanupError.message);}}throw error;}res.status(201).json(out);}));
@@ -923,7 +977,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`$${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);}
    result={data:Array.isArray(values)?inserted:inserted[0]||null};
  } else if(action==='update'){
-   const row=supplied[0]||{};const keys=Object.keys(row);if(!keys.length)return res.json({data:[]});const vals=keys.map(k=>row[k]);const sets=keys.map((k,i)=>`${ident(k)}=$${i+1}`).join(',');const updateWhere=where.map(w=>w.replace(/\$(\d+)/g,(_m,n)=>`$${Number(n)+vals.length}`)).join(' AND ');const all=[...vals,...params];const r=await pool.query(`UPDATE ${ident(table)} SET ${sets}${updateWhere?` WHERE ${updateWhere}`:''} RETURNING *`,all);if(table==='profiles'&&!adminUser&&r.rows[0]){const v=await pool.query(`UPDATE profiles SET firma_verifikovana=(tip_lica='pravno' AND pib IS NOT NULL AND EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib)) WHERE id=$1 RETURNING *`,[userId]);result={data:v.rows};}else result={data:r.rows};
+   const row=supplied[0]||{};const keys=Object.keys(row);if(!keys.length)return res.json({data:[]});const vals=keys.map(k=>row[k]);const sets=keys.map((k,i)=>`${ident(k)}=$${i+1}`).join(',');const updateWhere=where.map(w=>w.replace(/\$(\d+)/g,(_m,n)=>`$${Number(n)+vals.length}`)).join(' AND ');const all=[...vals,...params];const r=await pool.query(`UPDATE ${ident(table)} SET ${sets}${updateWhere?` WHERE ${updateWhere}`:''} RETURNING *`,all);if(table==='profiles'&&!adminUser&&r.rows[0]){const v=await pool.query(`UPDATE profiles SET firma_verifikovana=(tip_lica='pravno' AND pib IS NOT NULL AND EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib)) WHERE id=$1 RETURNING *`,[userId]);result={data:v.rows};}else{result={data:r.rows};if(table==='ponude'||table==='zahtevi')for(const row of r.rows)await notifyListingFollowers(table,row,userId);}
  } else if(action==='delete'){
    const deleteWhere=whereSql||'';if(!deleteWhere)return res.status(400).json({error:'Brisanje bez filtera nije dozvoljeno.'});
    let imageKeys=[];if(table==='ponude'||table==='zahtevi'){const matches=await pool.query(`SELECT id FROM ${ident(table)}${deleteWhere}`,params);imageKeys=await listingStorageKeys(table,matches.rows.map(x=>x.id));}
