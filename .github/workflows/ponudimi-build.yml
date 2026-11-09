@@ -36,6 +36,7 @@ jobs:
           ZIP_FILE="$RUNNER_TEMP/PonudiMi-samostalna-instalacija.zip"
           mkdir -p "$PACKAGE_DIR"
           git archive --format=tar HEAD | tar -xf - -C "$PACKAGE_DIR"
+          find "$PACKAGE_DIR" -type f -name "*.zip" -delete
           {
             echo "PonudiMi standalone package"
             echo "Commit: $GITHUB_SHA"
