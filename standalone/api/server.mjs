@@ -428,7 +428,7 @@ app.get('/api/admin/business-firms',auth,admin,asyncRoute(async(req,res)=>{
  res.json({data:r.rows});
 }));
 app.get('/api/admin/business-packages',auth,admin,asyncRoute(async(_req,res)=>{
- await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=CURRENT_DATE");
+ await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=(now() AT TIME ZONE 'Europe/Belgrade')::date");
  const r=await pool.query(`SELECT k.*,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id ORDER BY CASE WHEN k.status='aktivan' THEN 0 ELSE 1 END,k.vazi_do ASC,k.created_at DESC LIMIT 300`);
  res.json({data:r.rows});
 }));
@@ -450,7 +450,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
   const active=payment==='placeno'||payment==='oslobodjeno';
   if(active)await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
   const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
-   VALUES($1,$2,$3,$4,$5,CURRENT_DATE,(CURRENT_DATE + ($6::text || ' months')::interval)::date,$7,$8,$9) RETURNING *`,
+   VALUES($1,$2,$3,$4,$5,(now() AT TIME ZONE 'Europe/Belgrade')::date,((now() AT TIME ZONE 'Europe/Belgrade')::date + ($6::text || ' months')::interval)::date,$7,$8,$9) RETURNING *`,
    [userId,code,selected.price,active?'aktivan':'na_cekanju',payment,selected.months,note||null,reference||null,req.user.sub]);
   await c.query('COMMIT');res.status(201).json({data:result.rows[0],poruka:active?'Paket je aktiviran.':'Paket je evidentiran i čeka uplatu.'});
  }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
@@ -471,9 +471,11 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
 
 let packageReminderRunning=false;
 async function sendBusinessPackageReminders(){
- if(packageReminderRunning||!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return;
+ if(packageReminderRunning)return;
  packageReminderRunning=true;
  try{
+  await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=(now() AT TIME ZONE 'Europe/Belgrade')::date");
+  if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return;
   const due=await pool.query(`SELECT k.id,k.vazi_do,p.email,p.naziv_firme FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id
    WHERE k.status='aktivan' AND k.email_podsetnik_poslat_at IS NULL
    AND k.vazi_do=(now() AT TIME ZONE 'Europe/Belgrade')::date + 10
