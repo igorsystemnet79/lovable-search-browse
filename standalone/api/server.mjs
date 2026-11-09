@@ -1220,7 +1220,7 @@ app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
   LEFT JOIN zahtevi z ON c.listing_type='zahtevi' AND z.id=c.listing_id WHERE c.id=$1`,[req.params.id]);
  if(!conversation.rows[0])return res.status(404).json({error:'Razgovor nije pronađen.'});
  await pool.query("INSERT INTO message_admin_access_log(admin_id,conversation_id,action,reason) VALUES($1,$2,'view',$3)",[req.user.sub,req.params.id,reason]);
- await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',req.params.id,JSON.stringify({conversation_id:req.params.id,reason})]);
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_view_messages','POST',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/view',req.params.id,JSON.stringify({conversation_id:req.params.id,reason})]);
  const messages=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC LIMIT 1000',[req.params.id]);
  res.set('Cache-Control','private, no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
