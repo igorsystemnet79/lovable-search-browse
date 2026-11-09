@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "react";
 import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja } from "@/integrations/standalone/client";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu } from "@/lib/admin.functions";
+import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
@@ -29,7 +29,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "APR firme", "Paketi firmi", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -61,6 +61,7 @@ function AdminPage() {
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
             {tab === "APR firme" && <Apr />}
+            {tab === "Paketi firmi" && <PaketiFirmi />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
             {tab === "ChatGPT" && <AdminChatGPT />}
           </>
@@ -780,6 +781,48 @@ function Poruke() {
       ))}
     </div>
   );
+}
+
+
+function PaketiFirmi() {
+ const [q,setQ]=useState("");
+ const [firme,setFirme]=useState<any[]>([]);
+ const [selected,setSelected]=useState("");
+ const [paket,setPaket]=useState("mesecni");
+ const [uplata,setUplata]=useState("ceka_uplatu");
+ const [napomena,setNapomena]=useState("");
+ const [referenca,setReferenca]=useState("");
+ const [rows,setRows]=useState<any[]>([]);
+ const [busy,setBusy]=useState(false);
+ const [msg,setMsg]=useState("");
+ const load=useCallback(async()=>{try{const r=await ucitajPaketeFirmi();setRows(r.data||[]);}catch(e){setMsg(e instanceof Error?e.message:"Pakete nije moguće učitati.");}},[]);
+ useEffect(()=>{void load();},[load]);
+ useEffect(()=>{let active=true;const timer=setTimeout(()=>{pretraziFirmeZaPaket(q).then(r=>{if(active)setFirme(r.data||[]);}).catch(()=>{if(active)setFirme([]);});},250);return()=>{active=false;clearTimeout(timer);};},[q]);
+ async function submit(){if(!selected){setMsg("Izaberi firmu.");return;}setBusy(true);setMsg("");try{const r=await dodeliPaketFirmi({user_id:selected,paket,status_uplate:uplata,napomena,referenca_uplate:referenca});setMsg(r.poruka||"Paket je sačuvan.");setSelected("");setNapomena("");setReferenca("");await load();}catch(e){setMsg(e instanceof Error?e.message:"Paket nije sačuvan.");}finally{setBusy(false);}}
+ async function cancel(id:string){if(!window.confirm("Otkazati ovaj paket?"))return;setBusy(true);try{await otkaziPaketFirme(id);setMsg("Paket je otkazan.");await load();}catch(e){setMsg(e instanceof Error?e.message:"Paket nije otkazan.");}finally{setBusy(false);}}
+ const labels:Record<string,string>={mesecni:"10 € / mesec",tromesecni:"20 € / 3 meseca",sestomesecni:"50 € / 6 meseci",godisnji:"100 € / 12 meseci"};
+ return <div className="space-y-5">
+  <section className="rounded-2xl border border-input bg-surface p-4">
+   <h2 className="font-semibold">Dodela paketa pravnom licu</h2>
+   <p className="mt-1 text-sm text-muted-foreground">Paket može dobiti samo APR-verifikovana firma. Aktivacija je moguća nakon evidentirane uplate ili kada administrator označi da je paket oslobođen plaćanja.</p>
+   <div className="mt-3 grid gap-3 md:grid-cols-2">
+    <div><label className="mb-1 block text-xs font-medium">Pretraga firme po nazivu, PIB-u ili e-mailu</label><Input className={inputCls} value={q} onChange={e=>setQ(e.target.value)} placeholder="Unesi naziv firme, PIB ili e-mail"/></div>
+    <div><label className="mb-1 block text-xs font-medium">Izaberi firmu</label><select className={inputCls} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Izaberi firmu</option>{firme.map(f=><option key={f.user_id} value={f.user_id}>{f.naziv_firme||"Firma"} · PIB {f.pib||"—"} · {f.firma_verifikovana?"Verifikovana":"Nije verifikovana"}</option>)}</select></div>
+    <div><label className="mb-1 block text-xs font-medium">Paket</label><select className={inputCls} value={paket} onChange={e=>setPaket(e.target.value)}>{Object.entries(labels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+    <div><label className="mb-1 block text-xs font-medium">Status uplate</label><select className={inputCls} value={uplata} onChange={e=>setUplata(e.target.value)}><option value="ceka_uplatu">Čeka uplatu — bez aktivacije</option><option value="placeno">Plaćeno — aktiviraj</option><option value="oslobodjeno">Oslobođeno plaćanja — aktiviraj</option></select></div>
+    <div><label className="mb-1 block text-xs font-medium">Referenca uplate (opciono)</label><Input className={inputCls} value={referenca} onChange={e=>setReferenca(e.target.value)} placeholder="Broj transakcije / poziv na broj"/></div>
+    <div><label className="mb-1 block text-xs font-medium">Administratorska napomena (opciono)</label><Input className={inputCls} value={napomena} onChange={e=>setNapomena(e.target.value)} placeholder="Napomena"/></div>
+   </div>
+   <button type="button" className="mt-3 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy||!selected} onClick={()=>void submit()}>{busy?"Sačekaj...":"Sačuvaj paket"}</button>
+   {msg&&<p role="status" className="mt-3 text-sm">{msg}</p>}
+  </section>
+  <section className="space-y-3"><div className="flex items-center justify-between"><h2 className="font-semibold">Evidencija paketa</h2><button className={small} onClick={()=>void load()} disabled={busy}>Osveži</button></div>
+   <div className="overflow-x-auto rounded-2xl bg-surface shadow-card"><table className="w-full min-w-[850px] text-left text-sm"><thead className="text-muted-foreground"><tr><th className="p-3">Firma / PIB</th><th className="p-3">Paket</th><th className="p-3">Uplata</th><th className="p-3">Važi do</th><th className="p-3">Status</th><th className="p-3">Podsetnik</th><th className="p-3">Radnja</th></tr></thead><tbody>
+   {rows.map(r=><tr key={r.id} className="border-t border-input"><td className="p-3">{r.naziv_firme||"Firma"}<br/><span className="text-xs text-muted-foreground">PIB {r.pib||"—"} · {r.email||"—"}</span></td><td className="p-3">{labels[r.paket]||r.paket}<br/><span className="text-xs text-muted-foreground">{Number(r.cena_eur).toFixed(2)} €</span></td><td className="p-3">{r.status_uplate==="placeno"?"Plaćeno":r.status_uplate==="oslobodjeno"?"Oslobođeno":"Čeka uplatu"}</td><td className="p-3">{new Date(r.vazi_do).toLocaleDateString("sr-RS",{timeZone:"UTC"})}</td><td className="p-3">{r.status==="aktivan"?"Aktivan":r.status==="na_cekanju"?"Na čekanju":r.status==="istekao"?"Istekao":"Otkazan"}</td><td className="p-3">{r.email_podsetnik_poslat_at?"E-mail poslat":r.email_podsetnik_greska?"Greška pri slanju":"Čeka termin"}</td><td className="p-3">{["aktivan","na_cekanju"].includes(r.status)&&<button className={danger} disabled={busy} onClick={()=>void cancel(r.id)}>Otkaži</button>}</td></tr>)}
+   {!rows.length&&<tr><td colSpan={7} className="p-4 text-muted-foreground">Još nema evidentiranih paketa.</td></tr>}
+   </tbody></table></div>
+  </section>
+ </div>;
 }
 
 function Apr() {
