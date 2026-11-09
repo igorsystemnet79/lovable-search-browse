@@ -72,7 +72,7 @@ Skripta traži potvrdu pre upisa. SQL vraćanje radi u postojeću bazu i može p
 
 ## Google prijava (OAuth)
 
-Google prijava koristi sopstveni API i ne zahteva Supabase. U Google Cloud Console napravi OAuth 2.0 Client ID tipa **Web application**. Kao Authorized redirect URI unesi tačno:
+Google prijava koristi sopstveni API i ne zavisi od spoljašnjeg auth servisa. U Google Cloud Console napravi OAuth 2.0 Client ID tipa **Web application**. Kao Authorized redirect URI unesi tačno:
 
 ```text
 https://ponudimi-test-api.onrender.com/api/auth/google/callback
