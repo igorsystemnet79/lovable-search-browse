@@ -26,6 +26,12 @@ Registracija traži ime, prezime i jedinstveno korisničko ime (3–30 znakova; 
 
 Pri pokretanju API-ja `standalone/db/init.sql` automatski dodaje kolone `prezime` i `korisnicko_ime` u postojeću bazu, vraća prezime iz ranije sačuvanih registracionih metapodataka gde je dostupno i postavlja jedinstveni indeks za korisnička imena. Za ovu izmenu nije potrebno ručno izvršavati SQL.
 
+## Pravila, punoletstvo i privatnost
+
+Registracija zahteva potvrdu prihvatanja pravila platforme, upoznavanje sa obaveštenjem o privatnosti i samostalnu potvrdu da korisnik ima najmanje 18 godina. API odbija registraciju ako ove potvrde nisu prosleđene. U bazi se čuvaju verzija pravila, verzija obaveštenja, vreme prihvatanja, potvrda punoletstva, IP adresa i User-Agent radi evidencije prihvatanja.
+
+Stranica „Obaveštenje o privatnosti“ je radna verzija. Pre javnog puštanja obavezno uneti puno poslovno ime i adresu rukovaoca, matični broj/PIB, kontakt za privatnost, stvarne hosting i druge obrađivače, lokacije obrade i konkretne rokove čuvanja; zatim pribaviti pravnu proveru. Potvrda punoletstva je samostalna izjava korisnika i nije provera identiteta ličnom kartom.
+
 ## Prvi administratorski nalog
 
 Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija administratorsku ulogu. Registruj ga kroz stranicu Registracija nakon prvog pokretanja. Nemoj javno deliti tu adresu ili tajne iz `.env` fajla.
