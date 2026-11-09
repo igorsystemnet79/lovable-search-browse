@@ -1384,6 +1384,38 @@ const ensureAdminMessageArchives = async () => {
  )`);
  await pool.query('CREATE INDEX IF NOT EXISTS admin_message_archives_created_at_idx ON admin_message_archives(created_at DESC)');
 };
+const formatConversationText = ({conversation,messages=[],exportedAt,exportedBy,exportReason,archiveId,sha256}={}) => {
+ const lines=[
+  'PONUDIMI — PREPISKA KORISNIKA',
+  '='.repeat(48),
+  '',
+  'PODACI O RAZGOVORU',
+  'Oglas: '+(conversation?.listing_title||'Bez naslova'),
+  'Vrsta: '+(conversation?.listing_type==='ponude'?'Ponuda':conversation?.listing_type==='zahtevi'?'Zahtev':'Razgovor'),
+  'Kupac: '+(conversation?.buyer_name||'—')+' ('+(conversation?.buyer_email||'—')+')',
+  'Prodavac: '+(conversation?.seller_name||'—')+' ('+(conversation?.seller_email||'—')+')',
+  'Razgovor otvoren: '+(conversation?.created_at?new Date(conversation.created_at).toLocaleString('sr-RS'):'—'),
+  'Broj poruka: '+messages.length,
+  '',
+  'PREPISKA',
+  '='.repeat(48),
+  ''
+ ];
+ for(const message of messages){
+  lines.push((message.sender_name||message.sender_email||'Korisnik')+' — '+(message.created_at?new Date(message.created_at).toLocaleString('sr-RS'):'datum nije dostupan'));
+  lines.push(String(message.body||''));
+  lines.push('');
+ }
+ lines.push('PODACI O IZVOZU');
+ lines.push('Izvezeno: '+(exportedAt?new Date(exportedAt).toLocaleString('sr-RS'):'—'));
+ lines.push('Izvezao administrator: '+(exportedBy?.email||'—'));
+ lines.push('Razlog izvoza: '+(exportReason||'—'));
+ lines.push('Oznaka arhive: '+(archiveId||'—'));
+ if(sha256)lines.push('SHA-256: '+sha256);
+ lines.push('');
+ lines.push('Dokument je automatski generisan sa platforme PonudiMi.');
+ return lines.join('\\n');
+};
 app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversationId=req.params.id;
  if(!validUuid(conversationId))return res.status(400).json({error:'ID razgovora nije ispravan.'});
@@ -1402,17 +1434,17 @@ app.get('/api/admin/messages/:id/export',auth,admin,asyncRoute(async(req,res)=>{
  const conversation=result.rows[0];
  const messageResult=await pool.query('SELECT id,sender_id,body,created_at,read_at FROM marketplace_messages WHERE conversation_id=$1 ORDER BY created_at ASC',[conversationId]);
  const messages=messageResult.rows.map(m=>({...m,sender_name:m.sender_id===conversation.buyer_id?conversation.buyer_name:conversation.seller_name,sender_email:m.sender_id===conversation.buyer_id?conversation.buyer_email:conversation.seller_email}));
- const archiveId=randomUUID();
- const payload={document_type:'PonudiMi — arhiva privatne prepiske',format_version:1,archive_id:archiveId,exported_at:new Date().toISOString(),exported_by:{user_id:req.user.sub,email:req.user.email||null},export_reason:reason,conversation,messages};
- const canonical=JSON.stringify(payload);
- const sha256=createHash('sha256').update(canonical,'utf8').digest('hex');
- const document={...payload,integrity:{algorithm:'SHA-256',hash:sha256,hash_scope:'SHA-256 nad UTF-8 bajtovima JSON objekta bez ovog integrity polja; proverava integritet izvezenog sadržaja.'}};
- const filename='ponudimi-prepiska-'+conversationId+'-'+archiveId+'.json';
+ const archiveId=randomUUID(),exportedAt=new Date().toISOString(),exportedBy={user_id:req.user.sub,email:req.user.email||null};
+ const baseText=formatConversationText({conversation,messages,exportedAt,exportedBy,exportReason:reason,archiveId});
+ const sha256=createHash('sha256').update(baseText,'utf8').digest('hex');
+ const textContent=formatConversationText({conversation,messages,exportedAt,exportedBy,exportReason:reason,archiveId,sha256});
+ const document={document_type:'PonudiMi — tekstualna arhiva privatne prepiske',format_version:2,archive_id:archiveId,exported_at:exportedAt,exported_by:exportedBy,export_reason:reason,conversation,messages,text_content:textContent,integrity:{algorithm:'SHA-256',hash:sha256,hash_scope:'Kontrolni zbir teksta prepiske bez završne linije SHA-256.'}};
+ const filename='ponudimi-prepiska-'+conversationId+'.txt';
  await ensureAdminMessageArchives();
  await pool.query('INSERT INTO admin_message_archives(id,conversation_id,file_name,document,sha256,message_count,created_by,created_by_email,export_reason) VALUES($1,$2,$3,$4::jsonb,$5,$6,$7,$8,$9)',
   [archiveId,conversationId,filename,JSON.stringify(document),sha256,messages.length,req.user.sub,req.user.email||null,reason]);
- await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_export_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/export',conversationId,JSON.stringify({archive_id:archiveId,conversation_id:conversationId,message_count:messages.length,reason,sha256})]);
- res.set({'Cache-Control':'private, no-store','Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="'+filename+'"'}).send(JSON.stringify(document,null,2));
+ await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_export_messages','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/export',conversationId,JSON.stringify({archive_id:archiveId,conversation_id:conversationId,message_count:messages.length,reason,sha256,format:'text/plain'})]);
+ res.set({'Cache-Control':'private, no-store','Content-Type':'text/plain; charset=utf-8','Content-Disposition':'attachment; filename="'+filename+'"'}).send(textContent);
 }));
 app.get('/api/admin/message-archives',auth,admin,asyncRoute(async(req,res)=>{
  await ensureAdminMessageArchives();
@@ -1427,10 +1459,18 @@ app.get('/api/admin/message-archives',auth,admin,asyncRoute(async(req,res)=>{
 app.get('/api/admin/message-archives/:id/download',auth,admin,asyncRoute(async(req,res)=>{
  if(!validUuid(req.params.id))return res.status(400).json({error:'ID arhive nije ispravan.'});
  await ensureAdminMessageArchives();
- const result=await pool.query('SELECT file_name,document FROM admin_message_archives WHERE id=$1',[req.params.id]);
+ const result=await pool.query('SELECT file_name,document,sha256 FROM admin_message_archives WHERE id=$1',[req.params.id]);
  if(!result.rows[0])return res.status(404).json({error:'Arhiva nije pronađena.'});
  await pool.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_download_message_archive','GET',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/message-archives/:id/download',req.params.id,JSON.stringify({archive_id:req.params.id})]);
- res.set({'Cache-Control':'private, no-store','Content-Type':'application/json; charset=utf-8','Content-Disposition':'attachment; filename="'+String(result.rows[0].file_name).replace(/["\\\\]/g,'')+'"'}).send(JSON.stringify(result.rows[0].document,null,2));
+ const document=result.rows[0].document||{};
+ let content=typeof document.text_content==='string'?document.text_content:'';
+ if(!content){
+  const conversation=document.conversation||{};
+  const messages=Array.isArray(document.messages)?document.messages:[];
+  content=formatConversationText({conversation,messages,exportedAt:document.exported_at,exportedBy:document.exported_by,exportReason:document.export_reason,archiveId:document.archive_id||req.params.id,sha256:result.rows[0].sha256});
+ }
+ const filename=String(result.rows[0].file_name||'ponudimi-prepiska.txt').replace(/[^a-zA-Z0-9._-]/g,'_').replace(/\\.json$/i,'.txt');
+ res.set({'Cache-Control':'private, no-store','Content-Type':'text/plain; charset=utf-8','Content-Disposition':'attachment; filename="'+(filename.endsWith('.txt')?filename:filename+'.txt')+'"'}).send(content);
 }));
 app.delete('/api/admin/message-archives/:id',auth,admin,asyncRoute(async(req,res)=>{
  if(!validUuid(req.params.id))return res.status(400).json({error:'ID arhive nije ispravan.'});
