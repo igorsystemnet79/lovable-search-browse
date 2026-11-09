@@ -1,0 +1,62 @@
+name: PonudiMi quality checks
+
+on:
+  push:
+    branches:
+      - deploy/ponudimi-standalone
+  pull_request:
+    branches:
+      - deploy/ponudimi-standalone
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  application:
+    name: Frontend build, lint and API syntax
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build frontend
+        run: npm run build
+      - name: Lint frontend
+        run: npm run lint
+      - name: Check standalone API syntax
+        run: node --check standalone/api/server.mjs
+
+  database:
+    name: PostgreSQL schema validation
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ponudimi
+          POSTGRES_PASSWORD: test-password
+          POSTGRES_DB: ponudimi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ponudimi -d ponudimi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install PostgreSQL client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Apply database schema twice
+        env:
+          PGPASSWORD: test-password
+        run: |
+          psql -h 127.0.0.1 -U ponudimi -d ponudimi_test -v ON_ERROR_STOP=1 -f standalone/db/init.sql
+          psql -h 127.0.0.1 -U ponudimi -d ponudimi_test -v ON_ERROR_STOP=1 -f standalone/db/init.sql
