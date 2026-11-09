@@ -559,7 +559,15 @@ async function sendBusinessPackageReminders(){
  finally{packageReminderRunning=false;}
 }
 
-app.use((err,_req,res,_next)=>{console.error(err);res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});});
+app.use((err,_req,res,_next)=>{
+ console.error(err);
+ if(err instanceof multer.MulterError){
+  const status=err.code==='LIMIT_FILE_SIZE'?413:400;
+  return res.status(status).json({error:err.code==='LIMIT_FILE_SIZE'?'Fotografija može imati najviše 20 MB.':err.code==='LIMIT_FILE_COUNT'?'Možeš dodati najviše 7 fotografija po oglasu.':'Podaci o fotografiji nisu ispravni.'});
+ }
+ if(/Dozvoljeni su samo JPG, PNG i WebP formati/.test(String(err?.message||'')))return res.status(400).json({error:err.message});
+ res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});
+});
 const port=Number(process.env.PORT||process.env.API_PORT||4000);
 async function startServer(){
  const schemaPath=path.resolve(__dirname,'../db/init.sql');
