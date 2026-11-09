@@ -26,7 +26,7 @@ CREATE TABLE IF NOT EXISTS platform_rules_versions (
 CREATE TABLE IF NOT EXISTS profiles (
  id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
  ime text, prezime text, korisnicko_ime text, telefon text, grad text, adresa text, tip_lica text NOT NULL DEFAULT 'fizicko' CHECK (tip_lica IN ('fizicko','pravno')),
- naziv_firme text, pib text CHECK (pib IS NULL OR pib ~ '^[0-9]{9}
+ naziv_firme text, pib text CHECK (pib IS NULL OR pib ~ '^[0-9]{9}$'),
  firma_verifikovana boolean NOT NULL DEFAULT false, blokiran boolean NOT NULL DEFAULT false, email text,
  created_at timestamptz NOT NULL DEFAULT now()
 );
