@@ -7,7 +7,7 @@ export type PrijavaOglasa = {
   prijavio_id: string | null;
   razlog: string;
   detalji: string | null;
-  status: "na_cekanju" | "pregledano" | "odbijeno";
+  status: "na_cekanju" | "pregledano" | "odbijeno" | "oglas_uklonjen" | "vracen_u_prikaz";
   admin_napomena: string | null;
   created_at: string;
   odluceno_at: string | null;
@@ -46,6 +46,6 @@ export async function ucitajPrijaveOglasa(): Promise<PrijavaOglasa[]> {
   return request("/api/admin/reports");
 }
 
-export async function obradiPrijavu(id: string, status: "pregledano" | "odbijeno", napomena?: string) {
+export async function obradiPrijavu(id: string, status: "pregledano" | "odbijeno" | "oglas_uklonjen" | "vracen_u_prikaz", napomena?: string) {
   return request(`/api/admin/reports/${encodeURIComponent(id)}/decision`, "POST", { status, napomena });
 }
