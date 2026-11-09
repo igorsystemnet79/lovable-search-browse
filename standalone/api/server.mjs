@@ -186,7 +186,10 @@ async function notifyNewListingSubscribers(table,listing,ownerId){
  const label=String(listing.naslov||'Novi oglas').slice(0,120);
  const message=`Objavljen je novi oglas: „${label}“.`;
  const link=isOffer?'/ponude':'/zahtevi';
- await pool.query(`INSERT INTO user_notifications(user_id,type,title,message,link,metadata,dedupe_key) SELECT n.user_id,$1,$2,$3,$4,jsonb_build_object('listing_id',$5::text,'listing_type',$6),gen_random_uuid()::text FROM notification_preferences n WHERE n.in_app_enabled AND n.${flag} AND n.user_id<>$7 ON CONFLICT(user_id,dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING`,[type,title,message,link,listing.id,table,ownerId]);
+ const subscribers=await pool.query(`SELECT user_id FROM notification_preferences WHERE ${flag} AND (in_app_enabled OR email_enabled) AND user_id<>$1`,[ownerId]);
+ for(const subscriber of subscribers.rows){
+  await createUserNotification(subscriber.user_id,type,title,message,link,{listing_id:listing.id,listing_type:table},type+':'+listing.id+':'+subscriber.user_id);
+ }
 }
 // Audit authenticated write operations, storing only a whitelist of non-secret fields.
 app.use((req,res,next)=>{
