@@ -75,6 +75,7 @@ function Registracija() {
             adresa: f.adresa.trim(),
             tip_lica: tip,
             pravila_prihvacena: true,
+            punoletstvo_potvrdjeno: true,
             politika_privatnosti_potvrdjena: true,
             ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
           },
@@ -147,7 +148,7 @@ function Registracija() {
         </div>
         <label className="flex items-start gap-3 rounded-xl border border-input p-3 text-sm leading-6">
           <input type="checkbox" required checked={prihvatioPravila} onChange={e => setPrihvatioPravila(e.target.checked)} className="mt-1 size-4 shrink-0 accent-current" />
-          <span>Pročitao/la sam i prihvatam <Link to="/pravila" target="_blank" className="font-semibold text-brand underline">Pravilnik o ponašanju</Link> i potvrđujem da sam upoznat/a sa <Link to="/privatnost" target="_blank" className="font-semibold text-brand underline">Politikom privatnosti</Link>, uključujući mogućnost opravdanog i evidentiranog administratorskog pristupa privatnim razgovorima.</span>
+          <span>Potvrđujem da imam najmanje 18 godina. Pročitao/la sam i prihvatam <Link to="/pravila" target="_blank" className="font-semibold text-brand underline">Pravilnik o ponašanju</Link> i potvrđujem da sam upoznat/a sa <Link to="/privatnost" target="_blank" className="font-semibold text-brand underline">Politikom privatnosti</Link>, uključujući mogućnost opravdanog i evidentiranog administratorskog pristupa privatnim razgovorima.</span>
         </label>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
         <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
