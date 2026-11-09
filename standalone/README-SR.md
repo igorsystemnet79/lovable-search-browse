@@ -58,6 +58,16 @@ Za vraćanje na odgovarajuću instalaciju koristi:
 
 Skripta traži potvrdu pre upisa. SQL vraćanje radi u postojeću bazu i može promeniti njene podatke; koristi ga samo kada namerno vraćaš backup. Nemoj brisati Docker volumene.
 
+## Google prijava (OAuth)
+
+Google prijava koristi sopstveni API i ne zahteva Supabase. U Google Cloud Console napravi OAuth 2.0 Client ID tipa **Web application**. Kao Authorized redirect URI unesi tačno:
+
+```text
+https://ponudimi-test-api.onrender.com/api/auth/google/callback
+```
+
+Za drugu instalaciju zameni domen stvarnim javnim domenom API-ja. U Render Environment ili `.env` postavi `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` (mora biti identičan URI-ju u Google Cloud) i `PUBLIC_APP_URL=https://ponudimi-novo.onrender.com`. OAuth prijava povezuje samo postojeći PonudiMi nalog sa potpuno istom, Google-potvrđenom e-mail adresom; ako nalog ne postoji, korisnik prvo mora da se registruje redovnim postupkom, uključujući potvrdu telefona. Tajna klijenta nikada se ne unosi u frontend niti commit-uje u GitHub.
+
 ## Oporavak lozinke i integracije
 
 Oporavak lozinke šalje jednokratni link koji važi jedan sat. Za to moraju biti podešeni SMTP podaci. APR sinhronizacija radi samo kada dobiješ i uneseš važeći pristup APR API servisu. Google OAuth nije uključen u ovu samostalnu verziju; email i lozinka rade bez spoljnog identiteta.
