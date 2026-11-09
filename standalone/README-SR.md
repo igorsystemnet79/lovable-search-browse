@@ -20,6 +20,12 @@ Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotogr
 
 Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni `localhost` koristi se HTTP.
 
+## Registracija i podaci korisnika
+
+Registracija traži ime, prezime i jedinstveno korisničko ime (3–30 znakova; slova, brojevi, tačka, donja crta ili crtica). Korisničko ime se čuva malim slovima i proverava se njegova jedinstvenost. Lozinke se čuvaju isključivo kao bcrypt hash i nikada nisu vidljive administratoru. U administratorskoj tabeli prikazuje se maskirana oznaka i objašnjenje zaštite lozinke.
+
+Pri pokretanju API-ja `standalone/db/init.sql` automatski dodaje kolone `prezime` i `korisnicko_ime` u postojeću bazu, vraća prezime iz ranije sačuvanih registracionih metapodataka gde je dostupno i postavlja jedinstveni indeks za korisnička imena. Za ovu izmenu nije potrebno ručno izvršavati SQL.
+
 ## Prvi administratorski nalog
 
 Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija administratorsku ulogu. Registruj ga kroz stranicu Registracija nakon prvog pokretanja. Nemoj javno deliti tu adresu ili tajne iz `.env` fajla.
