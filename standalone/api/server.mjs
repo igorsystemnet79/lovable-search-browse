@@ -1367,6 +1367,41 @@ app.post('/api/admin/messages/:id/view',auth,admin,asyncRoute(async(req,res)=>{
  res.set('Cache-Control','private, no-store').json({conversation:conversation.rows[0],messages:messages.rows});
 }));
 
+app.delete('/api/admin/messages/:id/message/:messageId',auth,admin,asyncRoute(async(req,res)=>{
+ const conversationId=req.params.id,messageId=req.params.messageId;
+ if(!validUuid(conversationId)||!validUuid(messageId))return res.status(400).json({error:'ID razgovora ili poruke nije ispravan.'});
+ const reason=String(req.body?.reason||'').trim().slice(0,500);
+ if(reason.length<10)return res.status(400).json({error:'Za brisanje navedite razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const message=await client.query('SELECT id,conversation_id,sender_id FROM marketplace_messages WHERE id=$1 AND conversation_id=$2 FOR UPDATE',[messageId,conversationId]);
+  if(!message.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Poruka nije pronađena.'});}
+  await client.query('DELETE FROM marketplace_messages WHERE id=$1',[messageId]);
+  await client.query('UPDATE message_conversations SET updated_at=now() WHERE id=$1',[conversationId]);
+  await client.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_delete_message','DELETE',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id/message/:messageId',messageId,JSON.stringify({conversation_id:conversationId,message_id:messageId,sender_id:message.rows[0].sender_id,reason})]);
+  await client.query('COMMIT');
+  res.json({ok:true,message:'Poruka je obrisana.'});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+app.delete('/api/admin/messages/:id',auth,admin,asyncRoute(async(req,res)=>{
+ const conversationId=req.params.id;
+ if(!validUuid(conversationId))return res.status(400).json({error:'ID razgovora nije ispravan.'});
+ const reason=String(req.body?.reason||'').trim().slice(0,500);
+ if(reason.length<10)return res.status(400).json({error:'Za brisanje navedite razlog od najmanje 10 karaktera.'});
+ const client=await pool.connect();
+ try{
+  await client.query('BEGIN');
+  const conversation=await client.query('SELECT id,buyer_id,seller_id FROM message_conversations WHERE id=$1 FOR UPDATE',[conversationId]);
+  if(!conversation.rows[0]){await client.query('ROLLBACK');return res.status(404).json({error:'Razgovor nije pronađen.'});}
+  const count=await client.query('SELECT count(*)::int AS count FROM marketplace_messages WHERE conversation_id=$1',[conversationId]);
+  await client.query("INSERT INTO admin_audit_log(actor_id,actor_email,action,http_method,route,target_id,response_status,details) VALUES($1,$2,'admin_delete_conversation','DELETE',$3,$4,200,$5::jsonb)",[req.user.sub,req.user.email,'/api/admin/messages/:id',conversationId,JSON.stringify({conversation_id:conversationId,buyer_id:conversation.rows[0].buyer_id,seller_id:conversation.rows[0].seller_id,message_count:count.rows[0].count,reason})]);
+  await client.query('DELETE FROM message_conversations WHERE id=$1',[conversationId]);
+  await client.query('COMMIT');
+  res.json({ok:true,message:'Razgovor i sve njegove poruke su obrisani.'});
+ }catch(error){await client.query('ROLLBACK');throw error;}finally{client.release();}
+}));
+
 app.get('/api/admin/audit-log',auth,admin,asyncRoute(async(req,res)=>{
  const limit=Math.min(500,Math.max(1,Number.parseInt(req.query.limit||'100',10)||100)),offset=Math.max(0,Number.parseInt(req.query.offset||'0',10)||0);
  const actor=String(req.query.actor||'').trim().slice(0,254),action=String(req.query.action||'').trim().slice(0,120),from=String(req.query.from||'').trim(),to=String(req.query.to||'').trim();
