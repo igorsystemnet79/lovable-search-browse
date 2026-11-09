@@ -42,13 +42,25 @@ Umesto `admin@example.com` unesi tačnu adresu iz `ADMIN_EMAIL`. Komanda radi sa
 
 ## Backup i vraćanje
 
-Iz direktorijuma `standalone` pokreni:
+**Automatski backup:** Docker Compose pokreće i servis `backup`. On pravi kopiju PostgreSQL baze i arhivu fotografija odmah nakon pokretanja, a zatim ponavlja postupak na svakih 24 sata. Fajlovi se čuvaju u `standalone/backups`, a lokalne kopije starije od 14 dana automatski se brišu. Ako backup ne uspe, servis beleži grešku u svom logu i pokušava ponovo nakon sledećeg intervala.
+
+Provera statusa i logova:
+
+```bash
+docker compose ps backup
+docker compose logs --tail=100 backup
+ls -lh backups/
+```
+
+Interval se može promeniti promenljivom `BACKUP_INTERVAL_SECONDS` u `.env` (podrazumevano `86400` sekundi).
+
+**Važno:** automatska kopija na istom serveru nije dovoljna zaštita od kvara ili gubitka celog servera. Redovno kopiraj oba backup fajla na drugu lokaciju (drugi server ili privatno skladište). Za ručno pokretanje dodatne kopije koristi:
 
 ```bash
 ./scripts/backup.sh
 ```
 
-Skripta pravi dva fajla u `standalone/backups`: SQL kopiju PostgreSQL baze i arhivu fotografija. Kopiraj oba fajla i na drugu, nezavisnu lokaciju.
+Skripta pravi dva fajla u `standalone/backups`: SQL kopiju PostgreSQL baze i arhivu fotografija.
 
 Za vraćanje na odgovarajuću instalaciju koristi:
 
