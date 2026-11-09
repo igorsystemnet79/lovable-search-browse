@@ -26,7 +26,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma", "Evidencija aktivnosti"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -52,6 +52,7 @@ function AdminPage() {
         {tab === "Poruke" && <Poruke />}
         {tab === "APR firme" && <Apr />}
         {tab === "Platforma" && <PlatformSettings />}
+        {tab === "Obaveštenja" && <AdminObavestenja />}
         {tab === "Evidencija aktivnosti" && <EvidencijaAktivnosti />}
       </>
     );
@@ -375,6 +376,51 @@ function PlatformSettings() {
   );
 }
 
+
+
+function AdminObavestenja() {
+  const [title, setTitle] = useState("");
+  const [message, setMessage] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const token = () => {
+    try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; }
+    catch { return ""; }
+  };
+  async function send() {
+    setBusy(true); setNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/notifications/broadcast", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
+        body: JSON.stringify({ title: title.trim(), message: message.trim() }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Slanje obaveštenja nije uspelo.");
+      setNotice(`Obaveštenje je poslato na ${Number(data.sent || 0).toLocaleString("sr-RS")} korisničkih naloga.`);
+      setTitle(""); setMessage("");
+    } catch (e) { setError(e instanceof Error ? e.message : "Slanje nije uspelo."); }
+    finally { setBusy(false); }
+  }
+  return (
+    <section className="max-w-2xl space-y-4 rounded-2xl bg-surface p-5 shadow-card sm:p-6">
+      <div>
+        <h2 className="text-xl font-semibold">Važno obaveštenje korisnicima</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Poruka će se pojaviti u zvoncu za obaveštenja korisnicima koji nisu isključili važna obaveštenja.</p>
+      </div>
+      <label className="block text-sm font-medium">Naslov
+        <input className={inputCls + " mt-1 w-full"} maxLength={120} value={title} onChange={e => setTitle(e.target.value)} placeholder="Naslov obaveštenja" />
+      </label>
+      <label className="block text-sm font-medium">Tekst obaveštenja
+        <textarea className={inputCls + " mt-1 min-h-28 w-full"} maxLength={500} value={message} onChange={e => setMessage(e.target.value)} placeholder="Unesite kratko i jasno obaveštenje..." />
+      </label>
+      <button type="button" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy || !title.trim() || !message.trim()} onClick={send}>{busy ? "Slanje..." : "Pošalji obaveštenje"}</button>
+      {notice && <p role="status" className="text-sm font-medium text-green-700">{notice}</p>}
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    </section>
+  );
+}
 
 type AuditRow = {
   id: string; actor_email: string | null; action: string; http_method: string;
