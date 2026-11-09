@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as MojiOglasiRouteImport } from './routes/moji-oglasi'
+import { Route as MojNalogRouteImport } from './routes/moj-nalog'
 import { Route as PodrskaRouteImport } from './routes/podrska'
 import { Route as PonudeRouteImport } from './routes/ponude'
 import { Route as PraceniOglasiRouteImport } from './routes/praceni-oglasi'
@@ -39,6 +40,11 @@ const AdminRoute = AdminRouteImport.update({
 const MojiOglasiRoute = MojiOglasiRouteImport.update({
   id: '/moji-oglasi',
   path: '/moji-oglasi',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MojNalogRoute = MojNalogRouteImport.update({
+  id: '/moj-nalog',
+  path: '/moj-nalog',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PodrskaRoute = PodrskaRouteImport.update({
@@ -110,6 +116,7 @@ const OglasKindIdRoute = OglasKindIdRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/moj-nalog': typeof MojNalogRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/moj-nalog': typeof MojNalogRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -147,6 +155,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/moj-nalog': typeof MojNalogRoute
   '/moji-oglasi': typeof MojiOglasiRoute
   '/podrska': typeof PodrskaRoute
   '/ponude': typeof PonudeRoute
@@ -168,6 +177,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/moji-oglasi'
+    | '/moj-nalog'
     | '/podrska'
     | '/ponude'
     | '/praceni-oglasi'
@@ -223,6 +233,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
   MojiOglasiRoute: typeof MojiOglasiRoute
+  MojNalogRoute: typeof MojNalogRoute
   PodrskaRoute: typeof PodrskaRoute
   PonudeRoute: typeof PonudeRoute
   PraceniOglasiRoute: typeof PraceniOglasiRoute
@@ -259,6 +270,13 @@ declare module '@tanstack/react-router' {
       path: '/moji-oglasi'
       fullPath: '/moji-oglasi'
       preLoaderRoute: typeof MojiOglasiRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/moj-nalog': {
+      id: '/moj-nalog'
+      path: '/moj-nalog'
+      fullPath: '/moj-nalog'
+      preLoaderRoute: typeof MojNalogRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/podrska': {
