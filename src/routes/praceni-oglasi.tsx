@@ -36,7 +36,7 @@ function Praceni() {
         <h1 className="text-3xl font-bold">Praćeni oglasi</h1>
         {!loading && !user && <p className="mt-4">Da pratiš ponude i zahteve, <Link to="/prijava" className="font-semibold text-brand underline">prijavi se</Link>.</p>}
         {user && q.isLoading && <p className="mt-4 text-muted-foreground">Učitavanje praćenih oglasa...</p>}
-        {user && !q.isLoading && ukupno === 0 && <p className="mt-4 text-muted-foreground">Trenutno ne pratiš nijednu ponudu ili zahtev. Izaberi „Prati ponudu“ ili „Prati zahtev“ ispod oglasa.</p>}
+        {user && !q.isLoading && !q.isError && ukupno === 0 && <p className="mt-4 text-muted-foreground">Trenutno ne pratiš nijednu ponudu ili zahtev. Izaberi „Prati ponudu“ ili „Prati zahtev“ ispod oglasa.</p>}
         {user && q.isError && <p className="mt-4 text-sm text-destructive">Praćeni oglasi trenutno ne mogu da se učitaju. Pokušaj ponovo.</p>}
         {ponude.length > 0 && <section className="mt-7">
           <h2 className="text-xl font-semibold">Ponude koje pratiš ({ponude.length})</h2>
