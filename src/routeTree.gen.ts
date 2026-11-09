@@ -171,8 +171,6 @@ export interface FileRouteTypes {
     | '/oglas/$kind/$id'
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
-    | '/kriterijumi-rangiranja'
-    | '/politika-privatnosti'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -188,6 +186,8 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/kriterijumi-rangiranja'
+    | '/politika-privatnosti'
   id:
     | '__root__'
     | '/'
@@ -203,6 +203,8 @@ export interface FileRouteTypes {
     | '/zahtevi'
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
+    | '/kriterijumi-rangiranja'
+    | '/politika-privatnosti'
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
   fileRoutesById: FileRoutesById
