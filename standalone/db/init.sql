@@ -795,3 +795,58 @@ ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS moderacija_blokirana boolean NOT NU
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
 ALTER TABLE ponude ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
 ALTER TABLE zahtevi ADD COLUMN IF NOT EXISTS status_trgovca text NOT NULL DEFAULT 'nepotvrdjeno' CHECK (status_trgovca IN ('trgovac','nije_trgovac','nepotvrdjeno'));
+
+
+-- Privatne poruke između korisnika i administratorska evidencija.
+CREATE TABLE IF NOT EXISTS message_conversations (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ listing_type text NOT NULL CHECK (listing_type IN ('ponude','zahtevi')),
+ listing_id uuid NOT NULL,
+ buyer_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ seller_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ UNIQUE(listing_type,listing_id,buyer_id,seller_id)
+);
+CREATE INDEX IF NOT EXISTS message_conversations_buyer_idx ON message_conversations(buyer_id,updated_at DESC);
+CREATE INDEX IF NOT EXISTS message_conversations_seller_idx ON message_conversations(seller_id,updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS message_messages (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ conversation_id uuid NOT NULL REFERENCES message_conversations(id) ON DELETE CASCADE,
+ sender_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ body text NOT NULL CHECK (char_length(body) BETWEEN 1 AND 2000),
+ created_at timestamptz NOT NULL DEFAULT now(),
+ read_at timestamptz
+);
+CREATE INDEX IF NOT EXISTS message_messages_conversation_idx ON message_messages(conversation_id,created_at,id);
+CREATE INDEX IF NOT EXISTS message_messages_unread_idx ON message_messages(conversation_id,sender_id) WHERE read_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS message_archives (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ conversation_id uuid REFERENCES message_conversations(id) ON DELETE SET NULL,
+ file_name text NOT NULL,
+ content text NOT NULL,
+ sha256 text NOT NULL CHECK (sha256 ~ '^[a-f0-9]{64}$'),
+ message_count integer NOT NULL DEFAULT 0 CHECK (message_count>=0),
+ created_by uuid REFERENCES users(id) ON DELETE SET NULL,
+ export_reason text NOT NULL,
+ listing_type text,
+ listing_title text,
+ buyer_name text,
+ seller_name text,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS message_archives_created_idx ON message_archives(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS message_admin_audit (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ conversation_id uuid REFERENCES message_conversations(id) ON DELETE SET NULL,
+ admin_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ action text NOT NULL CHECK (action IN ('view','export','download_archive','delete_message','delete_conversation','delete_archive')),
+ reason text NOT NULL,
+ details jsonb NOT NULL DEFAULT '{}'::jsonb,
+ created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS message_admin_audit_conversation_idx ON message_admin_audit(conversation_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS message_admin_audit_admin_idx ON message_admin_audit(admin_id,created_at DESC);
