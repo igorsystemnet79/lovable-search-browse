@@ -133,7 +133,7 @@ const admin = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
  next();
 });
-// Audit authenticated write operations without persisting submitted values or secrets.
+// Audit authenticated write operations, storing only a whitelist of non-secret fields.
 app.use((req,res,next)=>{
  const method=String(req.method||'').toUpperCase();
  if(!['POST','PUT','PATCH','DELETE'].includes(method)||req.path.startsWith('/api/auth/'))return next();
