@@ -11,6 +11,9 @@ Ovaj paket pokreće frontend, sopstveni API, PostgreSQL i trajno čuvanje fotogr
 
 ## Instalacija
 
+Preporučena provera zavisnosti je `npm run audit:security` iz korena projekta. Bezbednosna provera je odvojena od `npm run build`, tako da poznato upozorenje o ranjivosti u zavisnosti ne prekida automatski produkcionu izgradnju; upozorenja ipak treba pregledati i ažurirati zavisnosti pre javnog puštanja.
+
+
 1. Raspakuj ZIP na server.
 2. Uđi u direktorijum `standalone`.
 3. Pokreni `./scripts/install.sh`. Skripta proverava Docker Compose, traži domen i email prvog administratora, automatski generiše jake tajne i pokreće servise.
