@@ -3,7 +3,7 @@ import { useCallback,useEffect,useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 export const Route=createFileRoute("/poruke")({
- validateSearch:(search:Record<string,unknown>)=>({razgovor:typeof search.razgovor==="string"?search.razgovor:undefined}),
+ validateSearch:(search:Record<string,unknown>)=>({razgovor:typeof search["razgovor"]==="string"?search["razgovor"]:undefined}),
  head:()=>({meta:[{title:"Moje poruke — PonudiMi"},{name:"robots",content:"noindex"}]}),
  component:PorukePage,
 });
