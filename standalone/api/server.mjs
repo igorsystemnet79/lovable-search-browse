@@ -68,6 +68,7 @@ app.use(['/api/ponude','/api/zahtevi'], rateLimit({ windowMs: 60 * 1000, limit: 
 app.use('/api/oglasi', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage/upload', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
+app.use('/api/messages', rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: true, legacyHeaders: false }));
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
@@ -1188,7 +1189,6 @@ app.get('/api/admin/messages',auth,admin,asyncRoute(async(req,res)=>{
   CASE WHEN c.listing_type='ponude' THEN o.naslov ELSE z.naslov END AS listing_title,
   bu.email AS buyer_email,coalesce(nullif(bp.ime,''),bu.email) AS buyer_name,
   su.email AS seller_email,coalesce(nullif(sp.ime,''),su.email) AS seller_name,
-  (SELECT body FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message,
   (SELECT created_at FROM marketplace_messages m WHERE m.conversation_id=c.id ORDER BY m.created_at DESC LIMIT 1) AS last_message_at,
   (SELECT count(*)::int FROM marketplace_messages m WHERE m.conversation_id=c.id) AS message_count
   FROM message_conversations c JOIN users bu ON bu.id=c.buyer_id JOIN users su ON su.id=c.seller_id
