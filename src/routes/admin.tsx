@@ -8,6 +8,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
 import { ClearableSearchInput } from "@/components/clearable-search-input";
 import type { Tables } from "@/integrations/standalone/types";
+import { DEFAULT_PLATFORM_RULES } from "@/lib/platform-rules";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -26,7 +27,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "APR firme", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Poruke", "Pravilnik", "APR firme", "Platforma", "Obaveštenja", "Evidencija aktivnosti"] as const;
 const small = "rounded-full border border-input px-3 py-1 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "rounded-full bg-destructive px-3 py-1 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -50,6 +51,7 @@ function AdminPage() {
         {tab === "Ponude" && <Oglasi tabela="ponude" />}
         {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
         {tab === "Poruke" && <Poruke />}
+        {tab === "Pravilnik" && <PlatformRulesEditor />}
         {tab === "APR firme" && <Apr />}
         {tab === "Platforma" && <PlatformSettings />}
         {tab === "Obaveštenja" && <AdminObavestenja />}
@@ -354,6 +356,114 @@ function Apr() {
   );
 }
 
+
+
+function PlatformRulesEditor() {
+  const [content, setContent] = useState(DEFAULT_PLATFORM_RULES);
+  const [history, setHistory] = useState<any[]>([]);
+  const [version, setVersion] = useState<number | null>(null);
+  const [publishedAt, setPublishedAt] = useState<string | null>(null);
+  const [busy, setBusy] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const token = () => {
+    try { return JSON.parse(localStorage.getItem("ponudimi_session") || "null")?.access_token || ""; }
+    catch { return ""; }
+  };
+  const headers = () => ({ Authorization: `Bearer ${token()}` });
+  const load = useCallback(async () => {
+    setBusy(true); setError("");
+    try {
+      const [currentResponse, historyResponse] = await Promise.all([
+        fetch("/api/platform-rules", { cache: "no-store" }),
+        fetch("/api/admin/platform-rules/history", { cache: "no-store", headers: headers() }),
+      ]);
+      const current = await currentResponse.json().catch(() => ({}));
+      const previous = await historyResponse.json().catch(() => ({}));
+      if (!currentResponse.ok) throw new Error(current.error || "Trenutni pravilnik nije dostupan.");
+      if (!historyResponse.ok) throw new Error(previous.error || "Istorija pravilnika nije dostupna.");
+      setContent(current.data?.sadrzaj || DEFAULT_PLATFORM_RULES);
+      setVersion(current.data?.version ? Number(current.data.version) : null);
+      setPublishedAt(current.data?.published_at || null);
+      setHistory(previous.data || []);
+    } catch (e) { setError(e instanceof Error ? e.message : "Greška pri učitavanju pravilnika."); }
+    finally { setBusy(false); }
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  async function publish() {
+    if (content.trim().length < 30) { setError("Unesite potpun tekst pravilnika."); return; }
+    if (!window.confirm("Objaviti novu verziju pravilnika? Izmena će odmah biti vidljiva svim korisnicima.")) return;
+    setSaving(true); setNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/platform-rules", {
+        method: "PUT",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ sadrzaj: content }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Objavljivanje pravilnika nije uspelo.");
+      setVersion(Number(data.data?.version) || null);
+      setPublishedAt(data.data?.published_at || new Date().toISOString());
+      setNotice("Pravilnik je objavljen i promena je odmah dostupna na javnoj stranici.");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Objavljivanje nije uspelo."); }
+    finally { setSaving(false); }
+  }
+  async function restore(id: string) {
+    if (!window.confirm("Vratiti izabranu verziju? Ona će biti objavljena kao nova verzija, a postojeća istorija ostaje sačuvana.")) return;
+    setSaving(true); setNotice(""); setError("");
+    try {
+      const response = await fetch("/api/admin/platform-rules/restore", {
+        method: "POST",
+        headers: { ...headers(), "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Vraćanje verzije nije uspelo.");
+      setNotice("Izabrana verzija je vraćena i objavljena.");
+      await load();
+    } catch (e) { setError(e instanceof Error ? e.message : "Vraćanje nije uspelo."); }
+    finally { setSaving(false); }
+  }
+  return (
+    <section className="space-y-5">
+      <div className="max-w-4xl rounded-2xl bg-surface p-5 shadow-card sm:p-6">
+        <h2 className="text-xl font-semibold">Pravilnik o ponašanju na platformi</h2>
+        <p className="mt-2 text-sm leading-6 text-muted-foreground">Ovde uređujete pravila za oglase, zahteve, privatne poruke, zaštitu korisnika i moderaciju. Klikom na „Sačuvaj i objavi pravilnik“ nova verzija odmah postaje vidljiva na javnoj stranici. Svaka objava čuva se u istoriji.</p>
+        <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+          <span>{version ? `Trenutna verzija: ${version}` : "Početni nacrt još nije objavljen u bazi"}</span>
+          {publishedAt && <span>· Objavljeno: {new Date(publishedAt).toLocaleString("sr-RS")}</span>}
+        </div>
+        <label className="mt-4 block text-sm font-medium" htmlFor="platform-rules-editor">Tekst pravilnika</label>
+        <textarea id="platform-rules-editor" className={`${inputCls} mt-2 min-h-[560px] w-full font-mono text-sm leading-6`} maxLength={50000} value={content} onChange={e => setContent(e.target.value)} />
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <span className="text-xs text-muted-foreground">{content.length.toLocaleString("sr-RS")} / 50.000 karaktera</span>
+          <div className="flex gap-2">
+            <button type="button" className={small} disabled={busy || saving} onClick={load}>Osveži</button>
+            <button type="button" className="rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy || saving || content.trim().length < 30} onClick={publish}>{saving ? "Čuvanje..." : "Sačuvaj i objavi pravilnik"}</button>
+          </div>
+        </div>
+        {busy && <p className="mt-3 text-sm text-muted-foreground">Učitavanje pravilnika...</p>}
+        {notice && <p role="status" className="mt-3 text-sm font-medium text-green-700">{notice}</p>}
+        {error && <p role="alert" className="mt-3 text-sm font-medium text-destructive">{error}</p>}
+      </div>
+      <div className="max-w-4xl rounded-2xl bg-surface p-5 shadow-card sm:p-6">
+        <h3 className="text-lg font-semibold">Istorija objavljenih verzija</h3>
+        <p className="mt-1 text-sm text-muted-foreground">Vraćanje stare verzije ne briše istoriju; objavljuje je kao novu verziju.</p>
+        <div className="mt-4 space-y-2">
+          {history.map(item => (
+            <div key={item.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-input p-3 text-sm">
+              <div><p className="font-semibold">Verzija {item.version}</p><p className="text-xs text-muted-foreground">{new Date(item.published_at).toLocaleString("sr-RS")}</p></div>
+              <button type="button" className={small} disabled={saving} onClick={() => restore(item.id)}>Vrati ovu verziju</button>
+            </div>
+          ))}
+          {!history.length && <p className="text-sm text-muted-foreground">Još nema objavljenih verzija.</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
 
 function PlatformSettings() {
   const [enabled, setEnabled] = useState(false);
