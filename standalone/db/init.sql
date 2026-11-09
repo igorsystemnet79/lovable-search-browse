@@ -388,3 +388,6 @@ CREATE TRIGGER admin_audit_log_no_update BEFORE UPDATE OR DELETE ON admin_audit_
 
 -- Keep audit history independent from user deletion; actor_id is an immutable historical identifier.
 ALTER TABLE admin_audit_log DROP CONSTRAINT IF EXISTS admin_audit_log_actor_id_fkey;
+
+ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS new_offers boolean NOT NULL DEFAULT false;
+ALTER TABLE notification_preferences ADD COLUMN IF NOT EXISTS new_requests boolean NOT NULL DEFAULT false;
