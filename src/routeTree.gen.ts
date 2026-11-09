@@ -23,6 +23,8 @@ import { Route as ZahteviRouteImport } from './routes/zahtevi'
 import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 import { Route as OglasKindIdRouteImport } from './routes/oglas.$kind.$id'
 import { Route as PorukeRouteImport } from './routes/poruke'
+import { Route as PravilaRouteImport } from './routes/pravila'
+import { Route as PrivatnostRouteImport } from './routes/privatnost'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -89,6 +91,16 @@ const PorukeRoute = PorukeRouteImport.update({
   path: '/poruke',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PravilaRoute = PravilaRouteImport.update({
+  id: '/pravila',
+  path: '/pravila',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivatnostRoute = PrivatnostRouteImport.update({
+  id: '/privatnost',
+  path: '/privatnost',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OglasKindIdRoute = OglasKindIdRouteImport.update({
   id: '/oglas/$kind/$id',
   path: '/oglas/$kind/$id',
@@ -110,6 +122,8 @@ export interface FileRoutesByFullPath {
   '/kategorija/$slug': typeof KategorijaSlugRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/poruke': typeof PorukeRoute
+  '/pravila': typeof PravilaRoute
+  '/privatnost': typeof PrivatnostRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,6 +139,8 @@ export interface FileRoutesByTo {
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
   '/poruke': typeof PorukeRoute
+  '/pravila': typeof PravilaRoute
+  '/privatnost': typeof PrivatnostRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,6 +157,8 @@ export interface FileRoutesById {
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
   '/poruke': typeof PorukeRoute
+  '/pravila': typeof PravilaRoute
+  '/privatnost': typeof PrivatnostRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -159,6 +177,8 @@ export interface FileRouteTypes {
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
     | '/poruke'
+    | '/pravila'
+    | '/privatnost'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -175,6 +195,8 @@ export interface FileRouteTypes {
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
     | '/poruke'
+    | '/pravila'
+    | '/privatnost'
   id:
     | '__root__'
     | '/'
@@ -191,6 +213,8 @@ export interface FileRouteTypes {
     | '/kategorija/$slug'
     | '/oglas/$kind/$id'
     | '/poruke'
+    | '/pravila'
+    | '/privatnost'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -208,6 +232,8 @@ export interface RootRouteChildren {
   KategorijaSlugRoute: typeof KategorijaSlugRoute
   OglasKindIdRoute: typeof OglasKindIdRoute
   PorukeRoute: typeof PorukeRoute
+  PravilaRoute: typeof PravilaRoute
+  PrivatnostRoute: typeof PrivatnostRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -303,11 +329,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PorukeRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/poruke': {
-      id: '/poruke'
-      path: '/poruke'
-      fullPath: '/poruke'
-      preLoaderRoute: typeof PorukeRouteImport
+    '/pravila': {
+      id: '/pravila'
+      path: '/pravila'
+      fullPath: '/pravila'
+      preLoaderRoute: typeof PravilaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privatnost': {
+      id: '/privatnost'
+      path: '/privatnost'
+      fullPath: '/privatnost'
+      preLoaderRoute: typeof PrivatnostRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/oglas/$kind/$id': {
@@ -335,6 +368,8 @@ const rootRouteChildren: RootRouteChildren = {
   KategorijaSlugRoute: KategorijaSlugRoute,
   OglasKindIdRoute: OglasKindIdRoute,
   PorukeRoute: PorukeRoute,
+  PravilaRoute: PravilaRoute,
+  PrivatnostRoute: PrivatnostRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
