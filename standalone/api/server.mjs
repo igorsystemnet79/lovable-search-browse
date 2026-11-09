@@ -413,6 +413,53 @@ app.get('/api/storage/public',asyncRoute(async(req,res)=>{
 }));
 app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(!stored.rows[0])return res.status(404).end();res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=86400');res.send(stored.rows[0].body);}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
+
+const BUSINESS_PACKAGES = {
+ mesecni:{months:1,price:10,label:'Mesečni paket'},
+ tromesecni:{months:3,price:20,label:'Tromesečni paket'},
+ sestomesecni:{months:6,price:50,label:'Šestomesečni paket'},
+ godisnji:{months:12,price:100,label:'Godišnji paket'},
+};
+app.get('/api/admin/business-firms',auth,admin,asyncRoute(async(req,res)=>{
+ const q=String(req.query.q||'').trim().slice(0,100);
+ const params=[];let where="p.tip_lica='pravno'";
+ if(q){params.push(`%${q.replace(/[%_\\]/g,'\\app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{')}%`);where+=" AND (p.naziv_firme ILIKE $1 ESCAPE '\\\\' OR p.pib ILIKE $1 ESCAPE '\\\\' OR p.email ILIKE $1 ESCAPE '\\\\')";}
+ const r=await pool.query(`SELECT p.id AS user_id,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM profiles p WHERE ${where} ORDER BY p.naziv_firme NULLS LAST LIMIT 100`,params);
+ res.json({data:r.rows});
+}));
+app.get('/api/admin/business-packages',auth,admin,asyncRoute(async(_req,res)=>{
+ const r=await pool.query(`SELECT k.*,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id ORDER BY CASE WHEN k.status='aktivan' THEN 0 ELSE 1 END,k.vazi_do ASC,k.created_at DESC LIMIT 300`);
+ res.json({data:r.rows});
+}));
+app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
+ const userId=String(req.body?.user_id||'');
+ const code=String(req.body?.paket||'');
+ const payment=String(req.body?.status_uplate||'ceka_uplatu');
+ const note=String(req.body?.napomena||'').trim().slice(0,1000);
+ const reference=String(req.body?.referenca_uplate||'').trim().slice(0,120);
+ const selected=BUSINESS_PACKAGES[code];
+ if(!userId||!selected)return res.status(400).json({error:'Izaberi firmu i važeći paket.'});
+ if(!['ceka_uplatu','placeno','oslobodjeno'].includes(payment))return res.status(400).json({error:'Status uplate nije ispravan.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const firm=await c.query("SELECT id,tip_lica,firma_verifikovana FROM profiles WHERE id=$1 FOR UPDATE",[userId]);
+  if(!firm.rows[0]||firm.rows[0].tip_lica!=='pravno'){await c.query('ROLLBACK');return res.status(400).json({error:'Paket mogu dobiti samo registrovana pravna lica.'});}
+  if(!firm.rows[0].firma_verifikovana){await c.query('ROLLBACK');return res.status(400).json({error:'Firma prvo mora biti verifikovana u APR evidenciji.'});}
+  const active=payment==='placeno'||payment==='oslobodjeno';
+  if(active)await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
+  const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
+   VALUES($1,$2,$3,$4,$5,CURRENT_DATE,(CURRENT_DATE + ($6||' months')::interval)::date,$7,$8,$9) RETURNING *`,
+   [userId,code,selected.price,active?'aktivan':'na_cekanju',payment,selected.months,note||null,reference||null,req.user.sub]);
+  await c.query('COMMIT');res.status(201).json({data:result.rows[0],poruka:active?'Paket je aktiviran.':'Paket je evidentiran i čeka uplatu.'});
+ }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+}));
+app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(req,res)=>{
+ const r=await pool.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE id=$1 AND status IN ('aktivan','na_cekanju') RETURNING id",[req.params.id]);
+ if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
+ res.json({ok:true});
+}));
+
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
  try{const response=await fetch(url,{headers:{Authorization:`Bearer ${key}`,Accept:'application/json'}});if(!response.ok)throw new Error(`APR je vratio status ${response.status}`);const body=await response.json();const list=Array.isArray(body)?body:(body.data||[]);let n=0;
@@ -420,6 +467,33 @@ app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
   await pool.query('UPDATE profiles SET firma_verifikovana=EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib) WHERE tip_lica=$1',['pravno']);await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,$2,true,$3)',[req.user.sub,n,`Sinhronizovano ${n} firmi.`]);res.json({ok:true,broj:n,poruka:`Sinhronizovano ${n} firmi.`});
  }catch(e){await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,0,false,$2)',[req.user.sub,e.message]);throw e;}
 }));
+
+
+let packageReminderRunning=false;
+async function sendBusinessPackageReminders(){
+ if(packageReminderRunning||!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return;
+ packageReminderRunning=true;
+ try{
+  const due=await pool.query(`SELECT k.id,k.vazi_do,p.email,p.naziv_firme FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id
+   WHERE k.status='aktivan' AND k.email_podsetnik_poslat_at IS NULL
+   AND k.vazi_do=(now() AT TIME ZONE 'Europe/Belgrade')::date + 10
+   AND p.email IS NOT NULL AND p.email<>'' ORDER BY k.vazi_do LIMIT 100`);
+  if(!due.rowCount)return;
+  const nodemailer=(await import('nodemailer')).default;
+  const transport=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
+  for(const item of due.rows){
+   try{
+    const date=new Date(item.vazi_do).toLocaleDateString('sr-RS',{timeZone:'Europe/Belgrade'});
+    await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:item.email,subject:'PonudiMi — paket ističe za 10 dana',
+     text:`Poštovani, paket za firmu ${item.naziv_firme||''} ističe za 10 dana, dana ${date}. Obratite se administratoru platforme radi produženja.`,
+     html:`<p>Poštovani,</p><p>Paket za firmu <strong>${String(item.naziv_firme||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}</strong> ističe za 10 dana, dana <strong>${date}</strong>.</p><p>Obratite se administratoru platforme radi produženja.</p><p>PonudiMi</p>`});
+    await pool.query('UPDATE paketi_firmi SET email_podsetnik_poslat_at=now(),email_podsetnik_greska=NULL WHERE id=$1',[item.id]);
+   }catch(error){await pool.query('UPDATE paketi_firmi SET email_podsetnik_greska=$2 WHERE id=$1',[item.id,String(error?.message||error).slice(0,500)]);}
+  }
+  await transport.close();
+ }catch(error){console.error('Podsetnici za istek paketa nisu poslati:',error);}
+ finally{packageReminderRunning=false;}
+}
 
 app.use((err,_req,res,_next)=>{console.error(err);res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});});
 const port=Number(process.env.PORT||process.env.API_PORT||4000);
