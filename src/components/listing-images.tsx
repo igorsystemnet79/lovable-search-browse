@@ -121,7 +121,7 @@ export function ListingImages({
         <div>
           <p className="text-sm font-semibold">Fotografije</p>
           <p className="text-xs text-muted-foreground">Do 7 fotografija · JPG, PNG ili WEBP · do 20 MB po fotografiji</p>
-          <p className="text-xs text-muted-foreground">Nema ograničenja minimalnih dimenzija. Server automatski prilagođava fotografije formatu 800 × 600 px.</p>
+          <p className="text-xs text-muted-foreground">Nema minimalne rezolucije; radi stabilnosti, server obrađuje fotografije do 100 MP i prilagođava ih formatu 800 × 600 px.</p>
         </div>
         <span className="text-xs font-medium text-muted-foreground">{value.length}/7</span>
       </div>
