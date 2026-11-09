@@ -111,6 +111,7 @@ export interface FileRoutesByFullPath {
   '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
   '/oglas/$kind/$id': typeof OglasKindIdRoute
+  '/poruke': typeof PorukeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -125,6 +126,7 @@ export interface FileRoutesByTo {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/poruke': typeof PorukeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -140,6 +142,7 @@ export interface FileRoutesById {
   '/reset-lozinke': typeof ResetLozinkeRoute
   '/zahtevi': typeof ZahteviRoute
   '/kategorija/$slug': typeof KategorijaSlugRoute
+  '/poruke': typeof PorukeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,6 +296,13 @@ declare module '@tanstack/react-router' {
       path: '/kategorija/$slug'
       fullPath: '/kategorija/$slug'
       preLoaderRoute: typeof KategorijaSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/poruke': {
+      id: '/poruke'
+      path: '/poruke'
+      fullPath: '/poruke'
+      preLoaderRoute: typeof PorukeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/poruke': {
