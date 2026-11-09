@@ -34,7 +34,7 @@ Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija ad
 
 - PostgreSQL podaci su u Docker volumenu `postgres_data`.
 - Fotografije se podrazumevano čuvaju na lokalnom disku u Docker volumenu `uploads_data`.
-- Po oglasu je dozvoljeno do 7 fotografija; ulazni fajl može imati do 20 MB. API ih obrađuje na serveru i čuva kao JPEG dimenzija 800 × 600 px, bez zahteva za minimalnom rezolucijom.
+- Po oglasu je dozvoljeno do 7 fotografija; ulazni fajl može imati do 20 MB. API ih obrađuje na serveru i čuva kao JPEG dimenzija 800 × 600 px, bez minimalne rezolucije i uz tehničku granicu od 100 MP radi stabilnosti.
 - Za Render i druge platforme bez trajnog diska može se uključiti S3-kompatibilno skladište, uključujući Cloudflare R2, kroz promenljive `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` i `S3_REGION`.
 - API isporučuje fotografije preko iste javne putanje bez obzira na to da li su na lokalnom disku ili u R2. PostgreSQL tabela `slike_oglasa` čuva vezu fotografije sa oglasom, putanju ili URL i redosled. Sama binarna slika se ne upisuje u PostgreSQL.
 - Pri prelasku na sopstveni server isključuju se S3 promenljive i koristi se trajni disk; postojeće fotografije iz R2 treba prethodno kopirati na server i ažurirati njihove putanje u bazi.
