@@ -42,7 +42,7 @@ function PretragaPage() {
   const { user, loading: authLoading } = useAuth();
   const { data, isLoading, isError } = useQuery({ ...pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }), enabled: !authLoading && !!user });
 
-  const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0);
+  const ukupno = (data?.ponude.length ?? 0) + (data?.zahtevi.length ?? 0) + (data?.artikliKataloga.length ?? 0);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -87,6 +87,27 @@ function PretragaPage() {
           {isError && <p className="mt-8 text-sm text-destructive">Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.</p>}
           {!isLoading && ukupno === 0 && !isError && <p className="mt-8 text-sm text-muted-foreground">Nema rezultata za ovu pretragu. Probaj drugi pojam ili lokaciju.</p>}
           <div className="mt-10 grid w-full min-w-0 grid-cols-1 gap-8">
+            <section>
+              <h2 className="text-xl font-semibold">Artikli iz kataloga firmi ({data?.artikliKataloga.length ?? 0})</h2>
+              <p className="mt-1 text-sm text-muted-foreground">Proizvodi iz kataloga verifikovanih firmi sa aktivnim paketom.</p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {data?.artikliKataloga.map((item) => (
+                  <article key={item.id} className="rounded-2xl border border-border bg-surface p-4 shadow-card">
+                    <p className="text-xs font-medium text-muted-foreground">{item.kategorija} · Šifra: {item.sifra}</p>
+                    <h3 className="mt-2 font-semibold">{item.naziv}</h3>
+                    {item.opis && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{item.opis}</p>}
+                    <p className="mt-3 text-lg font-bold text-brand">{item.cena == null ? "Cena na upit" : `${Number(item.cena).toLocaleString("sr-RS")} ${item.valuta}`}</p>
+                    {item.kolicina != null && <p className="text-xs text-muted-foreground">Dostupna količina: {item.kolicina}</p>}
+                    <div className="mt-3 border-t border-border pt-3 text-sm">
+                      <p className="font-medium">{item.naziv_firme}</p>
+                      {item.grad && <p className="text-xs text-muted-foreground">{item.grad}</p>}
+                      {item.proizvodjac && <p className="mt-1 text-xs text-muted-foreground">Proizvođač: {item.proizvodjac}</p>}
+                    </div>
+                  </article>
+                ))}
+                {!isLoading && !(data?.artikliKataloga.length) && <p className="text-sm text-muted-foreground">Nema artikala iz poslovnih kataloga za ovu pretragu.</p>}
+              </div>
+            </section>
             <section>
               <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
               <ul className="mt-4 space-y-3">{data?.ponude.map((p) => <PonudaItem key={p.id} ponuda={p} />)}</ul>
