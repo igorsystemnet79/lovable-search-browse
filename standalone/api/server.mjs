@@ -110,6 +110,28 @@ const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}
 
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, storage_backend:s3?'r2':filesystemStorage?'filesystem':'postgres', checked_at:result.rows[0].checked_at }); }));
+app.get('/api/categories',asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT slug,naziv,slika,podkategorije,created_at,updated_at FROM platform_categories ORDER BY created_at,slug');res.set('Cache-Control','no-store');res.json({data:r.rows});}));
+const categorySlug=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'dj').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
+const DEFAULT_CATEGORY_IMAGE='https://images.pexels.com/photos/5825398/pexels-photo-5825398.jpeg?auto=compress&cs=tinysrgb&w=900';
+app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
+ const naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80),slug=categorySlug(naziv);
+ if(naziv.length<2||!slug)return res.status(400).json({error:'Unesi naziv grupe od najmanje 2 karaktera.'});
+ const exists=await pool.query('SELECT 1 FROM platform_categories WHERE slug=$1 OR lower(naziv)=lower($2)',[slug,naziv]);
+ if(exists.rowCount)return res.status(409).json({error:'Grupa sa tim nazivom već postoji.'});
+ const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
+}));
+app.post('/api/admin/categories/:slug/subcategories',auth,admin,asyncRoute(async(req,res)=>{
+ const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
+ if(naziv.length<2)return res.status(400).json({error:'Unesi naziv podgrupe od najmanje 2 karaktera.'});
+ const c=await pool.connect();
+ try{await c.query('BEGIN');let category=await c.query('SELECT slug,naziv FROM platform_categories WHERE slug=$1 FOR UPDATE',[slug]);
+  if(!category.rows[0]){const grupa=String(req.body?.grupa||'').trim().replace(/\s+/g,' ').slice(0,80);if(!grupa||categorySlug(grupa)!==slug){await c.query('ROLLBACK');return res.status(404).json({error:'Grupa nije pronađena.'});}
+   await c.query("INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,'',ARRAY[]::text[]) ON CONFLICT(slug) DO NOTHING",[slug,grupa]);category=await c.query('SELECT slug,naziv FROM platform_categories WHERE slug=$1 FOR UPDATE',[slug]);}
+  const current=await c.query('SELECT podkategorije FROM platform_categories WHERE slug=$1',[slug]),existing=current.rows[0].podkategorije||[];
+  if(existing.some(item=>item.toLocaleLowerCase('sr')===naziv.toLocaleLowerCase('sr'))){await c.query('ROLLBACK');return res.status(409).json({error:'Ta podgrupa već postoji u izabranoj grupi.'});}
+  const updated=await c.query('UPDATE platform_categories SET podkategorije=array_append(podkategorije,$2),updated_at=now() WHERE slug=$1 RETURNING slug,naziv,slika,podkategorije',[slug,naziv]);await c.query('COMMIT');res.json({data:updated.rows[0]});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
 app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{const r=await pool.query("SELECT sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");res.set('Cache-Control','no-store');res.json({data:r.rows[0]||null});}));
 app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT id,sadrzaj,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');res.json({data:r.rows});}));
 app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{const sadrzaj=String(req.body?.sadrzaj||'').trim();if(sadrzaj.length<30||sadrzaj.length>50000)return res.status(400).json({error:'Tekst pravila mora imati između 30 i 50.000 karaktera.'});const c=await pool.connect();try{await c.query('BEGIN');const current=await c.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');const version=current.rows[0].version+1;const inserted=await c.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[sadrzaj,version,req.user.sub]);await c.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[sadrzaj,version,req.user.sub]);await c.query('COMMIT');res.json({data:inserted.rows[0]});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));

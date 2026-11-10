@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju } from "@/integrations/standalone/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
@@ -29,7 +30,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -63,6 +64,7 @@ function AdminPage() {
             {tab === "Poruke korisnika" && <AdminKorisnickePoruke />}
             {tab === "APR firme" && <Apr />}
             {tab === "Paketi firmi" && <PaketiFirmi />}
+            {tab === "Kategorije" && <UpravljanjeKategorijama />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
             {tab === "ChatGPT" && <AdminChatGPT />}
           </>
@@ -912,6 +914,18 @@ function PredloziZaOdobrenje() {
  {!rows.length&&<p className="text-sm text-muted-foreground">Trenutno nema predloga moderatora.</p>}</div>;
 }
 
+function UpravljanjeKategorijama(){
+ const queryClient=useQueryClient(),{data:categories=[],isLoading,isError,refetch}=useQuery({queryKey:["platform-categories"],queryFn:ucitajKategorije,staleTime:0});
+ const [groupName,setGroupName]=useState(""),[subcategoryName,setSubcategoryName]=useState(""),[selectedSlug,setSelectedSlug]=useState(""),[mode,setMode]=useState<"group"|"subcategory">("group"),[busy,setBusy]=useState(false),[error,setError]=useState(""),[notice,setNotice]=useState("");
+ useEffect(()=>{if(!selectedSlug&&categories.length)setSelectedSlug(categories[0].slug);},[categories,selectedSlug]);
+ async function saveGroup(e:React.FormEvent){e.preventDefault();if(busy)return;setBusy(true);setError("");setNotice("");try{if(categories.some(c=>c.naziv.trim().toLocaleLowerCase("sr")===groupName.trim().toLocaleLowerCase("sr")))throw new Error("Grupa sa tim nazivom već postoji.");await dodajKategoriju(groupName);setGroupName("");await queryClient.invalidateQueries({queryKey:["platform-categories"]});await refetch();setNotice("Nova grupa je sačuvana i dostupna na naslovnoj strani, u objavi i pretrazi.");}catch(e){setError(e instanceof Error?e.message:"Grupu nije moguće sačuvati.");}finally{setBusy(false);}}
+ async function saveSubcategory(e:React.FormEvent){e.preventDefault();if(busy||!selectedSlug)return;setBusy(true);setError("");setNotice("");try{await dodajPotkategoriju(selectedSlug,subcategoryName,categories.find(c=>c.slug===selectedSlug)?.naziv||"");setSubcategoryName("");await queryClient.invalidateQueries({queryKey:["platform-categories"]});await refetch();setNotice("Nova podgrupa je sačuvana i dostupna u izboru kategorija i pretrazi.");}catch(e){setError(e instanceof Error?e.message:"Podgrupu nije moguće sačuvati.");}finally{setBusy(false);}}
+ return <section className="space-y-5"><div><h2 className="text-xl font-semibold">Upravljanje grupama i podgrupama</h2><p className="mt-1 text-sm text-muted-foreground">Nove kategorije se čuvaju u bazi i automatski postaju dostupne na naslovnoj strani, u objavi oglasa, objavi zahteva i pretrazi.</p></div>
+ <div className="flex flex-wrap gap-2"><button type="button" className={mode==="group"?"min-h-10 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground":"min-h-10 rounded-full border border-input px-4 py-2 text-sm"} onClick={()=>{setMode("group");setError("");setNotice("");}}>Dodaj novu grupu</button><button type="button" className={mode==="subcategory"?"min-h-10 rounded-full bg-brand px-4 py-2 text-sm font-semibold text-brand-foreground":"min-h-10 rounded-full border border-input px-4 py-2 text-sm"} onClick={()=>{setMode("subcategory");setError("");setNotice("");}}>Dodaj novu podgrupu</button></div>
+ {mode==="group"?<form onSubmit={saveGroup} className="max-w-xl space-y-3 rounded-2xl border border-input bg-surface p-4"><label className="block space-y-1 text-sm font-medium">Naziv nove grupe<Input className={inputCls} value={groupName} onChange={e=>setGroupName(e.target.value)} maxLength={80} minLength={2} required placeholder="Npr. Baštenska oprema"/></label><button type="submit" className="min-h-10 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy}>{busy?"Čuvanje...":"Sačuvaj grupu"}</button></form>:<form onSubmit={saveSubcategory} className="max-w-xl space-y-3 rounded-2xl border border-input bg-surface p-4"><label className="block space-y-1 text-sm font-medium">Izaberi grupu<select className={inputCls} value={selectedSlug} onChange={e=>setSelectedSlug(e.target.value)} required>{categories.map(c=><option key={c.slug} value={c.slug}>{c.naziv}</option>)}</select></label><label className="block space-y-1 text-sm font-medium">Naziv nove podgrupe<Input className={inputCls} value={subcategoryName} onChange={e=>setSubcategoryName(e.target.value)} maxLength={80} minLength={2} required placeholder="Npr. Tuš kabine"/></label><button type="submit" className="min-h-10 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy||!categories.length}>{busy?"Čuvanje...":"Sačuvaj podgrupu"}</button></form>}
+ {error&&<p role="alert" className="text-sm text-destructive">{error}</p>}{notice&&<p role="status" className="text-sm text-green-700">{notice}</p>}
+ <div className="rounded-2xl bg-surface p-4 shadow-card"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Trenutne grupe i podgrupe</h3><button type="button" className={small} onClick={()=>void refetch()} disabled={isLoading}>Osveži</button></div>{isLoading&&<p className="text-sm text-muted-foreground">Učitavanje kategorija...</p>}{isError&&<p role="alert" className="text-sm text-destructive">Kategorije trenutno nisu dostupne.</p>}<div className="grid gap-3 sm:grid-cols-2">{categories.map(c=><article key={c.slug} className="rounded-xl border border-input p-3"><h4 className="font-semibold">{c.naziv}</h4><p className="mt-2 text-xs text-muted-foreground">{c.podkategorije.length?c.podkategorije.join(" · "):"Još nema podgrupa."}</p></article>)}</div></div></section>;
+}
 function UpravljanjePravilima() {
   // Uvek prikaži kompletan tekst pravila odmah, čak i ako API istorije privremeno nije dostupan.
   const [text, setText] = useState(defaultPlatformRulesText);

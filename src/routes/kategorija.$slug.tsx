@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { ponudimi } from "@/integrations/standalone/client";
@@ -6,32 +6,12 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { BackLink } from "@/components/back-link";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
-import { nadjiKategoriju, kategorije } from "@/lib/kategorije";
+import { kategorije as podrazumevaneKategorije } from "@/lib/kategorije";
+import { ucitajKategorije } from "@/integrations/standalone/client";
 import type { Ponuda, Zahtev } from "@/lib/listings";
 
 export const Route = createFileRoute("/kategorija/$slug")({
-  loader: ({ params }) => {
-    const kat = nadjiKategoriju(params.slug);
-    if (!kat) throw notFound();
-    return { kat };
-  },
-  head: ({ loaderData }) => {
-    if (!loaderData) return { meta: [{ title: "Kategorija nije pronađena" }, { name: "robots", content: "noindex" }] };
-    const t = `${loaderData.kat.naziv} — PonudiMi`;
-    const d = `Ponude i zahtevi u kategoriji ${loaderData.kat.naziv}.`;
-    return {
-      meta: [
-        { property: "og:type", content: "website" },
-        { name: "twitter:card", content: "summary_large_image" },
-        { title: t },
-        { name: "description", content: d },
-        { property: "og:title", content: t },
-        { property: "og:description", content: d },
-        { property: "og:image", content: loaderData.kat.slika },
-        { name: "twitter:image", content: loaderData.kat.slika },
-      ],
-    };
-  },
+  head: () => ({ meta: [{ property: "og:type", content: "website" },{ name: "twitter:card", content: "summary_large_image" },{ title: "Kategorija — PonudiMi" },{ name: "description", content: "Ponude i zahtevi u izabranoj kategoriji." }] }),
   notFoundComponent: () => (
     <div className="container-page py-20 text-center">
       <h1 className="text-2xl font-bold">Kategorija nije pronađena</h1>
@@ -43,22 +23,26 @@ export const Route = createFileRoute("/kategorija/$slug")({
 });
 
 function KategorijaPage() {
-  const { kat } = Route.useLoaderData();
+  const { slug } = Route.useParams();
+  const { data: loadedCategories=podrazumevaneKategorije, isLoading: categoriesLoading }=useQuery({queryKey:["platform-categories"],queryFn:ucitajKategorije,staleTime:60_000});
+  const kat=loadedCategories.find(category=>category.slug===slug);
   const { user, loading: authLoading } = useAuth();
   const { data, isLoading } = useQuery({
-    queryKey: ["kategorija", kat.slug],
+    queryKey: ["kategorija", slug],
     queryFn: async () => {
       const [p, z] = await Promise.all([
-        ponudimi.from("ponude").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
+        ponudimi.from("ponude").select("*").ilike("kategorija", `%${kat?.naziv||""}%`).order("created_at", { ascending: false }),
         ponudimi.from("zahtevi").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
       ]);
       if (p.error) throw p.error;
       if (z.error) throw z.error;
       return { ponude: p.data as Ponuda[], zahtevi: z.data as Zahtev[] };
     },
-    enabled: !authLoading && !!user,
+    enabled: !authLoading && !!user && !!kat,
   });
 
+  if(categoriesLoading)return <div className="container-page py-20 text-center text-sm text-muted-foreground">Učitavanje kategorije...</div>;
+  if(!kat)return <div className="container-page py-20 text-center"><h1 className="text-2xl font-bold">Kategorija nije pronađena</h1><Link to="/" className="mt-4 inline-block text-brand hover:underline">← Početna</Link></div>;
   return (
     <div className="min-h-screen bg-background text-foreground">
       <SiteHeader />
@@ -94,7 +78,7 @@ function KategorijaPage() {
         <section className="mt-8">
           <h2 className="text-lg font-semibold">Sve glavne kategorije</h2>
           <nav className="mt-3 flex flex-wrap gap-2">
-            {kategorije.map((k) => (
+            {loadedCategories.map((k) => (
               <Link
                 key={k.slug}
                 to="/kategorija/$slug"

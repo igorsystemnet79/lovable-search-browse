@@ -1,4 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
+import { kategorije as podrazumevaneKategorije } from "@/lib/kategorije";
+import { ucitajKategorije } from "@/integrations/standalone/client";
 
 type SearchPanelProps = {
   defaultQ?: string;
@@ -13,6 +16,8 @@ type SearchPanelProps = {
 };
 
 export function SearchPanel({ defaultQ = "", defaultLokacija = "", defaultKategorija = "", defaultMinCena = "", defaultMaxCena = "", defaultValuta = "", defaultSort = "najnovije", advanced = false, searchPath = "/pretraga" }: SearchPanelProps) {
+  const categoryQuery=useQuery({queryKey:["platform-categories"],queryFn:ucitajKategorije,staleTime:60_000});
+  const categories=categoryQuery.data??podrazumevaneKategorije;
   return (
     <form
       action={searchPath}
@@ -47,7 +52,7 @@ export function SearchPanel({ defaultQ = "", defaultLokacija = "", defaultKatego
         <>
           <div className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-2">
             <span className="text-xs text-muted-foreground">Kategorija</span>
-            <Input name="kategorija" defaultValue={defaultKategorija} placeholder="Npr. Mobilni telefoni" className="h-auto border-0 bg-transparent px-0 py-0 text-sm shadow-none focus-visible:ring-0" />
+            <select name="kategorija" defaultValue={defaultKategorija} className="w-full bg-transparent text-sm outline-none"><option value="">Sve kategorije</option>{categories.map(category=><optgroup key={category.slug} label={category.naziv}><option value={category.naziv}>{category.naziv}</option>{category.podkategorije.map(subcategory=><option key={subcategory} value={subcategory}>{subcategory}</option>)}</optgroup>)}</select>
           </div>
           <div className="flex flex-col gap-1 rounded-xl border border-border bg-background px-4 py-2">
             <span className="text-xs text-muted-foreground">Cena / budžet od</span>

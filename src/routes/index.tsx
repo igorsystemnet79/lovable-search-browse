@@ -11,7 +11,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { ponudeQuery, zahteviQuery } from "@/lib/listings";
-import { kategorije } from "@/lib/kategorije";
+import { kategorije as podrazumevaneKategorije } from "@/lib/kategorije";
+import { ucitajKategorije } from "@/integrations/standalone/client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -48,6 +49,8 @@ function Index() {
   }, []);
   const ponude = useQuery(ponudeQuery(5));
   const zahtevi = useQuery(zahteviQuery(5));
+  const categoryQuery=useQuery({queryKey:["platform-categories"],queryFn:ucitajKategorije,staleTime:60_000});
+  const kategorije=categoryQuery.data??podrazumevaneKategorije;
 
   return (
     <div className="min-h-screen bg-background text-foreground">

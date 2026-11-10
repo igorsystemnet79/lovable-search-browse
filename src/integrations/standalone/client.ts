@@ -1,6 +1,7 @@
 /* PonudiMi standalone client compatibility layer.
  * Keeps the existing application call sites while using the self-hosted API.
  */
+import { kategorije as podrazumevaneKategorije, type Kategorija } from "@/lib/kategorije";
 const configuredApiOrigin = (import.meta as any).env?.VITE_API_ORIGIN;
 const sameOriginApi = configuredApiOrigin === "same-origin";
 export const API_ORIGIN = String(
@@ -239,6 +240,14 @@ export const ponudimi: any = {
 };
 
 
+export async function ucitajKategorije(): Promise<Kategorija[]> {
+ const response=await api("/api/categories"),additions=Array.isArray(response.data)?response.data as Partial<Kategorija>[]:[];
+ const merged=podrazumevaneKategorije.map(base=>{const extra=additions.find(item=>item.slug===base.slug);return extra?{...base,...extra,slika:extra.slika||base.slika,fotoAutor:extra.fotoAutor||base.fotoAutor,fotoIzvor:extra.fotoIzvor||base.fotoIzvor,podkategorije:[...new Set([...base.podkategorije,...(extra.podkategorije||[])])]}:base;});
+ for(const extra of additions)if(extra.slug&&!merged.some(item=>item.slug===extra.slug))merged.push({slug:extra.slug,naziv:extra.naziv||extra.slug,slika:extra.slika||podrazumevaneKategorije[0]?.slika||"",fotoAutor:extra.fotoAutor||"",fotoIzvor:extra.fotoIzvor||"",podkategorije:extra.podkategorije||[]});
+ return merged;
+}
+export async function dodajKategoriju(naziv:string){return api("/api/admin/categories",{method:"POST",body:JSON.stringify({naziv})});}
+export async function dodajPotkategoriju(slug:string,naziv:string,grupa:string){return api(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories`,{method:"POST",body:JSON.stringify({naziv,grupa})});}
 export async function ucitajPravilaPlatforme() {
   // Sprečava da pregledač ili posredni keš vrati staru verziju javno objavljenih pravila.
   return api(`/api/platform-rules?refresh=${Date.now()}`);

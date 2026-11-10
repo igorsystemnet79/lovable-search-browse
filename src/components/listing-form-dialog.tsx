@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { inputCls } from "@/components/auth-shell";
 import { useAuth } from "@/hooks/use-auth";
 import { ponudimi } from "@/integrations/standalone/client";
-import { kategorije, vrednostKategorije } from "@/lib/kategorije";
+import { kategorije as podrazumevaneKategorije } from "@/lib/kategorije";
+import { ucitajKategorije } from "@/integrations/standalone/client";
 import { listingFormSchema, type ListingFormValues } from "@/lib/listing-form";
 import { ListingImages, ucitajSlikeOglasa, sacuvajSlikeOglasa, type ListingPhoto } from "@/components/listing-images";
 
@@ -17,6 +18,8 @@ export type ListingEdit = { id: string; values: ListingFormValues };
 export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind | null; onClose: () => void; edit?: ListingEdit | null }) {
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
+  const categoryQuery=useQuery({queryKey:["platform-categories"],queryFn:ucitajKategorije,staleTime:60_000});
+  const kategorije=categoryQuery.data??podrazumevaneKategorije;
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,7 +91,7 @@ export function ListingFormDialog({ kind, onClose, edit }: { kind: ListingKind |
     if (!user || !kind || busy) return;
     const result = listingFormSchema.safeParse(form);
     if (!result.success) { setError(result.error.issues[0]?.message ?? "Proveri podatke."); return; }
-    if (!selectedCategory || !selectedSubcategory || !vrednostKategorije(result.data.kategorija)) {
+    if (!selectedCategory || !selectedSubcategory || !kategorije.some(category=>result.data.kategorija===category.naziv||category.podkategorije.some(subcategory=>result.data.kategorija===`${category.naziv} / ${subcategory}`))) {
       setError("Obavezno izaberi kategoriju i potkategoriju.");
       return;
     }
