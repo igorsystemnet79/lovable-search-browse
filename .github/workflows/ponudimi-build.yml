@@ -49,19 +49,19 @@ jobs:
         run: |
           set -euo pipefail
           COMPOSE=(docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml)
-          "${COMPOSE[@]}" up -d --build
+          timeout 300s "${COMPOSE[@]}" up -d --build
           for attempt in $(seq 1 60); do
-            if curl -fsS http://localhost/api/health -o "$RUNNER_TEMP/ponudimi-health.json"; then break; fi
+            if curl --connect-timeout 2 --max-time 5 -fsS http://localhost/api/health -o "$RUNNER_TEMP/ponudimi-health.json"; then break; fi
             sleep 2
           done
           grep -q '"storage_backend":"postgres"' "$RUNNER_TEMP/ponudimi-health.json"
-          curl -fsS -X POST http://localhost/api/db/query -H 'Content-Type: application/json' -d '{"table":"ponude","action":"select","limit":5}' -o "$RUNNER_TEMP/ponudimi-preview.json"
+          curl --connect-timeout 2 --max-time 10 -fsS -X POST http://localhost/api/db/query -H 'Content-Type: application/json' -d '{"table":"ponude","action":"select","limit":5}' -o "$RUNNER_TEMP/ponudimi-preview.json"
           grep -q '"data":\[\]' "$RUNNER_TEMP/ponudimi-preview.json"
-          search_status=$(curl -sS -o "$RUNNER_TEMP/ponudimi-search.json" -w '%{http_code}' -X POST http://localhost/api/db/rpc -H 'Content-Type: application/json' -d '{"fn":"pretrazi_ponude","args":{}}')
+          search_status=$(curl --connect-timeout 2 --max-time 10 -sS -o "$RUNNER_TEMP/ponudimi-search.json" -w '%{http_code}' -X POST http://localhost/api/db/rpc -H 'Content-Type: application/json' -d '{"fn":"pretrazi_ponude","args":{}}')
           test "$search_status" = "401"
-          offers_status=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/api/ponude)
+          offers_status=$(curl --connect-timeout 2 --max-time 10 -sS -o /dev/null -w '%{http_code}' http://localhost/api/ponude)
           test "$offers_status" = "401"
-          curl -fsS http://localhost/ -o /dev/null
+          curl --connect-timeout 2 --max-time 10 -fsS http://localhost/ -o /dev/null
           "${COMPOSE[@]}" ps
       - name: Print standalone Docker logs on failure
         if: failure()
