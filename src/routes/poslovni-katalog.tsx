@@ -6,7 +6,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { useAuth } from "@/hooks/use-auth";
 import { API_ORIGIN, dodajSlikeArtikluKataloga } from "@/integrations/standalone/client";
 import { inputCls } from "@/components/auth-shell";
-import { ucitajPoslovniKatalog, ucitajArtikleKataloga, sacuvajArtikalKataloga, obrisiArtikalKataloga, obrisiCeoKatalog, uveziCSVKataloga } from "@/integrations/standalone/client";
+import { ucitajPoslovniKatalog, ucitajArtikleKataloga, sacuvajArtikalKataloga, izmeniArtikalKataloga, obrisiArtikalKataloga, obrisiCeoKatalog, uveziCSVKataloga } from "@/integrations/standalone/client";
 
 export const Route = createFileRoute("/poslovni-katalog")({
   head: () => ({ meta: [{ title: "Poslovni katalog — PonudiMi" }, { name: "robots", content: "noindex" }] }),
@@ -24,6 +24,7 @@ function PoslovniKatalogPage() {
   const [error,setError]=useState("");
   const [csvFile,setCsvFile]=useState<File|null>(null);
   const [form,setForm]=useState({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});
+  const [editingId,setEditingId]=useState<string|null>(null);
   const load=useCallback(async()=>{
     if(!user)return;
     setBusy(true);setError("");
@@ -36,7 +37,7 @@ function PoslovniKatalogPage() {
   useEffect(()=>{void load();},[load]);
   async function addProduct(event:FormEvent){
     event.preventDefault();setBusy(true);setError("");setMessage("");
-    try{await sacuvajArtikalKataloga({...form,cena:form.cena===""?null:Number(form.cena),kolicina:form.kolicina===""?null:Number(form.kolicina)});setForm({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});setMessage("Artikal je sačuvan.");await load();}
+    try{const payload={...form,cena:form.cena===""?null:Number(form.cena),kolicina:form.kolicina===""?null:Number(form.kolicina)};if(editingId){const {sifra,...changes}=payload;await izmeniArtikalKataloga(editingId,changes);setMessage("Izmene artikla su sačuvane.");setEditingId(null);}else{await sacuvajArtikalKataloga(payload);setMessage("Artikal je sačuvan.");}setForm({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});await load();}
     catch(e:any){setError(e?.message||"Artikal nije sačuvan.");}finally{setBusy(false);}
   }
   async function importCsv(){
@@ -62,6 +63,8 @@ function PoslovniKatalogPage() {
     try{await dodajSlikeArtikluKataloga(id,Array.from(files));setMessage("Fotografije artikla su sačuvane.");await load();}
     catch(e:any){setError(e?.message||"Fotografije nisu sačuvane.");}finally{setBusy(false);}
   }
+  function editItem(item:any){setEditingId(item.id);setForm({sifra:item.sifra||"",naziv:item.naziv||"",opis:item.opis||"",kategorija:item.kategorija||"",cena:item.cena==null?"":String(item.cena),valuta:item.valuta||"RSD",kolicina:item.kolicina==null?"":String(item.kolicina),proizvodjac:item.proizvodjac||""});setError("");setMessage("");window.scrollTo({top:0,behavior:"smooth"});}
+  function cancelEdit(){setEditingId(null);setForm({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});}
   async function removeItem(id:string){
     if(!window.confirm("Da li sigurno želiš da obrišeš ovaj artikal?"))return;
     setBusy(true);setError("");
@@ -115,16 +118,16 @@ function PoslovniKatalogPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><div className="min-w-0"><input id="business-catalog-import-file" type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>setCsvFile(e.target.files?.[0]||null)} className="sr-only" aria-label="Izaberi Excel ili CSV fajl"/><label htmlFor="business-catalog-import-file" className="flex min-h-11 w-full cursor-pointer items-center justify-center rounded-full border border-input bg-background px-5 text-sm font-medium transition-colors hover:bg-secondary sm:w-auto">{csvFile?"Promeni fajl":"Izaberi Excel / CSV fajl"}</label>{csvFile&&<p className="mt-2 max-w-full truncate text-xs text-muted-foreground" title={csvFile.name}>Izabran fajl: {csvFile.name}</p>}</div><button type="button" disabled={!csvFile||busy} onClick={importCsv} className="min-h-11 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{busy?"Obrada...":"Uvezi Excel / CSV"}</button></div>
       </section>
       <section className="rounded-2xl bg-surface p-5 shadow-card space-y-4">
-        <h2 className="text-xl font-semibold">Dodaj pojedinačni artikal</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-xl font-semibold">{editingId?"Izmeni postojeći artikal":"Dodaj pojedinačni artikal"}</h2>{editingId&&<button type="button" onClick={cancelEdit} className="rounded-full border px-4 py-2 text-sm">Odustani od izmene</button>}</div>
         <form onSubmit={addProduct} className="grid gap-3 sm:grid-cols-2">
-          {(["sifra","naziv","kategorija","cena","valuta","kolicina","proizvodjac"] as const).map(key=><label key={key} className="space-y-1 text-sm"><span className="font-medium">{({sifra:"Šifra artikla",naziv:"Naziv",kategorija:"Kategorija",cena:"Cena",valuta:"Valuta",kolicina:"Količina",proizvodjac:"Proizvođač"} as any)[key]}</span><input className={inputCls+" w-full"} value={form[key]} onChange={e=>setForm(old=>({...old,[key]:e.target.value}))} required={["sifra","naziv","kategorija"].includes(key)} /></label>)}
+          {(["sifra","naziv","kategorija","cena","valuta","kolicina","proizvodjac"] as const).map(key=><label key={key} className="space-y-1 text-sm"><span className="font-medium">{({sifra:"Šifra artikla",naziv:"Naziv",kategorija:"Kategorija",cena:"Cena",valuta:"Valuta",kolicina:"Količina",proizvodjac:"Proizvođač"} as any)[key]}</span><input className={inputCls+" w-full"} value={form[key]} onChange={e=>setForm(old=>({...old,[key]:e.target.value}))} required={["sifra","naziv","kategorija"].includes(key)} disabled={editingId!==null&&key==="sifra"} /></label>)}
           <label className="space-y-1 text-sm sm:col-span-2"><span className="font-medium">Opis</span><textarea className={inputCls+" min-h-20 w-full"} value={form.opis} onChange={e=>setForm(old=>({...old,opis:e.target.value}))}/></label>
-          <button disabled={busy} className="min-h-11 rounded-full bg-highlight px-5 font-semibold text-highlight-foreground disabled:opacity-50 sm:col-span-2">{busy?"Čuvanje...":"Sačuvaj artikal"}</button>
+          <button disabled={busy} className="min-h-11 rounded-full bg-highlight px-5 font-semibold text-highlight-foreground disabled:opacity-50 sm:col-span-2">{busy?"Čuvanje...":editingId?"Sačuvaj izmene":"Sačuvaj artikal"}</button>
         </form>
       </section>
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">Artikli firme</h2><div className="flex flex-wrap gap-2"><input className={inputCls+" min-w-0"} placeholder="Pretraži katalog..." value={query} onChange={e=>setQuery(e.target.value)}/><button type="button" className="rounded-full border px-4 text-sm" onClick={()=>void load()}>Pretraži</button><button type="button" disabled={busy||!Number(summary?.ukupno)} onClick={()=>void clearCatalog()} className="min-h-10 rounded-full border border-destructive/40 px-4 text-sm font-medium text-destructive hover:bg-destructive/5 disabled:opacity-40">Obriši ceo katalog</button></div></div>
-        {busy&&!items.length?<p className="text-sm text-muted-foreground">Učitavanje kataloga...</p>:items.length===0?<p className="rounded-xl border p-5 text-sm text-muted-foreground">Još nema artikala u katalogu.</p>:<div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[720px] text-sm"><thead className="bg-secondary"><tr>{["Šifra","Naziv","Kategorija","Cena","Količina","Status",""].map(x=><th key={x} className="p-3 text-left">{x}</th>)}</tr></thead><tbody>{items.map(item=><tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.sifra}</td><td className="p-3"><div className="font-medium">{item.naziv}</div><div className="mt-2 flex gap-1">{(item.slike||[]).map((image:any)=><img key={image.id} src={API_ORIGIN+image.storage_path} alt={item.naziv} className="h-10 w-10 rounded-md border object-cover"/>)}</div></td><td className="p-3">{item.kategorija}</td><td className="p-3">{item.cena==null?"Na upit":Number(item.cena).toLocaleString("sr-RS")+" "+item.valuta}</td><td className="p-3">{item.kolicina??"—"}</td><td className="p-3">{item.aktivan?"Aktivan":"Neaktivan"}</td><td className="p-3"><div className="flex flex-col gap-2"><span className="text-xs text-muted-foreground">{(item.slike||[]).length} / 7 fotografija</span><input aria-label={"Dodaj fotografije za "+item.naziv} type="file" accept="image/jpeg,image/png,image/webp" multiple className="max-w-40 text-xs" onChange={e=>void uploadImages(item.id,e.target.files)}/><button type="button" onClick={()=>void removeItem(item.id)} className="text-left text-destructive hover:underline">Obriši artikal</button></div></td></tr>)}</tbody></table></div>}
+        {busy&&!items.length?<p className="text-sm text-muted-foreground">Učitavanje kataloga...</p>:items.length===0?<p className="rounded-xl border p-5 text-sm text-muted-foreground">Još nema artikala u katalogu.</p>:<div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[720px] text-sm"><thead className="bg-secondary"><tr>{["Šifra","Naziv","Kategorija","Cena","Količina","Status",""].map(x=><th key={x} className="p-3 text-left">{x}</th>)}</tr></thead><tbody>{items.map(item=><tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.sifra}</td><td className="p-3"><div className="font-medium">{item.naziv}</div><div className="mt-2 flex gap-1">{(item.slike||[]).map((image:any)=><img key={image.id} src={API_ORIGIN+image.storage_path} alt={item.naziv} className="h-10 w-10 rounded-md border object-cover"/>)}</div></td><td className="p-3">{item.kategorija}</td><td className="p-3">{item.cena==null?"Na upit":Number(item.cena).toLocaleString("sr-RS")+" "+item.valuta}</td><td className="p-3">{item.kolicina??"—"}</td><td className="p-3">{item.aktivan?"Aktivan":"Neaktivan"}</td><td className="p-3"><div className="flex flex-col gap-2"><span className="text-xs text-muted-foreground">{(item.slike||[]).length} / 7 fotografija</span><input aria-label={"Dodaj fotografije za "+item.naziv} type="file" accept="image/jpeg,image/png,image/webp" multiple className="max-w-40 text-xs" onChange={e=>void uploadImages(item.id,e.target.files)}/><button type="button" onClick={()=>editItem(item)} className="text-left font-medium text-brand hover:underline">Izmeni artikal</button><button type="button" onClick={()=>void removeItem(item.id)} className="text-left text-destructive hover:underline">Obriši artikal</button></div></td></tr>)}</tbody></table></div>}
       </section>
     </>}</main><SiteFooter/></div>;
 }
