@@ -1026,11 +1026,11 @@ app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
 async function ucitajKatalogPaketa() {
- const result=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,objavljen,pozicija,updated_at FROM business_package_catalog ORDER BY pozicija,slug');
+ const result=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,objavljen,pozicija,updated_at,max_artikala FROM business_package_catalog ORDER BY pozicija,slug');
  return result.rows;
 }
 app.get('/api/business-packages',asyncRoute(async(_req,res)=>{
- const result=await pool.query("SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti FROM business_package_catalog WHERE objavljen=true ORDER BY pozicija,slug");
+ const result=await pool.query("SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,max_artikala FROM business_package_catalog WHERE objavljen=true ORDER BY pozicija,slug");
  res.set('Cache-Control','no-store');res.json({data:result.rows});
 }));
 app.get('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(_req,res)=>{res.json({data:await ucitajKatalogPaketa()});}));
@@ -1038,7 +1038,7 @@ app.put('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(req,re
  const items=Array.isArray(req.body?.packages)?req.body.packages:[];
  const allowed=['light','average','advanced','total'];
  if(items.length!==4||allowed.some(slug=>!items.some(item=>item.slug===slug)))return res.status(400).json({error:'Potrebna su sva četiri paketa: Light, Average, Advanced i Total.'});
- for(const item of items){const price=Number(item.cena_eur),months=Number(item.trajanje_meseci),name=String(item.naziv||'').trim();if(!name||!Number.isFinite(price)||price<0||price>100000||!Number.isInteger(months)||months<1||months>36)return res.status(400).json({error:'Proveri naziv, cenu i trajanje svakog paketa.'});}
+ for(const item of items){const price=Number(item.cena_eur),months=Number(item.trajanje_meseci),name=String(item.naziv||'').trim();const capacity=Number(item.max_artikala);if(!name||!Number.isFinite(price)||price<0||price>100000||!Number.isInteger(months)||months<1||months>36||!Number.isInteger(capacity)||capacity<1||capacity>1000000)return res.status(400).json({error:'Proveri naziv, cenu, trajanje i kapacitet svakog paketa.'});}
  const c=await pool.connect();
  try{
   await c.query('BEGIN');
@@ -1047,7 +1047,7 @@ app.put('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(req,re
    const cena=Number(item.cena_eur),months=Number(item.trajanje_meseci);
    const opis=String(item.opis||'').trim().slice(0,2000);
    const pogodnosti=Array.isArray(item.pogodnosti)?item.pogodnosti.map(x=>String(x).trim().slice(0,180)).filter(Boolean).slice(0,12):[];
-   await c.query('UPDATE business_package_catalog SET naziv=$2,cena_eur=$3,trajanje_meseci=$4,opis=$5,pogodnosti=$6,objavljen=$7,updated_at=now() WHERE slug=$1',[slug,naziv,cena,months,opis,pogodnosti,Boolean(item.objavljen)]);
+   await c.query('UPDATE business_package_catalog SET naziv=$2,cena_eur=$3,trajanje_meseci=$4,opis=$5,pogodnosti=$6,objavljen=$7,max_artikala=$8,updated_at=now() WHERE slug=$1',[slug,naziv,cena,months,opis,pogodnosti,Boolean(item.objavljen),Number(item.max_artikala)]);
   }
   await c.query('COMMIT');res.json({data:await ucitajKatalogPaketa(),poruka:'Ponuda paketa je sačuvana.'});
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
