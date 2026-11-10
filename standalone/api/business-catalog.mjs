@@ -69,6 +69,9 @@ const numeric = (v)=>{
  const n=Number(normalized);return Number.isFinite(n)&&n>=0?n:NaN;
 };
 
+// APR provera je privremeno isključena tokom testiranja. Uključiti kada platforma bude spremna za rad.
+const APR_VERIFICATION_REQUIRED = false;
+
 export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUpload,normalizeImage,saveImage,removeImage}) {
  await pool.query(schema);
  const firm = async userId => {
@@ -82,7 +85,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    WHERE p.id=$1`,[userId]);
   const f=r.rows[0];
   if(!f||f.tip_lica!=='pravno')return {error:'Poslovni katalog je dostupan samo nalozima pravnih lica.',status:403};
-  if(!f.firma_verifikovana)return {error:'Firma mora biti verifikovana u APR evidenciji pre aktiviranja kataloga.',status:403};
+  if(APR_VERIFICATION_REQUIRED && !f.firma_verifikovana)return {error:'Firma mora biti verifikovana u APR evidenciji pre aktiviranja kataloga.',status:403};
   if(!f.paket)return {error:'Za korišćenje poslovnog kataloga potreban je aktivan paket firme.',status:403};
   return {firm:f,limit:Number(f.max_artikala||1000)};
  };
@@ -194,7 +197,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  }));
  app.get('/api/catalog/companies/:userId',auth,asyncRoute(async(req,res)=>{
   const company=await pool.query(`SELECT p.id,p.naziv_firme,p.grad
-   FROM profiles p WHERE p.id=$1 AND p.tip_lica='pravno' AND p.firma_verifikovana
+   FROM profiles p WHERE p.id=$1 AND p.tip_lica='pravno'
    AND EXISTS(SELECT 1 FROM paketi_firmi k WHERE k.user_id=p.id AND k.status='aktivan'
     AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date)`,[req.params.userId]);
   if(!company.rowCount)return res.status(404).json({error:'Poslovni katalog firme nije dostupan.'});
@@ -216,7 +219,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    (SELECT storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
    FROM business_catalog_products p JOIN profiles pr ON pr.id=p.user_id
    JOIN paketi_firmi k ON k.user_id=p.user_id AND k.status='aktivan' AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
-   WHERE p.aktivan AND pr.firma_verifikovana AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
+   WHERE p.aktivan AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
    AND ($2='' OR lower(p.kategorija)=lower($2)) AND ($3='' OR lower(coalesce(pr.grad,'')) LIKE '%'||lower($3)||'%')
    AND (NULLIF($4::text,'') IS NULL OR p.cena >= NULLIF($4::text,'')::numeric) AND (NULLIF($5::text,'') IS NULL OR p.cena <= NULLIF($5::text,'')::numeric) AND ($6='' OR p.valuta=$6)
    ORDER BY ${order} LIMIT 100`,[q,category,place,min,max,currency]);
