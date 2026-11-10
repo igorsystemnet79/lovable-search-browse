@@ -80,7 +80,8 @@ export const zahteviQuery = (limit?: number) => ({
 });
 
 export type CatalogProduct = { id:string; sifra:string; naziv:string; opis:string|null; kategorija:string; cena:number|null; valuta:string; kolicina:number|null; proizvodjac:string|null; naziv_firme:string; grad:string|null; slike:any[] };
-\nexport type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[]; artikliKataloga: CatalogProduct[] };
+
+export type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[]; artikliKataloga: CatalogProduct[] };
 
 export type SearchFilters = { kategorija?: string; minCena?: string; maxCena?: string; valuta?: string; sort?: string };
 
