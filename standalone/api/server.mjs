@@ -350,16 +350,41 @@ async function notifyMatchingSavedSearches(listingType, listing) {
    AND (NULLIF(BTRIM(a.category),'') IS NULL
      OR lower(unaccent(a.category))=lower(unaccent($3))
      OR lower(unaccent($3)) LIKE lower(unaccent(a.category))||' / %')
-   AND (a.query_text='' OR unaccent(lower(concat_ws(' ', $4, $5, $3))) LIKE '%'||unaccent(lower(a.query_text))||'%')
+   AND (a.query_text='' OR pretraga_uslov(concat_ws(' ', $4, $5, $3), a.query_text))
  `,[listing.user_id,listingType,listing.kategorija,listing.naslov,listing.opis||'']);
- if(!rows.length)return;
- const message=listingType==='ponude'
+ const alertMessage=listingType==='ponude'
   ? 'Pojavila se nova ponuda koja odgovara tvojoj sačuvanoj pretrazi.'
   : 'Pojavio se novi zahtev koji odgovara tvojoj sačuvanoj pretrazi.';
  for(const recipient of rows){
   await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
-   [recipient.user_id,listingType,listing.id,listing.naslov,message]);
+   [recipient.user_id,listingType,listing.id,listing.naslov,alertMessage]);
+ }
+
+ // Obostrano automatsko povezivanje: autor novog zahteva dobija obaveštenje
+ // kada već postoji odgovarajuća ponuda, i obrnuto.
+ const otherTable=listingType==='ponude'?'zahtevi':'ponude';
+ const matches=await pool.query(`
+  SELECT id,user_id,naslov FROM ${otherTable}
+  WHERE user_id IS NOT NULL AND user_id<>$1
+   AND pauziran=false AND moderacija_blokirana=false
+   AND (lower(unaccent(kategorija))=lower(unaccent($2))
+     OR lower(unaccent(kategorija)) LIKE lower(unaccent($2))||' / %'
+     OR lower(unaccent($2)) LIKE lower(unaccent(kategorija))||' / %')
+   AND (
+    pretraga_uslov(concat_ws(' ', $3, $4, $2), naslov)
+    OR pretraga_uslov(concat_ws(' ', naslov, opis, kategorija), $3)
+   )
+  ORDER BY created_at DESC LIMIT 100
+ `,[listing.user_id,listing.kategorija,listing.naslov,listing.opis||'']);
+ const counterpartType=otherTable;
+ const counterpartMessage=listingType==='ponude'
+  ? 'Pojavila se nova ponuda koja možda odgovara tvom objavljenom zahtevu.'
+  : 'Pojavila se nova potražnja koja možda odgovara tvojoj objavljenoj ponudi.';
+ for(const match of matches.rows){
+  await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
+   VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
+   [match.user_id,counterpartType,match.id,match.naslov,counterpartMessage]);
  }
 }
 app.get('/api/alert-searches',auth,asyncRoute(async(req,res)=>{
