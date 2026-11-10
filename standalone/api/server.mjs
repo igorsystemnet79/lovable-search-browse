@@ -791,12 +791,33 @@ app.get('/api/storage/public',asyncRoute(async(req,res)=>{
 app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=31536000, immutable');return object.Body.pipe(res);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
-const BUSINESS_PACKAGES = {
- mesecni:{months:1,price:10,label:'Mesečni paket'},
- tromesecni:{months:3,price:20,label:'Tromesečni paket'},
- sestomesecni:{months:6,price:50,label:'Šestomesečni paket'},
- godisnji:{months:12,price:100,label:'Godišnji paket'},
-};
+async function ucitajKatalogPaketa() {
+ const result=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,objavljen,pozicija,updated_at FROM business_package_catalog ORDER BY pozicija,slug');
+ return result.rows;
+}
+app.get('/api/business-packages',asyncRoute(async(_req,res)=>{
+ const result=await pool.query("SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti FROM business_package_catalog WHERE objavljen=true ORDER BY pozicija,slug");
+ res.set('Cache-Control','no-store');res.json({data:result.rows});
+}));
+app.get('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(_req,res)=>{res.json({data:await ucitajKatalogPaketa()});}));
+app.put('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(req,res)=>{
+ const items=Array.isArray(req.body?.packages)?req.body.packages:[];
+ const allowed=['light','average','advanced','total'];
+ if(items.length!==4||allowed.some(slug=>!items.some(item=>item.slug===slug)))return res.status(400).json({error:'Potrebna su sva četiri paketa: Light, Average, Advanced i Total.'});
+ for(const item of items){const price=Number(item.cena_eur),months=Number(item.trajanje_meseci),name=String(item.naziv||'').trim();if(!name||!Number.isFinite(price)||price<0||price>100000||!Number.isInteger(months)||months<1||months>36)return res.status(400).json({error:'Proveri naziv, cenu i trajanje svakog paketa.'});}
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  for(const item of items){
+   const slug=String(item.slug),naziv=String(item.naziv||'').trim().slice(0,40);
+   const cena=Number(item.cena_eur),months=Number(item.trajanje_meseci);
+   const opis=String(item.opis||'').trim().slice(0,2000);
+   const pogodnosti=Array.isArray(item.pogodnosti)?item.pogodnosti.map(x=>String(x).trim().slice(0,180)).filter(Boolean).slice(0,12):[];
+   await c.query('UPDATE business_package_catalog SET naziv=$2,cena_eur=$3,trajanje_meseci=$4,opis=$5,pogodnosti=$6,objavljen=$7,updated_at=now() WHERE slug=$1',[slug,naziv,cena,months,opis,pogodnosti,Boolean(item.objavljen)]);
+  }
+  await c.query('COMMIT');res.json({data:await ucitajKatalogPaketa(),poruka:'Ponuda paketa je sačuvana.'});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
 app.get('/api/admin/business-firms',auth,admin,asyncRoute(async(req,res)=>{
  const q=String(req.query.q||'').trim().slice(0,100).replace(/[%_\\\\]/g,'');
  const params=[];let where="p.tip_lica='pravno' AND p.firma_verifikovana=true";
@@ -815,8 +836,9 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
  const payment=String(req.body?.status_uplate||'ceka_uplatu');
  const note=String(req.body?.napomena||'').trim().slice(0,1000);
  const reference=String(req.body?.referenca_uplate||'').trim().slice(0,120);
- const selected=Object.prototype.hasOwnProperty.call(BUSINESS_PACKAGES,code)?BUSINESS_PACKAGES[code]:null;
- if(!userId||!selected)return res.status(400).json({error:'Izaberi firmu i važeći paket.'});
+ const catalog=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci FROM business_package_catalog WHERE slug=$1 AND objavljen=true',[code]);
+ const selected=catalog.rows[0]||null;
+ if(!userId||!selected)return res.status(400).json({error:'Izaberi firmu i objavljen paket.'});
  if(!['ceka_uplatu','placeno','oslobodjeno'].includes(payment))return res.status(400).json({error:'Status uplate nije ispravan.'});
  const c=await pool.connect();
  try{
@@ -828,7 +850,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
   if(active)await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
   const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
    VALUES($1,$2,$3,$4,$5,(now() AT TIME ZONE 'Europe/Belgrade')::date,((now() AT TIME ZONE 'Europe/Belgrade')::date + ($6::text || ' months')::interval)::date,$7,$8,$9) RETURNING *`,
-   [userId,code,selected.price,active?'aktivan':'na_cekanju',payment,selected.months,note||null,reference||null,req.user.sub]);
+   [userId,code,selected.cena_eur,active?'aktivan':'na_cekanju',payment,selected.trajanje_meseci,note||null,reference||null,req.user.sub]);
   await c.query('COMMIT');res.status(201).json({data:result.rows[0],poruka:active?'Paket je aktiviran.':'Paket je evidentiran i čeka uplatu.'});
  }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }));

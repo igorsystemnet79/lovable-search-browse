@@ -246,6 +246,30 @@ CREATE TABLE IF NOT EXISTS paketi_firmi (
 );
 CREATE INDEX IF NOT EXISTS paketi_firmi_user_idx ON paketi_firmi(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS paketi_firmi_aktivni_istek_idx ON paketi_firmi(status,vazi_do) WHERE status='aktivan';
+
+CREATE TABLE IF NOT EXISTS business_package_catalog (
+ slug text PRIMARY KEY CHECK (slug IN ('light','average','advanced','total')),
+ naziv text NOT NULL,
+ cena_eur numeric(10,2) NOT NULL CHECK (cena_eur >= 0),
+ trajanje_meseci integer NOT NULL CHECK (trajanje_meseci BETWEEN 1 AND 36),
+ opis text NOT NULL DEFAULT '',
+ pogodnosti text[] NOT NULL DEFAULT '{}',
+ objavljen boolean NOT NULL DEFAULT false,
+ pozicija integer NOT NULL DEFAULT 0,
+ updated_at timestamptz NOT NULL DEFAULT now()
+);
+INSERT INTO business_package_catalog(slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,objavljen,pozicija)
+VALUES
+ ('light','Light',10,1,'','{}',false,1),
+ ('average','Average',20,3,'','{}',false,2),
+ ('advanced','Advanced',50,6,'','{}',false,3),
+ ('total','Total',100,12,'','{}',false,4)
+ON CONFLICT(slug) DO NOTHING;
+ALTER TABLE paketi_firmi DROP CONSTRAINT IF EXISTS paketi_firmi_paket_check;
+ALTER TABLE paketi_firmi ADD CONSTRAINT paketi_firmi_paket_check CHECK (paket IN ('mesecni','tromesecni','sestomesecni','godisnji','light','average','advanced','total'));
+ALTER TABLE paketi_firmi DROP CONSTRAINT IF EXISTS paketi_firmi_cena_eur_check;
+ALTER TABLE paketi_firmi ADD CONSTRAINT paketi_firmi_cena_eur_check CHECK (cena_eur >= 0);
+
 CREATE UNIQUE INDEX IF NOT EXISTS paketi_firmi_jedan_aktivan_po_firmi ON paketi_firmi(user_id) WHERE status='aktivan';
 
 

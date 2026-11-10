@@ -23,6 +23,7 @@ export function SiteFooter() {
         </div>
 
         <nav aria-label="Pravne informacije" className="flex flex-wrap gap-4 text-sm text-brand-foreground/80">
+          <Link to="/za-firme" className="hover:underline">Za firme — paketi</Link>
           <Link to="/pravila-platforme" className="hover:underline">Pravila platforme</Link>
           <Link to="/politika-privatnosti" className="hover:underline">Politika privatnosti</Link>
           <Link to="/informacije-o-kupovini" className="hover:underline">Informacije o kupovini</Link>

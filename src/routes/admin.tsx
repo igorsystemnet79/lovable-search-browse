@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "re
 import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju, postaviSlikuKategorije, postaviSlikuPodkategorije } from "@/integrations/standalone/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme } from "@/lib/admin.functions";
+import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
@@ -30,7 +30,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -64,6 +64,7 @@ function AdminPage() {
             {tab === "Poruke korisnika" && <AdminKorisnickePoruke />}
             {tab === "APR firme" && <Apr />}
             {tab === "Paketi firmi" && <PaketiFirmi />}
+            {tab === "Ponuda paketa" && <UpravljanjePonudomPaketa />}
             {tab === "Kategorije" && <UpravljanjeKategorijama />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
             {tab === "ChatGPT" && <AdminChatGPT />}
@@ -797,19 +798,20 @@ function PaketiFirmi() {
  const [q,setQ]=useState("");
  const [firme,setFirme]=useState<any[]>([]);
  const [selected,setSelected]=useState("");
- const [paket,setPaket]=useState("mesecni");
+ const [paket,setPaket]=useState("light");
+ const [catalog,setCatalog]=useState<any[]>([]);
  const [uplata,setUplata]=useState("ceka_uplatu");
  const [napomena,setNapomena]=useState("");
  const [referenca,setReferenca]=useState("");
  const [rows,setRows]=useState<any[]>([]);
  const [busy,setBusy]=useState(false);
  const [msg,setMsg]=useState("");
- const load=useCallback(async()=>{try{const r=await ucitajPaketeFirmi();setRows(r.data||[]);}catch(e){setMsg(e instanceof Error?e.message:"Pakete nije moguće učitati.");}},[]);
+ const load=useCallback(async()=>{try{const [r,c]=await Promise.all([ucitajPaketeFirmi(),ucitajKatalogPaketa()]);setRows(r.data||[]);setCatalog(c.data||[]);if(c.data?.length&&!c.data.some((x:any)=>x.slug===paket))setPaket(c.data[0].slug);}catch(e){setMsg(e instanceof Error?e.message:"Pakete nije moguće učitati.");}},[paket]);
  useEffect(()=>{void load();},[load]);
  useEffect(()=>{let active=true;const timer=setTimeout(()=>{pretraziFirmeZaPaket(q).then(r=>{if(active)setFirme(r.data||[]);}).catch(()=>{if(active)setFirme([]);});},250);return()=>{active=false;clearTimeout(timer);};},[q]);
  async function submit(){if(!selected){setMsg("Izaberi firmu.");return;}setBusy(true);setMsg("");try{const r=await dodeliPaketFirmi({user_id:selected,paket,status_uplate:uplata,napomena,referenca_uplate:referenca});setMsg(r.poruka||"Paket je sačuvan.");setSelected("");setNapomena("");setReferenca("");await load();}catch(e){setMsg(e instanceof Error?e.message:"Paket nije sačuvan.");}finally{setBusy(false);}}
  async function cancel(id:string){if(!window.confirm("Otkazati ovaj paket?"))return;setBusy(true);try{await otkaziPaketFirme(id);setMsg("Paket je otkazan.");await load();}catch(e){setMsg(e instanceof Error?e.message:"Paket nije otkazan.");}finally{setBusy(false);}}
- const labels:Record<string,string>={mesecni:"10 € / mesec",tromesecni:"20 € / 3 meseca",sestomesecni:"50 € / 6 meseci",godisnji:"100 € / 12 meseci"};
+ const labels:Record<string,string>={mesecni:"Mesečni paket",tromesecni:"Tromesečni paket",sestomesecni:"Šestomesečni paket",godisnji:"Godišnji paket",...Object.fromEntries(catalog.map((p:any)=>[p.slug,`${p.naziv} — ${Number(p.cena_eur).toFixed(2)} € / ${p.trajanje_meseci} mes.`]))};
  return <div className="space-y-5">
   <section className="rounded-2xl border border-input bg-surface p-4">
    <h2 className="font-semibold">Dodela paketa pravnom licu</h2>
@@ -817,7 +819,7 @@ function PaketiFirmi() {
    <div className="mt-3 grid gap-3 md:grid-cols-2">
     <div><label className="mb-1 block text-xs font-medium">Pretraga firme po nazivu, PIB-u ili e-mailu</label><Input className={inputCls} value={q} onChange={e=>setQ(e.target.value)} placeholder="Unesi naziv firme, PIB ili e-mail"/></div>
     <div><label className="mb-1 block text-xs font-medium">Izaberi firmu</label><select className={inputCls} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Izaberi firmu</option>{firme.map(f=><option key={f.user_id} value={f.user_id}>{f.naziv_firme||"Firma"} · PIB {f.pib||"—"} · {f.firma_verifikovana?"Verifikovana":"Nije verifikovana"}</option>)}</select></div>
-    <div><label className="mb-1 block text-xs font-medium">Paket</label><select className={inputCls} value={paket} onChange={e=>setPaket(e.target.value)}>{Object.entries(labels).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select></div>
+    <div><label className="mb-1 block text-xs font-medium">Paket</label><select className={inputCls} value={paket} onChange={e=>setPaket(e.target.value)}>{catalog.filter((p:any)=>p.objavljen).map((p:any)=><option key={p.slug} value={p.slug}>{p.naziv} — {Number(p.cena_eur).toFixed(2)} € / {p.trajanje_meseci} mes.</option>)}</select></div>
     <div><label className="mb-1 block text-xs font-medium">Status uplate</label><select className={inputCls} value={uplata} onChange={e=>setUplata(e.target.value)}><option value="ceka_uplatu">Čeka uplatu — bez aktivacije</option><option value="placeno">Plaćeno — aktiviraj</option><option value="oslobodjeno">Oslobođeno plaćanja — aktiviraj</option></select></div>
     <div><label className="mb-1 block text-xs font-medium">Referenca uplate (opciono)</label><Input className={inputCls} value={referenca} onChange={e=>setReferenca(e.target.value)} placeholder="Broj transakcije / poziv na broj"/></div>
     <div><label className="mb-1 block text-xs font-medium">Administratorska napomena (opciono)</label><Input className={inputCls} value={napomena} onChange={e=>setNapomena(e.target.value)} placeholder="Napomena"/></div>
@@ -832,6 +834,25 @@ function PaketiFirmi() {
    </tbody></table></div>
   </section>
  </div>;
+}
+
+
+function UpravljanjePonudomPaketa(){
+ const [items,setItems]=useState<any[]>([]),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
+ const load=useCallback(async()=>{try{const r=await ucitajKatalogPaketa();setItems(r.data||[]);}catch(e){setMsg(e instanceof Error?e.message:"Cenovnik nije moguće učitati.");}},[]);
+ useEffect(()=>{void load();},[load]);
+ function update(slug:string,field:string,value:any){setItems(old=>old.map(item=>item.slug===slug?{...item,[field]:value}:item));}
+ async function save(){setBusy(true);setMsg("");try{const r=await sacuvajKatalogPaketa(items);setItems(r.data||items);setMsg(r.poruka||"Ponuda paketa je sačuvana.");}catch(e){setMsg(e instanceof Error?e.message:"Ponuda nije sačuvana.");}finally{setBusy(false);}}
+ return <section className="space-y-5"><div><h2 className="text-xl font-semibold">Ponuda paketa za firme</h2><p className="mt-1 text-sm text-muted-foreground">Ovde uređuješ cene, trajanje, opis i pogodnosti. Samo paketi označeni za objavu prikazuju se u javnom odeljku „Za firme“. Sačuvane izmene važe i za buduće dodele paketa; ranije evidentirane uplate ostaju nepromenjene.</p></div>
+ {items.map(item=><article key={item.slug} className="space-y-3 rounded-2xl border border-input bg-surface p-4"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-lg font-semibold">{item.naziv}</h3><span className="rounded-full bg-secondary px-3 py-1 text-xs font-medium">{item.slug.toUpperCase()}</span></div>
+ <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm font-medium">Naziv paketa<input className={inputCls} value={item.naziv} maxLength={40} onChange={e=>update(item.slug,"naziv",e.target.value)}/></label>
+ <label className="space-y-1 text-sm font-medium">Cena (EUR)<input className={inputCls} type="number" min="0" max="100000" step="0.01" value={item.cena_eur} onChange={e=>update(item.slug,"cena_eur",e.target.value===""?"":Number(e.target.value))}/></label>
+ <label className="space-y-1 text-sm font-medium">Trajanje (meseci)<input className={inputCls} type="number" min="1" max="36" step="1" value={item.trajanje_meseci} onChange={e=>update(item.slug,"trajanje_meseci",Number(e.target.value))}/></label>
+ <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" checked={Boolean(item.objavljen)} onChange={e=>update(item.slug,"objavljen",e.target.checked)}/> Objavi ovaj paket u odeljku „Za firme“</label></div>
+ <label className="block space-y-1 text-sm font-medium">Objašnjenje paketa<textarea className={inputCls+" min-h-24"} value={item.opis||""} maxLength={2000} onChange={e=>update(item.slug,"opis",e.target.value)} placeholder="Objasni kome je paket namenjen i šta korisnik dobija."/></label>
+ <label className="block space-y-1 text-sm font-medium">Pogodnosti (svaka u posebnom redu)<textarea className={inputCls+" min-h-28"} value={(item.pogodnosti||[]).join("\n")} onChange={e=>update(item.slug,"pogodnosti",e.target.value.split("\n").map((x:string)=>x.trim()).filter(Boolean).slice(0,12))} placeholder={"Primer pogodnosti 1\nPrimer pogodnosti 2"}/></label>
+ </article>)}
+ <div className="flex flex-wrap items-center gap-3"><button type="button" className="min-h-11 rounded-full bg-brand px-6 py-2 font-semibold text-brand-foreground disabled:opacity-50" disabled={busy||items.length!==4} onClick={()=>void save()}>{busy?"Čuvanje...":"Sačuvaj ponudu paketa"}</button><button type="button" className={small} disabled={busy} onClick={()=>void load()}>Učitaj sačuvane podatke</button></div>{msg&&<p role="status" className="text-sm">{msg}</p>}</section>;
 }
 
 function Apr() {

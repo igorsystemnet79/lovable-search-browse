@@ -66,3 +66,7 @@ export async function pretraziFirmeZaPaket(q:string){return adminRequest(`/api/a
 export async function ucitajPaketeFirmi(){return adminRequest("/api/admin/business-packages","GET") as Promise<{data:PaketFirme[]}>;}
 export async function dodeliPaketFirmi(data:{user_id:string;paket:string;status_uplate:string;napomena?:string;referenca_uplate?:string}){return adminRequest("/api/admin/business-packages","POST",data);}
 export async function otkaziPaketFirme(id:string){return adminRequest(`/api/admin/business-packages/${encodeURIComponent(id)}/cancel`,"POST",{});}
+
+export type KatalogPaket = {slug:string;naziv:string;cena_eur:number;trajanje_meseci:number;opis:string;pogodnosti:string[];objavljen:boolean;pozicija:number};
+export async function ucitajKatalogPaketa(){return adminRequest("/api/admin/business-package-catalog","GET") as Promise<{data:KatalogPaket[]}>;}
+export async function sacuvajKatalogPaketa(packages:KatalogPaket[]){return adminRequest("/api/admin/business-package-catalog","PUT",{packages});}

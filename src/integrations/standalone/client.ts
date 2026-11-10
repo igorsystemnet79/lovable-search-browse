@@ -289,3 +289,7 @@ export async function ucitajRezimOdrzavanja() {
 export async function podesiRezimOdrzavanja(enabled: boolean, message?: string) {
   return api("/api/admin/maintenance-mode", { method: "PUT", body: JSON.stringify({ enabled, message }) });
 }
+
+export async function ucitajJavnePaketeFirmi() {
+  return api("/api/business-packages?refresh=" + Date.now());
+}
