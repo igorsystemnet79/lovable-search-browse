@@ -16,6 +16,7 @@ export type ProfileRow = {
   naziv_firme: string | null;
   pib: string | null;
   firma_verifikovana: boolean;
+  firma_status_verifikacije: 'na_cekanju' | 'verifikovana' | 'odbijena';
   blokiran: boolean;
   email: string | null;
   created_at: string;
