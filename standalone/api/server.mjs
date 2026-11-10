@@ -377,14 +377,13 @@ async function notifyMatchingSavedSearches(listingType, listing) {
    )
   ORDER BY created_at DESC LIMIT 100
  `,[listing.user_id,listing.kategorija,listing.naslov,listing.opis||'']);
- const counterpartType=otherTable;
  const counterpartMessage=listingType==='ponude'
   ? 'Pojavila se nova ponuda koja možda odgovara tvom objavljenom zahtevu.'
   : 'Pojavila se nova potražnja koja možda odgovara tvojoj objavljenoj ponudi.';
  for(const match of matches.rows){
   await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
-   [match.user_id,counterpartType,match.id,match.naslov,counterpartMessage]);
+   [match.user_id,listingType,listing.id,listing.naslov,counterpartMessage]);
  }
 }
 app.get('/api/alert-searches',auth,asyncRoute(async(req,res)=>{
