@@ -70,3 +70,9 @@ export async function otkaziPaketFirme(id:string){return adminRequest(`/api/admi
 export type KatalogPaket = {slug:string;naziv:string;cena_eur:number;trajanje_meseci:number;opis:string;pogodnosti:string[];objavljen:boolean;pozicija:number};
 export async function ucitajKatalogPaketa(){return adminRequest("/api/admin/business-package-catalog","GET") as Promise<{data:KatalogPaket[]}>;}
 export async function sacuvajKatalogPaketa(packages:KatalogPaket[]){return adminRequest("/api/admin/business-package-catalog","PUT",{packages});}
+
+ 
+export async function pretraziKorisnikeZaPaket(q:string){return adminRequest(`/api/admin/access-grants/users?q=${encodeURIComponent(q)}`,"GET") as Promise<{data:any[]}>;}
+export async function ucitajAdminDodelePaketa(){return adminRequest("/api/admin/access-grants","GET") as Promise<{data:any[]}>;}
+export async function dodeliPaketKorisniku(data:{user_id:string;package_name:string;duration_days:number;gratis:boolean;cena_eur:number;napomena?:string}){return adminRequest("/api/admin/access-grants","POST",data);}
+export async function otkaziDodeluPaketa(id:string){return adminRequest(`/api/admin/access-grants/${encodeURIComponent(id)}/cancel`,"POST",{});}
