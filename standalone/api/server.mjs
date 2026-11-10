@@ -1096,6 +1096,13 @@ app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(r
  if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
  res.json({ok:true});
 }));
+app.post('/api/admin/business-packages/:id/reactivate',auth,admin,asyncRoute(async(req,res)=>{
+ const durationDays=Number(req.body?.duration_days);
+ if(!Number.isInteger(durationDays)||durationDays<1||durationDays>3650)return res.status(400).json({error:'Period mora biti ceo broj dana između 1 i 3650.'});
+ const r=await pool.query(`UPDATE paketi_firmi SET status='aktivan',vazi_od=(now() AT TIME ZONE 'Europe/Belgrade')::date,vazi_do=((now() AT TIME ZONE 'Europe/Belgrade')::date + ($2::int * interval '1 day'))::date,email_podsetnik_poslat_at=NULL,email_podsetnik_greska=NULL,updated_at=now() WHERE id=$1 RETURNING id,vazi_od,vazi_do,status`,[req.params.id,durationDays]);
+ if(!r.rowCount)return res.status(404).json({error:'Evidencija paketa nije pronađena.'});
+ res.json({ok:true,data:r.rows[0],message:`Paket je aktiviran na ${durationDays} dana.`});
+}));
 app.delete('/api/admin/business-packages/:id',auth,admin,asyncRoute(async(req,res)=>{
  const r=await pool.query('DELETE FROM paketi_firmi WHERE id=$1 RETURNING id',[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'Evidencija paketa nije pronađena.'});
