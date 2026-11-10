@@ -12,7 +12,7 @@ export const Route = createFileRoute("/poslovni-katalog")({
   component: PoslovniKatalogPage,
 });
 
-const template = "sifra,naziv,opis,kategorija,cena,valuta,kolicina,proizvodjac,jedinica_mere,aktivan\nART-001,Primer proizvoda,Opis proizvoda,Tehnika,1299,RSD,25,Proizvođač,kom,da\n";
+const template = "sifra;naziv;opis;kategorija;cena;valuta;kolicina;proizvodjac;jedinica_mere;aktivan\nART-001;Primer proizvoda;Opis proizvoda;Tehnika;1299;RSD;25;Proizvođač;kom;da\n";
 
 function PoslovniKatalogPage() {
   const { user } = useAuth();
