@@ -1,7 +1,7 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { ponudimi, posaljiSignalPrisustva } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi, posaljiSignalPrisustva } from "@/integrations/standalone/client";
 import logo from "@/assets/ponudimi-logo.png";
 
 const outline =
@@ -19,7 +19,7 @@ export function SiteHeader() {
     const loadUnread = async () => {
       try {
         const token = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null")?.access_token;
-        const response = await fetch("https://ponudimi-test-api.onrender.com/api/notifications", { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        const response = await fetch(`${API_ORIGIN}/api/notifications`, { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : {} });
         if (!response.ok) return;
         const data = await response.json();
         if (active) setUnreadNotifications(Number(data.unread || 0));
