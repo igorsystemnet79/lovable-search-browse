@@ -123,6 +123,14 @@ export const kategorije: Kategorija[] = [
     fotoIzvor: "https://www.pexels.com/photo/laptop-on-desk-6483627/",
     podkategorije: ["Majstorske usluge", "Prevoz i selidbe", "Čišćenje i održavanje", "Servisi i popravke", "Lepota i nega", "Edukacija i časovi", "IT i digitalne usluge", "Poslovne usluge", "Ostale usluge"],
   },
+  {
+    slug: "kupatila",
+    naziv: "Kupatila",
+    slika: "https://images.pexels.com/photos/19991843/pexels-photo-19991843.jpeg?auto=compress&cs=tinysrgb&w=900",
+    fotoAutor: "Alex Tyson",
+    fotoIzvor: "https://www.pexels.com/photo/interior-of-a-modern-bathroom-19991843/",
+    podkategorije: ["Sve za kupatila"],
+  },
 ];
 
 export const nadjiKategoriju = (slug: string) => kategorije.find((k) => k.slug === slug);
