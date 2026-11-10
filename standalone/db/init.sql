@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
  created_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS platform_categories (
- slug text PRIMARY KEY CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*
+ slug text PRIMARY KEY CHECK (slug ~ '^[a-z0-9]+(-[a-z0-9]+)*
  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), enabled boolean NOT NULL DEFAULT false,
  message text NOT NULL DEFAULT 'Platforma PonudiMi je trenutno u fazi izrade ili unapređenja. Molimo vas za strpljenje. Uskoro se vraćamo!',
  updated_by uuid REFERENCES users(id) ON DELETE SET NULL, updated_at timestamptz NOT NULL DEFAULT now()
@@ -315,10 +315,14 @@ CREATE TABLE IF NOT EXISTS message_admin_audit (
 CREATE INDEX IF NOT EXISTS message_admin_audit_conversation_idx ON message_admin_audit(conversation_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS message_admin_audit_admin_idx ON message_admin_audit(admin_id,created_at DESC);
 ),
- naziv text NOT NULL, slika text NOT NULL DEFAULT '', podkategorije text[] NOT NULL DEFAULT '{}',
- created_at timestamptz NOT NULL DEFAULT now(), updated_at timestamptz NOT NULL DEFAULT now()
+ naziv text NOT NULL,
+ slika text NOT NULL DEFAULT '',
+ podkategorije text[] NOT NULL DEFAULT '{}',
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS platform_categories_created_idx ON platform_categories(created_at,slug);
+
 CREATE TABLE IF NOT EXISTS platform_maintenance (
  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), enabled boolean NOT NULL DEFAULT false,
  message text NOT NULL DEFAULT 'Platforma PonudiMi je trenutno u fazi izrade ili unapređenja. Molimo vas za strpljenje. Uskoro se vraćamo!',

@@ -32,7 +32,7 @@ function KategorijaPage() {
     queryFn: async () => {
       const [p, z] = await Promise.all([
         ponudimi.from("ponude").select("*").ilike("kategorija", `%${kat?.naziv||""}%`).order("created_at", { ascending: false }),
-        ponudimi.from("zahtevi").select("*").ilike("kategorija", `%${kat.naziv}%`).order("created_at", { ascending: false }),
+        ponudimi.from("zahtevi").select("*").ilike("kategorija", `%${kat?.naziv || ""}%`).order("created_at", { ascending: false }),
       ]);
       if (p.error) throw p.error;
       if (z.error) throw z.error;
