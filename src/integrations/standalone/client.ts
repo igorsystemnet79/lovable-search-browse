@@ -248,6 +248,8 @@ export async function ucitajKategorije(): Promise<Kategorija[]> {
 }
 export async function dodajKategoriju(naziv:string){return api("/api/admin/categories",{method:"POST",body:JSON.stringify({naziv})});}
 export async function dodajPotkategoriju(slug:string,naziv:string,grupa:string){return api(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories`,{method:"POST",body:JSON.stringify({naziv,grupa})});}
+export async function obrisiKategoriju(slug:string){return api(`/api/admin/categories/${encodeURIComponent(slug)}`,{method:"DELETE"});}
+export async function obrisiPotkategoriju(slug:string,naziv:string){return api(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories/${encodeURIComponent(naziv)}`,{method:"DELETE"});}
 async function sacuvajSlikuKategorije(path:string,file?:File|null,url?:string){if(file){const form=new FormData();form.append("file",file);return api(path,{method:"POST",body:form});}return api(path,{method:"PUT",body:JSON.stringify({url})});}
 export async function postaviSlikuKategorije(slug:string,file?:File|null,url?:string){return sacuvajSlikuKategorije(`/api/admin/categories/${encodeURIComponent(slug)}/image`,file,url);}
 export async function postaviSlikuPodkategorije(slug:string,naziv:string,file?:File|null,url?:string){return sacuvajSlikuKategorije(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories/${encodeURIComponent(naziv)}/image`,file,url);}
