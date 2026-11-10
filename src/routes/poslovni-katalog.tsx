@@ -25,6 +25,56 @@ function PoslovniKatalogPage() {
   const [csvFile,setCsvFile]=useState<File|null>(null);
   const [form,setForm]=useState({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});
   const [editingId,setEditingId]=useState<string|null>(null);
+
+  // On mobile, return the catalog to the device width after a two-finger pinch.
+  // This does not disable zoom: the user can still enlarge the page while touching it.
+  useEffect(() => {
+    let pinchInProgress = false;
+    let resetTimer: number | undefined;
+    let restoreTimer: number | undefined;
+
+    const resetPinchZoom = () => {
+      if (!pinchInProgress) return;
+      pinchInProgress = false;
+      window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => {
+        const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+        const visualViewport = window.visualViewport;
+        if (!viewport || !visualViewport || visualViewport.scale <= 1.01) return;
+
+        const originalContent = viewport.content || "width=device-width, initial-scale=1";
+        viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+        window.requestAnimationFrame(() => {
+          restoreTimer = window.setTimeout(() => {
+            viewport.content = originalContent;
+          }, 80);
+        });
+      }, 120);
+    };
+
+    const onTouchStart = (event: TouchEvent) => {
+      if (event.touches.length > 1) {
+        pinchInProgress = true;
+        window.clearTimeout(resetTimer);
+      }
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (pinchInProgress && event.touches.length < 2) resetPinchZoom();
+    };
+    const onTouchCancel = () => resetPinchZoom();
+
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true });
+    document.addEventListener("touchcancel", onTouchCancel, { passive: true });
+
+    return () => {
+      window.clearTimeout(resetTimer);
+      window.clearTimeout(restoreTimer);
+      document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchend", onTouchEnd);
+      document.removeEventListener("touchcancel", onTouchCancel);
+    };
+  }, []);
   const load=useCallback(async()=>{
     if(!user)return;
     setBusy(true);setError("");
