@@ -122,7 +122,7 @@ app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
  const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
 }));
 app.delete('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
- const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return res.status(400).json({error:'Podaci o grupi nisu ispravni.'});
  const used=await pool.query("SELECT EXISTS(SELECT 1 FROM ponude WHERE lower(kategorija)=lower($1)) OR EXISTS(SELECT 1 FROM zahtevi WHERE lower(kategorija)=lower($1)) AS used",[naziv]);
  if(used.rows[0]?.used)return res.status(409).json({error:'Grupa se ne može obrisati jer postoje oglasi ili zahtevi u toj kategoriji. Prvo premesti te oglase i zahteve u drugu grupu.'});
