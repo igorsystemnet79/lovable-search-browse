@@ -43,10 +43,24 @@ jobs:
           node -e 'const fs=require("node:fs");const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/api-npm-audit.json","utf8"));for(const [name,item] of Object.entries(r.vulnerabilities||{})){console.log(JSON.stringify({name,severity:item.severity,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(v=>typeof v==="string"?v:{title:v.title,url:v.url,range:v.range})}));}if(Object.values(r.vulnerabilities||{}).some(v=>["high","critical"].includes(v.severity)))process.exit(1);'
       - name: Validate standalone Docker Compose configuration
         run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml config --quiet
-      - name: Build standalone Docker images
+      - name: Smoke test standalone Docker stack
         run: |
-          docker build -f standalone/Dockerfile.api -t ponudimi-api:ci .
-          docker build -f standalone/Dockerfile.web --build-arg VITE_API_ORIGIN=same-origin --build-arg PONUDIMI_API_ORIGIN=http://api:4000 -t ponudimi-web:ci .
+          set -euo pipefail
+          COMPOSE=(docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml)
+          "${COMPOSE[@]}" up -d --build
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://localhost/api/health -o "$RUNNER_TEMP/ponudimi-health.json"; then break; fi
+            sleep 2
+          done
+          grep -q '"storage_backend":"postgres"' "$RUNNER_TEMP/ponudimi-health.json"
+          curl -fsS http://localhost/ -o /dev/null
+          "${COMPOSE[@]}" ps
+      - name: Print standalone Docker logs on failure
+        if: failure()
+        run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml logs --no-color
+      - name: Stop standalone Docker stack
+        if: always()
+        run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml down -v --remove-orphans
       - name: Build frontend
         run: npm run build
       - name: Assemble standalone ZIP package
