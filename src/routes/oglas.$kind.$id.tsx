@@ -1,6 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { useAuth } from "@/hooks/use-auth";
 import { SiteFooter } from "@/components/site-footer";
@@ -58,6 +58,26 @@ function OglasPage() {
   const { kind, id } = Route.useParams();
   const isOffer = kind === "ponuda";
   const { user } = useAuth();
+  useEffect(() => {
+    if (!data) return;
+    const session = JSON.parse(localStorage.getItem("ponudimi_session") || "null");
+    const headers: Record<string, string> = {};
+    if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+    fetch(`${API_ORIGIN}/api/listings/${isOffer ? "ponude" : "zahtevi"}/${id}/view`, { method: "POST", headers }).catch(() => {});
+  }, [data?.id, id, isOffer]);
+  const { data: stats } = useQuery({
+    queryKey: ["listing-stats", kind, id, user?.id],
+    enabled: !!user && !!data && (data as any).user_id === user.id,
+    queryFn: async () => {
+      const session = JSON.parse(localStorage.getItem("ponudimi_session") || "null");
+      const response = await fetch(`${API_ORIGIN}/api/listings/${isOffer ? "ponude" : "zahtevi"}/${id}/stats`, {
+        headers: { Authorization: `Bearer ${session?.access_token || ""}` },
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "Statistika nije dostupna.");
+      return result as { ukupno: number; danas: number; poslednjih_7_dana: number };
+    },
+  });
   const { data, isLoading, isError } = useQuery({
     queryKey: ["oglas-detalj", kind, id],
     queryFn: async () => {
@@ -81,6 +101,15 @@ function OglasPage() {
             {(data as any).verifikovan_korisnik && <span className="mt-3 inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">✓ Verifikovan korisnik</span>}
           </header>
           <div className="space-y-6 p-5 sm:p-7">
+            {(data as any).user_id === user?.id && <section className="rounded-xl border border-border bg-secondary/40 p-4">
+              <h2 className="font-semibold">Statistika poseta</h2>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                <div><p className="text-2xl font-bold tabular-nums">{stats?.ukupno ?? "—"}</p><p className="text-xs text-muted-foreground">Ukupno</p></div>
+                <div><p className="text-2xl font-bold tabular-nums">{stats?.danas ?? "—"}</p><p className="text-xs text-muted-foreground">Danas</p></div>
+                <div><p className="text-2xl font-bold tabular-nums">{stats?.poslednjih_7_dana ?? "—"}</p><p className="text-xs text-muted-foreground">7 dana</p></div>
+              </div>
+              <p className="mt-2 text-xs text-muted-foreground">Broji se najviše jedna poseta istog korisnika u periodu od 24 sata. Tvoje posete sopstvenom oglasu se ne računaju.</p>
+            </section>}
             <section><h2 className="mb-3 text-lg font-semibold">Fotografije</h2><ListingImageGallery kind={kind as "ponuda" | "zahtev"} id={id} /></section>
             <section><h2 className="mb-3 text-lg font-semibold">Opis oglasa</h2><p className="whitespace-pre-wrap break-words text-sm leading-7 text-foreground/85">{data.opis?.trim() || "Opis nije dodat."}</p></section>
             {(data.kontakt_zasticen || data.ime_prezime || data.kontakt_ime || data.telefon || data.adresa) && <section className="rounded-xl bg-secondary/60 p-4"><h2 className="mb-2 font-semibold">Podaci o oglašivaču</h2><p className="text-sm"><span className="text-muted-foreground">Ime i prezime: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.ime_prezime || data.kontakt_ime || "••••••••"}</span></p><p className="mt-1 text-sm"><span className="text-muted-foreground">Telefon: </span>{data.kontakt_zasticen ? <span className="blur-[5px] select-none">••••••••</span> : data.telefon ? <a className="font-semibold text-brand hover:underline" href={"tel:" + data.telefon.replace(/[^+0-9]/g, "")}>{data.telefon}</a> : "Nije naveden"}</p><p className="mt-1 text-sm"><span className="text-muted-foreground">Adresa: </span><span className={data.kontakt_zasticen ? "blur-[5px] select-none" : ""}>{data.adresa || (data.kontakt_zasticen ? "••••••••" : "Nije navedena")}</span></p>{data.kontakt_zasticen && <><p className="mt-3 text-xs text-muted-foreground">Registruj se ili se prijavi da vidiš pune kontakt podatke oglašivača.</p><div className="mt-3 flex flex-wrap gap-2"><Link to="/registracija" className="rounded-full bg-brand px-4 py-2 text-xs font-semibold text-brand-foreground">Registruj se</Link><Link to="/prijava" className="rounded-full border border-input px-4 py-2 text-xs font-semibold">Prijavi se</Link></div></>}</section>}
