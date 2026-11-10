@@ -1,5 +1,5 @@
 import { Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { ponudimi, posaljiSignalPrisustva } from "@/integrations/standalone/client";
 import logo from "@/assets/ponudimi-logo.png";
@@ -12,6 +12,24 @@ const solid =
 export function SiteHeader() {
   const { user, isAdmin } = useIsAdmin();
   const navigate = useNavigate();
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  useEffect(() => {
+    if (!user) { setUnreadNotifications(0); return; }
+    let active = true;
+    const loadUnread = async () => {
+      try {
+        const token = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null")?.access_token;
+        const response = await fetch("https://ponudimi-test-api.onrender.com/api/notifications", { cache: "no-store", headers: token ? { Authorization: `Bearer ${token}` } : {} });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (active) setUnreadNotifications(Number(data.unread || 0));
+      } catch { /* Broj obaveštenja nije kritičan za rad navigacije. */ }
+    };
+    void loadUnread();
+    const timer = window.setInterval(loadUnread, 30000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [user?.id]);
+
   useEffect(() => {
     if (!user) return;
 
@@ -64,6 +82,7 @@ export function SiteHeader() {
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
               <Link to="/poruke" className={outline}>Poruke</Link>
+              <Link to="/obavestenja" className={outline}>Obaveštenja{unreadNotifications > 0 ? ` (${unreadNotifications > 99 ? "99+" : unreadNotifications})` : ""}</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
               <span className="inline-flex min-h-10 items-center justify-center px-1 text-center text-brand-foreground/80">
                 <span className="hidden sm:inline">{(user.user_metadata?.["ime"] as string) || user.email}</span>
