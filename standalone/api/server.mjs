@@ -381,6 +381,14 @@ async function notifyMatchingSavedSearches(listingType, listing) {
   ? 'Pojavila se nova ponuda koja možda odgovara tvom objavljenom zahtevu.'
   : 'Pojavila se nova potražnja koja možda odgovara tvojoj objavljenoj ponudi.';
  for(const match of matches.rows){
+  // Autor nove objave dobija link ka već postojećoj odgovarajućoj objavi.
+  const ownerMessage=listingType==='zahtevi'
+   ? 'Pronađena je već postojeća ponuda koja možda odgovara tvom zahtevu.'
+   : 'Pronađena je već postojeća potražnja koja možda odgovara tvojoj ponudi.';
+  await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
+   VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
+   [listing.user_id,otherTable,match.id,match.naslov,ownerMessage]);
+  // Vlasnik postojeće objave dobija link ka upravo objavljenoj objavi.
   await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
    [match.user_id,listingType,listing.id,listing.naslov,counterpartMessage]);
