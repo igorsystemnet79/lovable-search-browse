@@ -1144,6 +1144,9 @@ async function startServer(){
  const schemaPath=path.resolve(__dirname,'../db/init.sql');
  const schema=await readFile(schemaPath,'utf8');
  await pool.query(schema);
+ const { registerBusinessCatalog } = await import('./business-catalog.mjs');
+ await registerBusinessCatalog({ app, pool, auth, asyncRoute });
+ console.log('PonudiMi poslovni katalog je spreman.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
   console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
  await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=CURRENT_DATE");
