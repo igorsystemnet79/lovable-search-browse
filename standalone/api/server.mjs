@@ -100,8 +100,25 @@ async function removeImage(key) {
 }
 const asyncRoute = fn => (req,res,next) => Promise.resolve(fn(req,res,next)).catch(next);
 const rejectBlockedUser = async userId => { const result = await pool.query('SELECT blokiran FROM profiles WHERE id=$1', [userId]); return Boolean(result.rows[0]?.blokiran); };
-const auth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (!token) return res.status(401).json({ error:'Prijava je obavezna.' }); try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); next(); } catch { res.status(401).json({ error:'Sesija je istekla.' }); } });
-const optionalAuth = asyncRoute(async (req,res,next) => { const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,''); if (token) { try { req.user = jwt.verify(token, JWT_SECRET); if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' }); } catch { return res.status(401).json({ error:'Sesija je istekla.' }); } } next(); });
+const auth = asyncRoute(async (req,res,next) => {
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
+ if (!token) return res.status(401).json({ error:'Prijava je obavezna.' });
+ try { req.user = jwt.verify(token, JWT_SECRET); }
+ catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
+ // Database outages must not be mistaken for invalid JWTs: otherwise the client
+ // may erase a valid saved session during a temporary PostgreSQL interruption.
+ if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
+ next();
+});
+const optionalAuth = asyncRoute(async (req,res,next) => {
+ const token = (req.headers.authorization || '').replace(/^Bearer\s+/i,'');
+ if (token) {
+  try { req.user = jwt.verify(token, JWT_SECRET); }
+  catch { return res.status(401).json({ error:'Sesija je istekla.' }); }
+  if (await rejectBlockedUser(req.user.sub)) return res.status(403).json({ error:'Nalog je privremeno blokiran.' });
+ }
+ next();
+});
 const isPlatformAdmin = async user => { const email=String(user?.email||'').trim().toLowerCase(); const configuredAdminEmail=String(process.env.ADMIN_EMAIL||'igorsystemnet@gmail.com').trim().toLowerCase(); if(email && email===configuredAdminEmail) return true; const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[user.sub]); return r.rowCount>0; };
 const admin = asyncRoute(async (req,res,next) => { if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount && !(await isPlatformAdmin(req.user)))return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
