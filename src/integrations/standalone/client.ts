@@ -8,7 +8,7 @@ export const API_ORIGIN = String(
   configuredApiOrigin && !sameOriginApi
     ? configuredApiOrigin
     : typeof window !== "undefined"
-      ? (sameOriginApi ? window.location.origin : "https://ponudimi-test-api.onrender.com")
+      ? window.location.origin
       : process.env.PUBLIC_APP_URL || "http://localhost"
 ).replace(/\/+$/, "");
 const SESSION_KEY = "ponudimi_session";
