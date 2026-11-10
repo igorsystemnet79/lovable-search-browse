@@ -70,8 +70,30 @@ function PoslovniKatalogPage() {
     catch(e:any){setError(e?.message||"Artikal nije obrisan.");}finally{setBusy(false);}
   }
   function downloadTemplate(){
-    const blob=new Blob(["\uFEFF"+template],{type:"text/csv;charset=utf-8"});
-    const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download="ponudimi-katalog-obrazac.csv";a.click();URL.revokeObjectURL(url);
+    const workbook=XLSX.utils.book_new();
+    const headers=["sifra","naziv","opis","kategorija","cena","valuta","kolicina","proizvodjac","jedinica_mere","aktivan"];
+    const products=XLSX.utils.aoa_to_sheet([headers]);
+    products["!cols"]=[{wch:16},{wch:32},{wch:48},{wch:22},{wch:14},{wch:10},{wch:14},{wch:24},{wch:16},{wch:12}];
+    XLSX.utils.book_append_sheet(workbook,products,"Artikli");
+    const example=XLSX.utils.aoa_to_sheet([headers,["TEST-001","Primer proizvoda","Opis proizvoda","Tehnika",1299,"RSD",25,"Proizvođač","kom","da"]]);
+    example["!cols"]=products["!cols"];
+    XLSX.utils.book_append_sheet(workbook,example,"Primer");
+    const instructions=XLSX.utils.aoa_to_sheet([
+      ["UPUTSTVO ZA POPUNJAVANJE PONUDIMI KATALOGA"],
+      ["1. Unosite svoje proizvode na list Artikli, po jedan proizvod u svaki red."],
+      ["2. Ne menjajte nazive kolona u prvom redu."],
+      ["3. Šifra artikla i naziv su obavezni. Šifra mora biti jedinstvena u okviru kataloga firme."],
+      ["4. Cena i količina mogu ostati prazni ako nisu poznati."],
+      ["5. Valuta je najčešće RSD. Jedinica mere npr. kom, kg, m, l."],
+      ["6. U koloni aktivan unesite da ili ne."],
+      ["7. List Primer prikazuje primer unosa. Nemojte kopirati probni artikal u list Artikli."],
+      ["8. Sačuvajte fajl u .xlsx formatu i direktno ga učitajte u Poslovnom katalogu."],
+      ["9. Fotografije se dodaju posebno, nakon uvoza, za svaki artikal (do 7 fotografija)."],
+      ["10. Ista šifra artikla ažurira postojeći artikal umesto da napravi duplikat."]
+    ]);
+    instructions["!cols"]=[{wch:110}];
+    XLSX.utils.book_append_sheet(workbook,instructions,"Uputstvo");
+    XLSX.writeFile(workbook,"ponudimi-obrazac-poslovni-katalog.xlsx");
   }
   return <div className="min-h-screen bg-background text-foreground"><SiteHeader/><main className="container-page py-8 space-y-6">
     <div><Link to="/" className="text-sm text-brand hover:underline">← Početna</Link><h1 className="mt-3 text-3xl font-bold">Poslovni katalog</h1><p className="mt-2 text-sm text-muted-foreground">Upravljaj artiklima svoje firme. Katalog je odvojen od klasičnih oglasa i svaki artikal ima svoju šifru.</p></div>
