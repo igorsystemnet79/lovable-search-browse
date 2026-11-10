@@ -1096,6 +1096,11 @@ app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(r
  if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
  res.json({ok:true});
 }));
+app.delete('/api/admin/business-packages/:id',auth,admin,asyncRoute(async(req,res)=>{
+ const r=await pool.query('DELETE FROM paketi_firmi WHERE id=$1 RETURNING id',[req.params.id]);
+ if(!r.rowCount)return res.status(404).json({error:'Evidencija paketa nije pronađena.'});
+ res.json({ok:true,message:'Evidencija paketa je trajno obrisana.'});
+}));
 
 app.get('/api/admin/access-grants/users',auth,admin,asyncRoute(async(req,res)=>{
  const q=String(req.query.q||'').trim().slice(0,120).replace(/[%_\\\\]/g,'');
