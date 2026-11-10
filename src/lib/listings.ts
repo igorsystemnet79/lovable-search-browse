@@ -1,4 +1,4 @@
-import { ponudimi } from "@/integrations/standalone/client";
+import { ponudimi, pretraziArtikleKataloga } from "@/integrations/standalone/client";
 
 export type Ponuda = {
   id: string;
@@ -79,7 +79,8 @@ export const zahteviQuery = (limit?: number) => ({
   },
 });
 
-export type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[] };
+export type CatalogProduct = { id:string; sifra:string; naziv:string; opis:string|null; kategorija:string; cena:number|null; valuta:string; kolicina:number|null; proizvodjac:string|null; naziv_firme:string; grad:string|null; slike:any[] };
+\nexport type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[]; artikliKataloga: CatalogProduct[] };
 
 export type SearchFilters = { kategorija?: string; minCena?: string; maxCena?: string; valuta?: string; sort?: string };
 
@@ -87,13 +88,14 @@ export const pretragaQuery = (q: string, lokacija: string, filters: SearchFilter
   queryKey: ["pretraga", q, lokacija, filters],
   queryFn: async (): Promise<SearchResults> => {
     const args = { q: q.slice(0, 200), mesto: lokacija.slice(0, 100), kategorija: (filters.kategorija || "").slice(0, 100), minCena: filters.minCena || "", maxCena: filters.maxCena || "", valuta: filters.valuta || "", sort: filters.sort || "najnovije" };
-    const [ponude, zahtevi] = await Promise.all([
+    const [ponude, zahtevi, katalog] = await Promise.all([
       ponudimi.rpc("pretrazi_ponude", args),
       ponudimi.rpc("pretrazi_zahteve", args),
+      pretraziArtikleKataloga({q:args.q,kategorija:args.kategorija,mesto:args.mesto,minCena:args.minCena,maxCena:args.maxCena,valuta:args.valuta,sort:args.sort}),
     ]);
     if (ponude.error) throw ponude.error;
     if (zahtevi.error) throw zahtevi.error;
-    return { ponude: (ponude.data ?? []) as Ponuda[], zahtevi: (zahtevi.data ?? []) as Zahtev[] };
+    return { ponude: (ponude.data ?? []) as Ponuda[], zahtevi: (zahtevi.data ?? []) as Zahtev[], artikliKataloga: (katalog.data ?? []) as CatalogProduct[] };
   },
 });
 
