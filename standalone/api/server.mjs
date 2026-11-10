@@ -356,7 +356,7 @@ async function notifyMatchingSavedSearches(listingType, listing) {
   ? 'Pojavila se nova ponuda koja odgovara tvojoj sačuvanoj pretrazi.'
   : 'Pojavio se novi zahtev koji odgovara tvojoj sačuvanoj pretrazi.';
  for(const recipient of rows){
-  await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
+  await pool.query(`INSERT INTO ponudimi_smart_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
    [recipient.user_id,listingType,listing.id,listing.naslov,alertMessage]);
  }
@@ -385,11 +385,11 @@ async function notifyMatchingSavedSearches(listingType, listing) {
   const ownerMessage=listingType==='zahtevi'
    ? 'Pronađena je već postojeća ponuda koja možda odgovara tvom zahtevu.'
    : 'Pronađena je već postojeća potražnja koja možda odgovara tvojoj ponudi.';
-  await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
+  await pool.query(`INSERT INTO ponudimi_smart_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
    [listing.user_id,otherTable,match.id,match.naslov,ownerMessage]);
   // Vlasnik postojeće objave dobija link ka upravo objavljenoj objavi.
-  await pool.query(`INSERT INTO user_notifications(user_id,listing_type,listing_id,title,message)
+  await pool.query(`INSERT INTO ponudimi_smart_notifications(user_id,listing_type,listing_id,title,message)
    VALUES($1,$2,$3,$4,$5) ON CONFLICT(user_id,listing_type,listing_id) DO NOTHING`,
    [match.user_id,listingType,listing.id,listing.naslov,counterpartMessage]);
  }
@@ -416,16 +416,16 @@ app.delete('/api/alert-searches/:id',auth,asyncRoute(async(req,res)=>{
 app.get('/api/notifications',auth,asyncRoute(async(req,res)=>{
  const r=await pool.query(`SELECT n.id,n.listing_type,n.listing_id,n.title,n.message,n.created_at,n.read_at,
   CASE WHEN n.listing_type='ponude' THEN 'ponuda' ELSE 'zahtev' END AS listing_kind
-  FROM user_notifications n WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100`,[req.user.sub]);
- const unread=await pool.query('SELECT count(*)::int n FROM user_notifications WHERE user_id=$1 AND read_at IS NULL',[req.user.sub]);
+  FROM ponudimi_smart_notifications n WHERE n.user_id=$1 ORDER BY n.created_at DESC LIMIT 100`,[req.user.sub]);
+ const unread=await pool.query('SELECT count(*)::int n FROM ponudimi_smart_notifications WHERE user_id=$1 AND read_at IS NULL',[req.user.sub]);
  res.set('Cache-Control','private, no-store');res.json({data:r.rows,unread:unread.rows[0].n});
 }));
 app.patch('/api/notifications/read-all',auth,asyncRoute(async(req,res)=>{
- await pool.query('UPDATE user_notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL',[req.user.sub]);
+ await pool.query('UPDATE ponudimi_smart_notifications SET read_at=now() WHERE user_id=$1 AND read_at IS NULL',[req.user.sub]);
  res.json({ok:true});
 }));
 app.patch('/api/notifications/:id/read',auth,asyncRoute(async(req,res)=>{
- const r=await pool.query('UPDATE user_notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.sub]);
+ const r=await pool.query('UPDATE ponudimi_smart_notifications SET read_at=COALESCE(read_at,now()) WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.sub]);
  if(!r.rowCount)return res.status(404).json({error:'Obaveštenje nije pronađeno.'});
  res.json({ok:true});
 }));
