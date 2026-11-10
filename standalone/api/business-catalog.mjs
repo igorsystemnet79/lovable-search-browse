@@ -57,7 +57,7 @@ function csvRows(input) {
 const clean = (v,max=2000)=>String(v??'').trim().slice(0,max);
 const numeric = (v)=>{if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)&&n>=0?n:NaN;};
 
-export async function registerBusinessCatalog({app,pool,auth,asyncRoute}) {
+export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUpload,normalizeImage,saveImage,removeImage}) {
  await pool.query(schema);
  const firm = async userId => {
   const r=await pool.query(`SELECT p.id,p.tip_lica,p.firma_verifikovana,p.naziv_firme,
@@ -121,6 +121,32 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute}) {
  app.delete('/api/business/catalog/products/:id',auth,wrapped(async(req,res)=>{
   const r=await pool.query('DELETE FROM business_catalog_products WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.sub]);
   if(!r.rowCount)return res.status(404).json({error:'Artikal nije pronađen.'});
+  res.json({ok:true});
+ }));
+ app.post('/api/business/catalog/products/:id/images',auth,memoryUpload.array('fotografije',7),wrapped(async(req,res)=>{
+  const files=req.files||[];
+  if(!files.length)return res.status(400).json({error:'Izaberi najmanje jednu fotografiju.'});
+  const product=await pool.query('SELECT id FROM business_catalog_products WHERE id=$1 AND user_id=$2',[req.params.id,req.user.sub]);
+  if(!product.rowCount)return res.status(404).json({error:'Artikal nije pronađen.'});
+  const count=await pool.query('SELECT count(*)::int n FROM business_catalog_product_images WHERE product_id=$1',[req.params.id]);
+  if(count.rows[0].n+files.length>7)return res.status(400).json({error:'Za jedan artikal možeš dodati najviše 7 fotografija.'});
+  const saved=[];
+  try{
+   for(const [i,file] of files.entries()){
+    const key=`${req.user.sub}/catalog/${req.params.id}/${randomUUID()}.jpg`;
+    const normalized=await normalizeImage(file.buffer);await saveImage(key,normalized,'image/jpeg');saved.push(key);
+    await pool.query('INSERT INTO business_catalog_product_images(product_id,storage_path,pozicija) VALUES($1,$2,$3)',[req.params.id,`/uploads/${key}`,count.rows[0].n+i]);
+   }
+   const r=await pool.query('SELECT id,storage_path,pozicija FROM business_catalog_product_images WHERE product_id=$1 ORDER BY pozicija',[req.params.id]);
+   res.status(201).json({data:r.rows});
+  }catch(error){for(const key of saved){try{await removeImage(key);}catch{}}throw error;}
+ }));
+ app.delete('/api/business/catalog/images/:imageId',auth,wrapped(async(req,res)=>{
+  const found=await pool.query(`SELECT i.id,i.storage_path FROM business_catalog_product_images i JOIN business_catalog_products p ON p.id=i.product_id WHERE i.id=$1 AND p.user_id=$2`,[req.params.imageId,req.user.sub]);
+  if(!found.rowCount)return res.status(404).json({error:'Fotografija nije pronađena.'});
+  await pool.query('DELETE FROM business_catalog_product_images WHERE id=$1',[req.params.imageId]);
+  const key=String(found.rows[0].storage_path).replace(/^\\/uploads\\//,'');
+  try{await removeImage(key);}catch(error){console.error('Fotografija kataloga nije očišćena iz skladišta:',error);}
   res.json({ok:true});
  }));
  app.post('/api/business/catalog/import-csv',auth,wrapped(async(req,res,{limit})=>{
