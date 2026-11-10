@@ -1095,6 +1095,46 @@ app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(r
  if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
  res.json({ok:true});
 }));
+
+app.get('/api/admin/access-grants/users',auth,admin,asyncRoute(async(req,res)=>{
+ const q=String(req.query.q||'').trim().slice(0,120).replace(/[%_\\\\]/g,'');
+ const params=[];let where='';
+ if(q){params.push('%'+q+'%');where="WHERE (u.email ILIKE $1 OR p.email ILIKE $1 OR p.ime ILIKE $1 OR p.prezime ILIKE $1 OR p.naziv_firme ILIKE $1 OR p.pib ILIKE $1 OR p.korisnicko_ime ILIKE $1)";}
+ const r=await pool.query(`SELECT u.id AS user_id,coalesce(p.email,u.email) AS email,p.ime,p.prezime,p.naziv_firme,p.pib,p.tip_lica FROM users u LEFT JOIN profiles p ON p.id=u.id ${where} ORDER BY coalesce(p.naziv_firme,p.prezime,p.ime,u.email) LIMIT 100`,params);
+ res.json({data:r.rows});
+}));
+app.get('/api/admin/access-grants',auth,admin,asyncRoute(async(_req,res)=>{
+ await pool.query("UPDATE user_access_grants SET status='istekao' WHERE status='aktivan' AND vazi_do<=now()");
+ const r=await pool.query(`SELECT g.*,coalesce(p.email,u.email) AS email,p.ime,p.prezime,p.naziv_firme,p.tip_lica FROM user_access_grants g JOIN users u ON u.id=g.user_id LEFT JOIN profiles p ON p.id=u.id ORDER BY g.created_at DESC LIMIT 500`);
+ res.json({data:r.rows});
+}));
+app.post('/api/admin/access-grants',auth,admin,asyncRoute(async(req,res)=>{
+ const userId=String(req.body?.user_id||'');
+ const packageName=String(req.body?.package_name||'').trim().slice(0,80);
+ const days=Number(req.body?.duration_days);
+ const gratis=Boolean(req.body?.gratis);
+ const price=gratis?0:Number(req.body?.cena_eur);
+ const note=String(req.body?.napomena||'').trim().slice(0,1000);
+ if(!userId||packageName.length<2||!Number.isInteger(days)||days<1||days>3650||!Number.isFinite(price)||price<0||price>100000)return res.status(400).json({error:'Proveri korisnika, naziv paketa, trajanje i cenu.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const user=await c.query('SELECT id FROM users WHERE id=$1 FOR UPDATE',[userId]);
+  if(!user.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički nalog nije pronađen.'});}
+  await c.query("UPDATE user_access_grants SET status='zamenjen' WHERE user_id=$1 AND status='aktivan'",[userId]);
+  const result=await c.query(`INSERT INTO user_access_grants(user_id,package_name,duration_days,gratis,cena_eur,status,vazi_od,vazi_do,napomena,kreirao_id)
+   VALUES($1,$2,$3,$4,$5,'aktivan',now(),now()+($6::text||' days')::interval,$7,$8) RETURNING *`,
+   [userId,packageName,days,gratis,price,note||null,req.user.sub]);
+  await c.query('COMMIT');
+  res.status(201).json({data:result.rows[0],poruka:gratis?'Gratis period je aktiviran za izabranog korisnika.':'Paket je aktiviran za izabranog korisnika.'});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
+app.post('/api/admin/access-grants/:id/cancel',auth,admin,asyncRoute(async(req,res)=>{
+ const r=await pool.query("UPDATE user_access_grants SET status='otkazan' WHERE id=$1 AND status='aktivan' RETURNING id",[req.params.id]);
+ if(!r.rowCount)return res.status(404).json({error:'Aktivna dodela nije pronađena.'});
+ res.json({ok:true});
+}));
+
 app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
  const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
  try{const response=await fetch(url,{headers:{Authorization:`Bearer ${key}`,Accept:'application/json'}});if(!response.ok)throw new Error(`APR je vratio status ${response.status}`);const body=await response.json();const list=Array.isArray(body)?body:(body.data||[]);let n=0;
