@@ -1145,7 +1145,7 @@ async function startServer(){
  const schema=await readFile(schemaPath,'utf8');
  await pool.query(schema);
  const { registerBusinessCatalog } = await import('./business-catalog.mjs');
- await registerBusinessCatalog({ app, pool, auth, asyncRoute });
+ await registerBusinessCatalog({ app, pool, auth, asyncRoute, memoryUpload, normalizeImage, saveImage, removeImage });
  console.log('PonudiMi poslovni katalog je spreman.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
   console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
