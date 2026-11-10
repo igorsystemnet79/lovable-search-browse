@@ -32,7 +32,7 @@ function FirmaKatalogPage() {
         {company.grad && <p className="mt-2 text-sm text-brand-foreground/80">{company.grad}</p>}
         <p className="mt-4 text-sm text-brand-foreground/80">{products.length.toLocaleString("sr-RS")} prikazanih artikala</p>
       </section>
-      <div className="mt-8 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">Artikli firme</h2><Link to="/poslovni-katalog" className="text-sm font-medium text-brand hover:underline">Upravljaj svojim katalogom</Link></div>
+      <div className="mt-8 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">Artikli firme</h2>{user.id===id && <Link to="/poslovni-katalog" className="text-sm font-medium text-brand hover:underline">Upravljaj svojim katalogom</Link>}</div>
       {products.length===0 ? <p className="mt-4 rounded-xl border p-5 text-sm text-muted-foreground">Firma još nije objavila artikle u katalogu.</p> :
       <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{products.map((item:any)=><article key={item.id} className="overflow-hidden rounded-2xl border border-border bg-surface shadow-card">
         {item.slike?.[0]?.storage_path ? <img src={API_ORIGIN+item.slike[0].storage_path} alt={item.naziv} loading="lazy" className="h-44 w-full object-cover"/> : <div className="flex h-44 items-center justify-center bg-secondary text-4xl">📦</div>}
