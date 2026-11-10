@@ -45,11 +45,15 @@ CREATE INDEX IF NOT EXISTS business_catalog_product_images_product_idx
 function csvRows(input) {
  const rows=[]; let row=[], field='', quoted=false;
  const text=String(input||'').replace(/^\uFEFF/,'');
+ const firstLine=text.split('\n',1)[0]||'';
+ let commas=0,semicolons=0,inQuotes=false;
+ for(let i=0;i<firstLine.length;i++){const ch=firstLine[i];if(ch==='"')inQuotes=!inQuotes;else if(!inQuotes&&ch===',')commas++;else if(!inQuotes&&ch===';')semicolons++;}
+ const delimiter=semicolons>commas?';':',';
  for(let i=0;i<text.length;i++){
   const ch=text[i], next=text[i+1];
   if(quoted){if(ch==='"'&&next==='"'){field+='"';i++;}else if(ch==='"')quoted=false;else field+=ch;}
   else if(ch==='"')quoted=true;
-  else if(ch===','){row.push(field);field='';}
+  else if(ch===delimiter){row.push(field);field='';}
   else if(ch==='\n'){row.push(field);if(row.some(v=>v.trim()))rows.push(row);row=[];field='';}
   else if(ch!=='\r')field+=ch;
  }
@@ -58,7 +62,12 @@ function csvRows(input) {
  return rows;
 }
 const clean = (v,max=2000)=>String(v??'').trim().slice(0,max);
-const numeric = (v)=>{if(v===null||v===undefined||String(v).trim()==='')return null;const n=Number(String(v).replace(',','.'));return Number.isFinite(n)&&n>=0?n:NaN;};
+const numeric = (v)=>{
+ if(v===null||v===undefined||String(v).trim()==='')return null;
+ const raw=String(v).trim().replace(/\s/g,'');
+ const normalized=raw.includes(',')?raw.replace(/\./g,'').replace(',','.'):raw;
+ const n=Number(normalized);return Number.isFinite(n)&&n>=0?n:NaN;
+};
 
 export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUpload,normalizeImage,saveImage,removeImage}) {
  await pool.query(schema);
