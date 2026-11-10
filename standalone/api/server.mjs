@@ -110,7 +110,7 @@ const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}
 
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, storage_backend:s3?'r2':filesystemStorage?'filesystem':'postgres', checked_at:result.rows[0].checked_at }); }));
-app.get('/api/categories',asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT slug,naziv,slika,podkategorije,podkategorije_slike,created_at,updated_at FROM platform_categories ORDER BY created_at,slug');res.set('Cache-Control','no-store');res.json({data:r.rows});}));
+app.get('/api/categories',asyncRoute(async(_req,res)=>{const [r,x]=await Promise.all([pool.query('SELECT slug,naziv,slika,podkategorije,podkategorije_slike,created_at,updated_at FROM platform_categories ORDER BY created_at,slug'),pool.query('SELECT slug,subcategory FROM platform_category_exclusions')]);res.set('Cache-Control','no-store');res.json({data:r.rows,exclusions:x.rows});}));
 const categorySlug=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'dj').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
 const DEFAULT_CATEGORY_IMAGE='https://images.pexels.com/photos/5825398/pexels-photo-5825398.jpeg?auto=compress&cs=tinysrgb&w=900';
 app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
@@ -118,23 +118,24 @@ app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
  if(naziv.length<2||!slug)return res.status(400).json({error:'Unesi naziv grupe od najmanje 2 karaktera.'});
  const exists=await pool.query('SELECT 1 FROM platform_categories WHERE slug=$1 OR lower(naziv)=lower($2)',[slug,naziv]);
  if(exists.rowCount)return res.status(409).json({error:'Grupa sa tim nazivom već postoji.'});
+ await pool.query("DELETE FROM platform_category_exclusions WHERE slug=$1",[slug]);
  const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
 }));
 app.delete('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
- const slug=String(req.params.slug||'').trim(),found=await pool.query('SELECT slug,naziv FROM platform_categories WHERE slug=$1',[slug]);
- if(!found.rows[0])return res.status(404).json({error:'Grupa nije pronađena ili je već obrisana.'});
- const naziv=found.rows[0].naziv;
+ const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return res.status(400).json({error:'Podaci o grupi nisu ispravni.'});
  const used=await pool.query("SELECT EXISTS(SELECT 1 FROM ponude WHERE lower(kategorija)=lower($1)) OR EXISTS(SELECT 1 FROM zahtevi WHERE lower(kategorija)=lower($1)) AS used",[naziv]);
- if(used.rows[0]?.used)return res.status(409).json({error:'Grupa se ne može obrisati jer postoje aktivni ili raniji oglasi/zahtevi u toj kategoriji. Prvo premesti te oglase i zahteve u drugu grupu.'});
+ if(used.rows[0]?.used)return res.status(409).json({error:'Grupa se ne može obrisati jer postoje oglasi ili zahtevi u toj kategoriji. Prvo premesti te oglase i zahteve u drugu grupu.'});
  await pool.query('DELETE FROM platform_categories WHERE slug=$1',[slug]);
+ await pool.query("INSERT INTO platform_category_exclusions(slug,subcategory) VALUES($1,'') ON CONFLICT(slug,subcategory) DO NOTHING",[slug]);
  res.json({ok:true,message:'Grupa je obrisana.'});
 }));
 app.delete('/api/admin/categories/:slug/subcategories/:name',auth,admin,asyncRoute(async(req,res)=>{
  const slug=String(req.params.slug||'').trim(),name=String(req.params.name||'').trim();
- if(!name)return res.status(400).json({error:'Nije navedena podgrupa za brisanje.'});
- const result=await pool.query("UPDATE platform_categories SET podkategorije=array_remove(podkategorije,$2),podkategorije_slike=COALESCE(podkategorije_slike,'{}'::jsonb)-$2,updated_at=now() WHERE slug=$1 AND $2=ANY(podkategorije) RETURNING slug,naziv,podkategorije",[slug,name]);
- if(!result.rows[0])return res.status(404).json({error:'Podgrupa nije pronađena ili je već obrisana.'});
- res.json({data:result.rows[0],message:'Podgrupa je obrisana.'});
+ if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||name.length<2)return res.status(400).json({error:'Podaci o podgrupi nisu ispravni.'});
+ await pool.query("UPDATE platform_categories SET podkategorije=array_remove(podkategorije,$2),podkategorije_slike=COALESCE(podkategorije_slike,'{}'::jsonb)-$2,updated_at=now() WHERE slug=$1",[slug,name]);
+ await pool.query("INSERT INTO platform_category_exclusions(slug,subcategory) VALUES($1,$2) ON CONFLICT(slug,subcategory) DO NOTHING",[slug,name]);
+ res.json({ok:true,message:'Podgrupa je obrisana.'});
 }));
 app.post('/api/admin/categories/:slug/subcategories',auth,admin,asyncRoute(async(req,res)=>{
  const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
@@ -145,6 +146,7 @@ app.post('/api/admin/categories/:slug/subcategories',auth,admin,asyncRoute(async
    await c.query("INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,'',ARRAY[]::text[]) ON CONFLICT(slug) DO NOTHING",[slug,grupa]);category=await c.query('SELECT slug,naziv FROM platform_categories WHERE slug=$1 FOR UPDATE',[slug]);}
   const current=await c.query('SELECT podkategorije FROM platform_categories WHERE slug=$1',[slug]),existing=current.rows[0].podkategorije||[];
   if(existing.some(item=>item.toLocaleLowerCase('sr')===naziv.toLocaleLowerCase('sr'))){await c.query('ROLLBACK');return res.status(409).json({error:'Ta podgrupa već postoji u izabranoj grupi.'});}
+  await c.query("DELETE FROM platform_category_exclusions WHERE slug=$1 AND subcategory=$2",[slug,naziv]);
   const updated=await c.query('UPDATE platform_categories SET podkategorije=array_append(podkategorije,$2),updated_at=now() WHERE slug=$1 RETURNING slug,naziv,slika,podkategorije',[slug,naziv]);await c.query('COMMIT');res.json({data:updated.rows[0]});
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }));
