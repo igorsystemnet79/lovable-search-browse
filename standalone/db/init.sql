@@ -14,9 +14,11 @@ CREATE TABLE IF NOT EXISTS platform_categories (
  naziv text NOT NULL,
  slika text NOT NULL DEFAULT '',
  podkategorije text[] NOT NULL DEFAULT '{}',
+ podkategorije_slike jsonb NOT NULL DEFAULT '{}'::jsonb,
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now()
 );
+ALTER TABLE platform_categories ADD COLUMN IF NOT EXISTS podkategorije_slike jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS platform_categories_created_idx ON platform_categories(created_at,slug);
 
 CREATE TABLE IF NOT EXISTS platform_maintenance (

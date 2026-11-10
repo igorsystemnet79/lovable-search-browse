@@ -110,7 +110,7 @@ const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}
 
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
 app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, storage_backend:s3?'r2':filesystemStorage?'filesystem':'postgres', checked_at:result.rows[0].checked_at }); }));
-app.get('/api/categories',asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT slug,naziv,slika,podkategorije,created_at,updated_at FROM platform_categories ORDER BY created_at,slug');res.set('Cache-Control','no-store');res.json({data:r.rows});}));
+app.get('/api/categories',asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT slug,naziv,slika,podkategorije,podkategorije_slike,created_at,updated_at FROM platform_categories ORDER BY created_at,slug');res.set('Cache-Control','no-store');res.json({data:r.rows});}));
 const categorySlug=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/gi,'dj').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,80);
 const DEFAULT_CATEGORY_IMAGE='https://images.pexels.com/photos/5825398/pexels-photo-5825398.jpeg?auto=compress&cs=tinysrgb&w=900';
 app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
@@ -132,6 +132,42 @@ app.post('/api/admin/categories/:slug/subcategories',auth,admin,asyncRoute(async
   const updated=await c.query('UPDATE platform_categories SET podkategorije=array_append(podkategorije,$2),updated_at=now() WHERE slug=$1 RETURNING slug,naziv,slika,podkategorije',[slug,naziv]);await c.query('COMMIT');res.json({data:updated.rows[0]});
  }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
 }));
+function validCategoryImageUrl(raw) {
+ let parsed;
+ try { parsed = new URL(String(raw || '').trim()); } catch { return null; }
+ if (parsed.protocol !== 'https:' || parsed.username || parsed.password || parsed.href.length > 2048) return null;
+ return parsed.href;
+}
+async function saveCategoryImage(req, slug, subcategory = null) {
+ const category = await pool.query('SELECT slug,podkategorije FROM platform_categories WHERE slug=$1',[slug]);
+ if (!category.rows[0]) return { status:404, error:'Grupa nije pronađena.' };
+ if (subcategory !== null && !(category.rows[0].podkategorije || []).includes(subcategory)) return { status:404, error:'Podgrupa nije pronađena u izabranoj grupi.' };
+ let imageUrl = '';
+ if (req.file) {
+  const normalized = await normalizeImage(req.file.buffer);
+  const key = 'categories/' + slug + '/' + randomUUID() + '.jpg';
+  await saveImage(key, normalized, 'image/jpeg');
+  imageUrl = '/api/storage/public?path=' + encodeURIComponent(key);
+ } else {
+  imageUrl = validCategoryImageUrl(req.body?.url);
+  if (!imageUrl) return { status:400, error:'Unesi ispravan HTTPS link do fotografije ili izaberi JPG, PNG ili WebP sliku.' };
+ }
+ let result;
+ if (subcategory === null) {
+  result = await pool.query('UPDATE platform_categories SET slika=$2,updated_at=now() WHERE slug=$1 RETURNING slug,naziv,slika,podkategorije,podkategorije_slike',[slug,imageUrl]);
+ } else {
+  result = await pool.query("UPDATE platform_categories SET podkategorije_slike=jsonb_set(COALESCE(podkategorije_slike, '{}'::jsonb),ARRAY[$2]::text[],to_jsonb($3::text),true),updated_at=now() WHERE slug=$1 RETURNING slug,naziv,slika,podkategorije,podkategorije_slike",[slug,subcategory,imageUrl]);
+ }
+ return { status:200, data:result.rows[0] };
+}
+const categoryImageHandler = subcategory => asyncRoute(async (req,res) => {
+ const result = await saveCategoryImage(req,req.params.slug,subcategory ? req.params.name : null);
+ res.status(result.status).json(result.error ? {error:result.error} : {data:result.data});
+});
+app.post('/api/admin/categories/:slug/image',auth,admin,memoryUpload.single('file'),categoryImageHandler(false));
+app.put('/api/admin/categories/:slug/image',auth,admin,categoryImageHandler(false));
+app.post('/api/admin/categories/:slug/subcategories/:name/image',auth,admin,memoryUpload.single('file'),categoryImageHandler(true));
+app.put('/api/admin/categories/:slug/subcategories/:name/image',auth,admin,categoryImageHandler(true));
 app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{const r=await pool.query("SELECT sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");res.set('Cache-Control','no-store');res.json({data:r.rows[0]||null});}));
 app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT id,sadrzaj,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');res.json({data:r.rows});}));
 app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{const sadrzaj=String(req.body?.sadrzaj||'').trim();if(sadrzaj.length<30||sadrzaj.length>50000)return res.status(400).json({error:'Tekst pravila mora imati između 30 i 50.000 karaktera.'});const c=await pool.connect();try{await c.query('BEGIN');const current=await c.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');const version=current.rows[0].version+1;const inserted=await c.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[sadrzaj,version,req.user.sub]);await c.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[sadrzaj,version,req.user.sub]);await c.query('COMMIT');res.json({data:inserted.rows[0]});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
