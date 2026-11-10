@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 // PonudiMi poslovni katalog — odvojen od klasičnih oglasa.
 const schema = `
 ALTER TABLE business_package_catalog
