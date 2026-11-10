@@ -125,6 +125,46 @@ app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
  await pool.query("DELETE FROM platform_category_exclusions WHERE slug=$1",[slug]);
  const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
 }));
+app.patch('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
+ const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return res.status(400).json({error:'Unesi ispravan naziv grupe od najmanje 2 karaktera.'});
+ const current=await pool.query('SELECT naziv FROM platform_categories WHERE slug=$1',[slug]);
+ if(!current.rows[0])return res.status(404).json({error:'Grupa nije pronađena.'});
+ const duplicate=await pool.query('SELECT 1 FROM platform_categories WHERE lower(naziv)=lower($1) AND slug<>$2',[naziv,slug]);
+ if(duplicate.rowCount)return res.status(409).json({error:'Grupa sa tim nazivom već postoji.'});
+ const oldName=current.rows[0].naziv;
+ const c=await pool.connect();
+ try{await c.query('BEGIN');
+  await c.query('UPDATE platform_categories SET naziv=$2,updated_at=now() WHERE slug=$1',[slug,naziv]);
+  if(oldName!==naziv){
+   await c.query('UPDATE ponude SET kategorija=$1 WHERE lower(kategorija)=lower($2)',[naziv,oldName]);
+   await c.query('UPDATE zahtevi SET kategorija=$1 WHERE lower(kategorija)=lower($2)',[naziv,oldName]);
+  }
+  await c.query('COMMIT');
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ const updated=await pool.query('SELECT slug,naziv,slika,podkategorije,podkategorije_slike FROM platform_categories WHERE slug=$1',[slug]);
+ res.json({data:updated.rows[0]});
+}));
+app.patch('/api/admin/categories/:slug/subcategories/:name',auth,admin,asyncRoute(async(req,res)=>{
+ const slug=String(req.params.slug||'').trim(),oldName=String(req.params.name||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||oldName.length<2||naziv.length<2)return res.status(400).json({error:'Podaci o podgrupi nisu ispravni.'});
+ const c=await pool.connect();
+ try{await c.query('BEGIN');
+  const found=await c.query('SELECT podkategorije,podkategorije_slike FROM platform_categories WHERE slug=$1 FOR UPDATE',[slug]);
+  if(!found.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Grupa nije pronađena.'});}
+  const subs=found.rows[0].podkategorije||[];
+  if(!subs.includes(oldName)){await c.query('ROLLBACK');return res.status(404).json({error:'Podgrupa nije pronađena.'});}
+  if(subs.some(item=>item!==oldName&&item.toLocaleLowerCase('sr')===naziv.toLocaleLowerCase('sr'))){await c.query('ROLLBACK');return res.status(409).json({error:'Podgrupa sa tim nazivom već postoji.'});}
+  const next=subs.map(item=>item===oldName?naziv:item);
+  const images={...(found.rows[0].podkategorije_slike||{})};
+  if(Object.prototype.hasOwnProperty.call(images,oldName)){images[naziv]=images[oldName];delete images[oldName];}
+  await c.query('UPDATE platform_categories SET podkategorije=$2::text[],podkategorije_slike=$3::jsonb,updated_at=now() WHERE slug=$1',[slug,next,JSON.stringify(images)]);
+  await c.query("DELETE FROM platform_category_exclusions WHERE slug=$1 AND subcategory=$2",[slug,oldName]);
+  await c.query('COMMIT');
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+ const updated=await pool.query('SELECT slug,naziv,slika,podkategorije,podkategorije_slike FROM platform_categories WHERE slug=$1',[slug]);
+ res.json({data:updated.rows[0]});
+}));
 app.delete('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
  const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return res.status(400).json({error:'Podaci o grupi nisu ispravni.'});
