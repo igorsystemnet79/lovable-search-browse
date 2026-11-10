@@ -23,6 +23,7 @@ import { Route as ZahteviRouteImport } from './routes/zahtevi'
 import { Route as KategorijaSlugRouteImport } from './routes/kategorija.$slug'
 import { Route as OglasKindIdRouteImport } from './routes/oglas.$kind.$id'
 import { Route as PorukeRouteImport } from './routes/poruke'
+import { Route as ObavestenjaRouteImport } from './routes/obavestenja'
 import { Route as KriterijumiRangiranjaRouteImport } from './routes/kriterijumi-rangiranja'
 import { Route as PolitikaPrivatnostiRouteImport } from './routes/politika-privatnosti'
 
@@ -96,6 +97,11 @@ const PorukeRoute = PorukeRouteImport.update({
   path: '/poruke',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ObavestenjaRoute = ObavestenjaRouteImport.update({
+  id: '/obavestenja',
+  path: '/obavestenja',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const KriterijumiRangiranjaRoute = KriterijumiRangiranjaRouteImport.update({
   id: '/kriterijumi-rangiranja',
   path: '/kriterijumi-rangiranja',
@@ -126,6 +132,7 @@ export interface FileRoutesByFullPath {
   '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
   '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
   '/poruke': typeof PorukeRoute
+  '/obavestenja': typeof ObavestenjaRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -143,6 +150,7 @@ export interface FileRoutesByTo {
   '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
   '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
   '/poruke': typeof PorukeRoute
+  '/obavestenja': typeof ObavestenjaRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -161,6 +169,7 @@ export interface FileRoutesById {
   '/kriterijumi-rangiranja': typeof KriterijumiRangiranjaRoute
   '/politika-privatnosti': typeof PolitikaPrivatnostiRoute
   '/poruke': typeof PorukeRoute
+  '/obavestenja': typeof ObavestenjaRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -181,6 +190,7 @@ export interface FileRouteTypes {
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
     | '/poruke'
+    | '/obavestenja'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -199,6 +209,7 @@ export interface FileRouteTypes {
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
     | '/poruke'
+    | '/obavestenja'
   id:
     | '__root__'
     | '/'
@@ -217,6 +228,7 @@ export interface FileRouteTypes {
     | '/kriterijumi-rangiranja'
     | '/politika-privatnosti'
     | '/poruke'
+    | '/obavestenja'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   PorukeRoute: typeof PorukeRoute
   KriterijumiRangiranjaRoute: typeof KriterijumiRangiranjaRoute
   PolitikaPrivatnostiRoute: typeof PolitikaPrivatnostiRoute
+  ObavestenjaRoute: typeof ObavestenjaRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -345,6 +358,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof KriterijumiRangiranjaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/obavestenja': {
+      id: '/obavestenja'
+      path: '/obavestenja'
+      fullPath: '/obavestenja'
+      preLoaderRoute: typeof ObavestenjaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/politika-privatnosti': {
       id: '/politika-privatnosti'
       path: '/politika-privatnosti'
@@ -372,6 +392,7 @@ const rootRouteChildren: RootRouteChildren = {
   PorukeRoute: PorukeRoute,
   KriterijumiRangiranjaRoute: KriterijumiRangiranjaRoute,
   PolitikaPrivatnostiRoute: PolitikaPrivatnostiRoute,
+  ObavestenjaRoute: ObavestenjaRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
