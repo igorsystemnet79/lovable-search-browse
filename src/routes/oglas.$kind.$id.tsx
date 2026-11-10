@@ -58,6 +58,14 @@ function OglasPage() {
   const { kind, id } = Route.useParams();
   const isOffer = kind === "ponuda";
   const { user } = useAuth();
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ["oglas-detalj", kind, id],
+    queryFn: async () => {
+      const { data, error } = await ponudimi.from(isOffer ? "ponude" : "zahtevi").select("*").eq("id", id).single();
+      if (error) throw error;
+      return data as Ponuda | Zahtev;
+    },
+  });
   useEffect(() => {
     if (!data) return;
     const session = JSON.parse(localStorage.getItem("ponudimi_session") || "null");
@@ -76,14 +84,6 @@ function OglasPage() {
       const result = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(result.error || "Statistika nije dostupna.");
       return result as { ukupno: number; danas: number; poslednjih_7_dana: number };
-    },
-  });
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ["oglas-detalj", kind, id],
-    queryFn: async () => {
-      const { data, error } = await ponudimi.from(isOffer ? "ponude" : "zahtevi").select("*").eq("id", id).single();
-      if (error) throw error;
-      return data as Ponuda | Zahtev;
     },
   });
   return (
