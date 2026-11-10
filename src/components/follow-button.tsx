@@ -27,6 +27,7 @@ export function FollowButton({ ponuda, zahtev }: { ponuda?: Ponuda; zahtev?: Zah
     );
   }
 
+  const ownListing = item.user_id === user.id;
   const f = q.data?.find((x) =>
     isOffer ? x.ponuda_id === item.id : x.zahtev_id === item.id,
   );
@@ -70,8 +71,8 @@ export function FollowButton({ ponuda, zahtev }: { ponuda?: Ponuda; zahtev?: Zah
         {busy
           ? "Čuvanje..."
           : f
-            ? "🔕 Ne prati više oglas"
-            : "🔔 Prati oglas"}
+            ? (ownListing ? "🔕 Ne prati više svoj oglas" : "🔕 Ne prati više oglas")
+            : (ownListing ? "🔔 Prati svoj oglas" : "🔔 Prati oglas")}
       </button>
       {q.isError && (
         <span role="status" className="text-xs text-destructive">
