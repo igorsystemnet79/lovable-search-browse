@@ -59,6 +59,7 @@ services:
       dockerfile: standalone/Dockerfile.web
       args:
         VITE_API_ORIGIN: ${VITE_API_ORIGIN:-same-origin}
+        PONUDIMI_API_ORIGIN: ${PONUDIMI_API_ORIGIN:-http://api:4000}
     restart: unless-stopped
     environment:
       NODE_ENV: production

@@ -23,7 +23,7 @@ Preporučena provera zavisnosti je `npm run audit:security` iz korena projekta. 
 
 Caddy automatski pribavlja i obnavlja TLS sertifikat za javni domen. Za lokalni `localhost` koristi se HTTP.
 
-Frontend podrazumevano koristi isti domen za API (Caddy prosleđuje `/api/*` na API servis). U `.env` ostavi `VITE_API_ORIGIN=same-origin` za standardnu samostalnu instalaciju. Popuni ga samo ako API namerno hostuješ na drugoj HTTPS adresi, pa ponovo izgradi web servis. `API_INTERNAL_URL` je interna Docker adresa koju koristi server-side deo aplikacije; nemoj je menjati za standardni Compose raspored.
+Frontend podrazumevano koristi isti domen za API (Caddy prosleđuje `/api/*` i `/uploads/*` na API servis). U `.env` ostavi `VITE_API_ORIGIN=same-origin` i `PONUDIMI_API_ORIGIN=http://api:4000` za standardnu samostalnu instalaciju. `PONUDIMI_API_ORIGIN` je build-time cilj Nitro proxy-ja; promeni ga samo ako web servis i API hostuješ odvojeno, pa ponovo izgradi web servis. `API_INTERNAL_URL=http://api:4000` je runtime interna Docker adresa koju koristi server-side deo aplikacije; nemoj je menjati za standardni Compose raspored.
 
 ## Registracija i podaci korisnika
 
