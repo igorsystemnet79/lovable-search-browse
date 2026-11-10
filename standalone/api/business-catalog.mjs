@@ -192,6 +192,17 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
   res.json({ok:true,ukupno:items.length,dodato:inserted,azurirano:updated});
  }));
+ app.get('/api/catalog/companies/:userId',auth,asyncRoute(async(req,res)=>{
+  const company=await pool.query(`SELECT p.id,p.naziv_firme,p.grad
+   FROM profiles p WHERE p.id=$1 AND p.tip_lica='pravno' AND p.firma_verifikovana
+   AND EXISTS(SELECT 1 FROM paketi_firmi k WHERE k.user_id=p.id AND k.status='aktivan'
+    AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date)`,[req.params.userId]);
+  if(!company.rowCount)return res.status(404).json({error:'Poslovni katalog firme nije dostupan.'});
+  const products=await pool.query(`SELECT p.*,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
+   (SELECT id,storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
+   FROM business_catalog_products p WHERE p.user_id=$1 AND p.aktivan ORDER BY p.naziv LIMIT 500`,[req.params.userId]);
+  res.json({company:company.rows[0],data:products.rows});
+ }));
  app.get('/api/catalog/search',auth,asyncRoute(async(req,res)=>{
   const q=clean(req.query.q,120),category=clean(req.query.kategorija,120),place=clean(req.query.mesto,100),currency=clean(req.query.valuta,3);
   const minValue=numeric(req.query.minCena),maxValue=numeric(req.query.maxCena);
@@ -200,7 +211,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   if(q.length<2&&!category&&!place)return res.json({data:[]});
   const sort=['najstarije','cena_rastuce','cena_opadajuce'].includes(req.query.sort)?req.query.sort:'najnovije';
   const order=sort==='najstarije'?'p.created_at ASC':sort==='cena_rastuce'?'p.cena ASC NULLS LAST,p.updated_at DESC':sort==='cena_opadajuce'?'p.cena DESC NULLS LAST,p.updated_at DESC':'p.updated_at DESC';
-  const r=await pool.query(`SELECT p.id,p.sifra,p.naziv,p.opis,p.kategorija,p.cena,p.valuta,p.kolicina,p.proizvodjac,
+  const r=await pool.query(`SELECT p.id,p.user_id,p.sifra,p.naziv,p.opis,p.kategorija,p.cena,p.valuta,p.kolicina,p.proizvodjac,
    pr.naziv_firme,pr.grad,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
    (SELECT storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
    FROM business_catalog_products p JOIN profiles pr ON pr.id=p.user_id
