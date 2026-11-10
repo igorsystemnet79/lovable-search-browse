@@ -56,12 +56,9 @@ UPDATE profiles SET firma_status_verifikacije=CASE WHEN firma_verifikovana THEN 
  WHERE firma_status_verifikacije IS NULL OR firma_status_verifikacije NOT IN ('na_cekanju','verifikovana','odbijena');
 ALTER TABLE profiles ALTER COLUMN firma_status_verifikacije SET DEFAULT 'na_cekanju';
 ALTER TABLE profiles ALTER COLUMN firma_status_verifikacije SET NOT NULL;
-DO $ BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='profiles_firma_status_verifikacije_check') THEN
-    ALTER TABLE profiles ADD CONSTRAINT profiles_firma_status_verifikacije_check
-      CHECK (firma_status_verifikacije IN ('na_cekanju','verifikovana','odbijena'));
-  END IF;
-END $;
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_firma_status_verifikacije_check;
+ALTER TABLE profiles ADD CONSTRAINT profiles_firma_status_verifikacije_check
+  CHECK (firma_status_verifikacije IN ('na_cekanju','verifikovana','odbijena'));
 UPDATE profiles p SET prezime=NULLIF(BTRIM(u.metadata->>'prezime'),'') FROM users u WHERE u.id=p.id AND (p.prezime IS NULL OR BTRIM(p.prezime)='') AND NULLIF(BTRIM(u.metadata->>'prezime'),'') IS NOT NULL;
 UPDATE profiles p SET korisnicko_ime=LOWER(NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'')) FROM users u WHERE u.id=p.id AND (p.korisnicko_ime IS NULL OR p.korisnicko_ime='') AND NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'') IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_korisnicko_ime_unique ON profiles (lower(korisnicko_ime)) WHERE korisnicko_ime IS NOT NULL AND korisnicko_ime <> '';
