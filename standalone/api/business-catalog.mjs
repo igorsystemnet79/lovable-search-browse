@@ -183,9 +183,9 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  }));
  app.get('/api/catalog/search',auth,asyncRoute(async(req,res)=>{
   const q=clean(req.query.q,120),category=clean(req.query.kategorija,120),place=clean(req.query.mesto,100),currency=clean(req.query.valuta,3);
-  const min=numeric(req.query.minCena),max=numeric(req.query.maxCena);
+  const minValue=numeric(req.query.minCena),maxValue=numeric(req.query.maxCena);\n  const min=minValue===null?'':minValue,max=maxValue===null?'':maxValue;
   if(Number.isNaN(min)||Number.isNaN(max))return res.status(400).json({error:'Raspon cene nije ispravan.'});
-  if(q.length<2&&!category)return res.json({data:[]});
+  if(q.length<2&&!category&&!place)return res.json({data:[]});
   const sort=['najstarije','cena_rastuce','cena_opadajuce'].includes(req.query.sort)?req.query.sort:'najnovije';
   const order=sort==='najstarije'?'p.created_at ASC':sort==='cena_rastuce'?'p.cena ASC NULLS LAST,p.updated_at DESC':sort==='cena_opadajuce'?'p.cena DESC NULLS LAST,p.updated_at DESC':'p.updated_at DESC';
   const r=await pool.query(`SELECT p.id,p.sifra,p.naziv,p.opis,p.kategorija,p.cena,p.valuta,p.kolicina,p.proizvodjac,
