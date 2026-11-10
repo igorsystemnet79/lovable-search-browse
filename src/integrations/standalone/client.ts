@@ -26,9 +26,9 @@ function writeSession(session: any) {
 }
 const listeners = new Set<(event: string, session: any) => void>();
 function emit(event: string, session: any) { for (const listener of listeners) listener(event, session); }
-// Render Free may suspend the API while idle. Share one short wake-up
-// check across concurrent requests so login and homepage listings recover
-// together instead of each request waiting through its own retry loop.
+// Render Free može da uspava API posle perioda neaktivnosti. Buđenje
+// ponekad traje duže od jednog standardnog HTTP timeout-a, zato svi paralelni
+// zahtevi dele isti duži health-check ciklus umesto da prerano odustanu.
 let apiReadyUntil = 0;
 let apiReadyPromise: Promise<void> | null = null;
 
@@ -38,7 +38,8 @@ async function ensureApiReady(): Promise<void> {
 
   apiReadyPromise = (async () => {
     let lastError: unknown;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    const maxAttempts = 9;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const apiOrigin = typeof window === "undefined"
           ? (process.env.API_INTERNAL_URL || API_ORIGIN)
@@ -47,7 +48,7 @@ async function ensureApiReady(): Promise<void> {
         const response = await fetch(healthTarget, {
           method: "GET",
           cache: "no-store",
-          signal: AbortSignal.timeout(6000),
+          signal: AbortSignal.timeout(8000),
         });
         if (response.ok) {
           const health = await response.json().catch(() => null);
@@ -55,10 +56,10 @@ async function ensureApiReady(): Promise<void> {
             apiReadyUntil = Date.now() + 45_000;
             return;
           }
-          lastError = new Error("API nije potvrdio vezu sa bazom.");
+          lastError = new Error("API još nije potvrdio vezu sa bazom.");
         } else {
           const error = Object.assign(
-            new Error(`Servis za naloge nije spreman (HTTP ${response.status}).`),
+            new Error(`Servis za naloge se pokreće (HTTP ${response.status}).`),
             { status: response.status },
           );
           if (response.status >= 400 && response.status < 500 && response.status !== 429) {
@@ -70,10 +71,10 @@ async function ensureApiReady(): Promise<void> {
         if (error?.fatal) throw error;
         lastError = error;
       }
-      if (attempt < 4) await new Promise(resolve => setTimeout(resolve, 1500));
+      if (attempt < maxAttempts - 1) await new Promise(resolve => setTimeout(resolve, 3000));
     }
     throw Object.assign(
-      new Error("Servis trenutno ne odgovara ili ne može da se poveže sa bazom. Pokušaj ponovo za minut."),
+      new Error("Servis se nije probudio na vreme. Sačekaj još malo i pokušaj ponovo; nalog i lozinka nisu promenjeni."),
       { status: 503, code: "API_STARTUP_TIMEOUT", cause: lastError },
     );
   })();
