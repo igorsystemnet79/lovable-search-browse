@@ -24,7 +24,9 @@ app.use(express.json({ limit: '2mb' }));
 app.use((req,_res,next)=>{const raw=String(req.headers.cookie||'');req.cookies=Object.fromEntries(raw.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}));next();});
 // Google OAuth ima zaseban limit, da ponovljeni pokušaji ne blokiraju običnu prijavu.
 app.use('/api/auth/google', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja Google prijave. Sačekaj nekoliko minuta i pokušaj ponovo.' } }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path.startsWith('/google') }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path.startsWith('/google') || req.path === '/register' }));
+// Registracija ima sopstveni brojač: pozivi prijave i ostalih auth ruta ne smeju da je blokiraju.
+const registerLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja registracije. Sačekaj nekoliko minuta i pokušaj ponovo.' } });
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
@@ -245,7 +247,7 @@ app.get('/api/auth/google/callback',asyncRoute(async(req,res)=>{
  }catch(error){await c.query('ROLLBACK').catch(()=>{});throw error;}finally{c.release();}
 }));
 
-app.post('/api/auth/register', asyncRoute(async(req,res)=>{
+app.post('/api/auth/register', registerLimiter, asyncRoute(async(req,res)=>{
  const maintenance=await pool.query('SELECT enabled,message FROM platform_maintenance WHERE singleton=true');if(maintenance.rows[0]?.enabled)return res.status(503).json({error:maintenance.rows[0].message,code:'MAINTENANCE_MODE',maintenance:true});
  const {email,password,metadata={}}=req.body||{}; const e=String(email||'').trim().toLowerCase();
  if(!/^\S+@\S+\.\S+$/.test(e)||String(password||'').length<8) return res.status(400).json({error:'Unesi ispravnu e-mail adresu i lozinku od najmanje 8 karaktera.'});
