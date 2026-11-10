@@ -531,7 +531,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                         <span>{roles.join(", ") || "bez uloge"}</span>
                         <span className={p.blokiran ? "font-semibold text-destructive" : "text-green-700"}>{p.blokiran ? "Blokiran" : "Aktivan"}</span>
                         <span>Status prodavca: {p.status_trgovca === "trgovac" ? "Trgovac" : p.status_trgovca === "nije_trgovac" ? "Privatno lice" : "Nije potvrđen"}</span>
-                        {p.tip_lica === "pravno" && <span>{p.naziv_firme || "Firma"} · PIB {p.pib || "—"} · {p.firma_verifikovana ? "Verifikovana" : "Nije verifikovana"}</span>}
+                        {p.tip_lica === "pravno" && <span className="font-medium">{p.naziv_firme || "Firma"} · PIB {p.pib || "—"} · Status: {p.firma_status_verifikacije === "verifikovana" || p.firma_verifikovana ? "Verifikovana" : p.firma_status_verifikacije === "odbijena" ? "Odbijena" : "Čeka proveru"}</span>}
                       </div>
                     </td>
                     <td className="px-3 py-3 text-xs text-muted-foreground">
@@ -545,7 +545,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                         <button className={small} disabled={p.id === selfId} onClick={() => toggleUloga(p.id, "admin")}>{roles.includes("admin") ? "Ukini admina" : "Daj admina"}</button>
                         <button className={small} onClick={() => toggleUloga(p.id, "moderator")}>{roles.includes("moderator") ? "Ukini moderatora" : "Daj moderatora"}</button>
                         <button className={small} disabled={p.id === selfId} onClick={() => update(p.id, { blokiran: !p.blokiran })}>{p.blokiran ? "Odblokiraj" : "Blokiraj"}</button>
-                        {p.tip_lica === "pravno" && <button className={small} onClick={() => update(p.id, { firma_verifikovana: !p.firma_verifikovana })}>{p.firma_verifikovana ? "Poništi verifikaciju" : "Verifikuj firmu"}</button>}
+                        {p.tip_lica === "pravno" && <select aria-label={`Status APR provere za ${p.naziv_firme || p.email || "firmu"}`} className={small} value={p.firma_status_verifikacije || (p.firma_verifikovana ? "verifikovana" : "na_cekanju")} onChange={(e) => { const status = e.target.value as "na_cekanju" | "verifikovana" | "odbijena"; void update(p.id, { firma_status_verifikacije: status, firma_verifikovana: status === "verifikovana" }); }}><option value="na_cekanju">Čeka proveru</option><option value="verifikovana">Verifikovana</option><option value="odbijena">Odbijena</option></select>}
                         {p.id !== selfId && <button className={danger} onClick={() => obrisi(p)}>Obriši</button>}
                       </div>
                     </td>
