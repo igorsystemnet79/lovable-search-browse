@@ -8,7 +8,7 @@ import { SiteHeader } from "@/components/site-header";
 import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
 import { inputCls } from "@/components/auth-shell";
-import { kategorije as podrazumevaneKategorije } from "@/lib/kategorije";
+import { kategorije as podrazumevaneKategorije, type Kategorija } from "@/lib/kategorije";
 import { Input } from "@/components/ui/input";
 import type { Tables } from "@/integrations/standalone/types";
 import { obradiPrijavu, ucitajPrijaveOglasa, type PrijavaOglasa } from "@/lib/reports";
