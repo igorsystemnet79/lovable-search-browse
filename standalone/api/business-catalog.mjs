@@ -76,12 +76,29 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  await pool.query(schema);
  const firm = async userId => {
   const r=await pool.query(`SELECT p.id,p.tip_lica,p.firma_verifikovana,p.naziv_firme,
-   k.paket,k.vazi_do,k.status,bc.max_artikala
+   k.paket,k.vazi_do,k.status,bc.max_artikala,k.izvor
    FROM profiles p
-   LEFT JOIN LATERAL (SELECT paket,vazi_do,status FROM paketi_firmi
-    WHERE user_id=p.id AND status='aktivan' AND vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
-    ORDER BY vazi_do DESC LIMIT 1) k ON true
-   LEFT JOIN business_package_catalog bc ON bc.slug=k.paket
+   LEFT JOIN LATERAL (
+    SELECT paket,vazi_do,status,izvor FROM (
+     SELECT package_name AS paket,vazi_do,status,'admin'::text AS izvor,created_at
+      FROM user_access_grants
+      WHERE user_id=p.id AND status='aktivan' AND vazi_do>now()
+     UNION ALL
+     SELECT paket,vazi_do::timestamptz,status,'standard'::text AS izvor,created_at
+      FROM paketi_firmi
+      WHERE user_id=p.id AND status='aktivan' AND vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
+    ) aktivni_paketi
+    ORDER BY CASE WHEN izvor='admin' THEN 0 ELSE 1 END,created_at DESC
+    LIMIT 1
+   ) k ON true
+   LEFT JOIN business_package_catalog bc ON bc.slug=CASE lower(trim(k.paket))
+    WHEN 'light' THEN 'light' WHEN 'average' THEN 'average'
+    WHEN 'advanced' THEN 'advanced' WHEN 'total' THEN 'total'
+    WHEN 'mesečni' THEN 'light' WHEN 'mesecni' THEN 'light'
+    WHEN 'tromesečni' THEN 'average' WHEN 'tromesecni' THEN 'average'
+    WHEN 'šestomesečni' THEN 'advanced' WHEN 'sestomesecni' THEN 'advanced'
+    WHEN 'godišnji' THEN 'total' WHEN 'godisnji' THEN 'total'
+    ELSE NULL END
    WHERE p.id=$1`,[userId]);
   const f=r.rows[0];
   if(!f||f.tip_lica!=='pravno')return {error:'Poslovni katalog je dostupan samo nalozima pravnih lica.',status:403};
@@ -198,8 +215,11 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  app.get('/api/catalog/companies/:userId',auth,asyncRoute(async(req,res)=>{
   const company=await pool.query(`SELECT p.id,p.naziv_firme,p.grad
    FROM profiles p WHERE p.id=$1 AND p.tip_lica='pravno'
-   AND EXISTS(SELECT 1 FROM paketi_firmi k WHERE k.user_id=p.id AND k.status='aktivan'
-    AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date)`,[req.params.userId]);
+   AND (
+    EXISTS(SELECT 1 FROM paketi_firmi k WHERE k.user_id=p.id AND k.status='aktivan'
+     AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date)
+    OR EXISTS(SELECT 1 FROM user_access_grants g WHERE g.user_id=p.id AND g.status='aktivan' AND g.vazi_do>now())
+   )`,[req.params.userId]);
   if(!company.rowCount)return res.status(404).json({error:'Poslovni katalog firme nije dostupan.'});
   const products=await pool.query(`SELECT p.*,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
    (SELECT id,storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
@@ -218,8 +238,11 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    pr.naziv_firme,pr.grad,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
    (SELECT storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
    FROM business_catalog_products p JOIN profiles pr ON pr.id=p.user_id
-   JOIN paketi_firmi k ON k.user_id=p.user_id AND k.status='aktivan' AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
-   WHERE p.aktivan AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
+   WHERE p.aktivan AND (
+    EXISTS(SELECT 1 FROM paketi_firmi k WHERE k.user_id=p.user_id AND k.status='aktivan'
+     AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date)
+    OR EXISTS(SELECT 1 FROM user_access_grants g WHERE g.user_id=p.user_id AND g.status='aktivan' AND g.vazi_do>now())
+   ) AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
    AND ($2='' OR lower(p.kategorija)=lower($2)) AND ($3='' OR lower(coalesce(pr.grad,'')) LIKE '%'||lower($3)||'%')
    AND (NULLIF($4::text,'') IS NULL OR p.cena >= NULLIF($4::text,'')::numeric) AND (NULLIF($5::text,'') IS NULL OR p.cena <= NULLIF($5::text,'')::numeric) AND ($6='' OR p.valuta=$6)
    ORDER BY ${order} LIMIT 100`,[q,category,place,min,max,currency]);
