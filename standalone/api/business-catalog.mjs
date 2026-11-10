@@ -185,7 +185,8 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  }));
  app.get('/api/catalog/search',auth,asyncRoute(async(req,res)=>{
   const q=clean(req.query.q,120),category=clean(req.query.kategorija,120),place=clean(req.query.mesto,100),currency=clean(req.query.valuta,3);
-  const minValue=numeric(req.query.minCena),maxValue=numeric(req.query.maxCena);\n  const min=minValue===null?'':minValue,max=maxValue===null?'':maxValue;
+  const minValue=numeric(req.query.minCena),maxValue=numeric(req.query.maxCena);
+  const min=minValue===null?'':minValue,max=maxValue===null?'':maxValue;
   if(Number.isNaN(min)||Number.isNaN(max))return res.status(400).json({error:'Raspon cene nije ispravan.'});
   if(q.length<2&&!category&&!place)return res.json({data:[]});
   const sort=['najstarije','cena_rastuce','cena_opadajuce'].includes(req.query.sort)?req.query.sort:'najnovije';
