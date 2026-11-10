@@ -334,3 +334,7 @@ export async function dodajSlikeArtikluKataloga(id:string,files:File[]) {
 export async function obrisiSlikuArtiklaKataloga(id:string) {
   return api("/api/business/catalog/images/"+encodeURIComponent(id),{method:"DELETE"});
 }
+
+export async function ucitajJavniKatalogFirme(userId:string) {
+  return api("/api/catalog/companies/"+encodeURIComponent(userId));
+}
