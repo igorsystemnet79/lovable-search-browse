@@ -155,15 +155,21 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute}) {
   res.json({ok:true,ukupno:items.length,dodato:inserted,azurirano:updated});
  }));
  app.get('/api/catalog/search',auth,asyncRoute(async(req,res)=>{
-  const q=clean(req.query.q,120),category=clean(req.query.kategorija,120);
+  const q=clean(req.query.q,120),category=clean(req.query.kategorija,120),place=clean(req.query.mesto,100),currency=clean(req.query.valuta,3);
+  const min=numeric(req.query.minCena),max=numeric(req.query.maxCena);
+  if(Number.isNaN(min)||Number.isNaN(max))return res.status(400).json({error:'Raspon cene nije ispravan.'});
   if(q.length<2&&!category)return res.json({data:[]});
+  const sort=['najstarije','cena_rastuce','cena_opadajuce'].includes(req.query.sort)?req.query.sort:'najnovije';
+  const order=sort==='najstarije'?'p.created_at ASC':sort==='cena_rastuce'?'p.cena ASC NULLS LAST,p.updated_at DESC':sort==='cena_opadajuce'?'p.cena DESC NULLS LAST,p.updated_at DESC':'p.updated_at DESC';
   const r=await pool.query(`SELECT p.id,p.sifra,p.naziv,p.opis,p.kategorija,p.cena,p.valuta,p.kolicina,p.proizvodjac,
    pr.naziv_firme,pr.grad,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
    (SELECT storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
    FROM business_catalog_products p JOIN profiles pr ON pr.id=p.user_id
    JOIN paketi_firmi k ON k.user_id=p.user_id AND k.status='aktivan' AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
    WHERE p.aktivan AND pr.firma_verifikovana AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
-   AND ($2='' OR lower(p.kategorija)=lower($2)) ORDER BY p.updated_at DESC LIMIT 100`,[q,category]);
+   AND ($2='' OR lower(p.kategorija)=lower($2)) AND ($3='' OR lower(coalesce(pr.grad,'')) LIKE '%'||lower($3)||'%')
+   AND ($4='' OR p.cena >= $4) AND ($5='' OR p.cena <= $5) AND ($6='' OR p.valuta=$6)
+   ORDER BY ${order} LIMIT 100`,[q,category,place,min,max,currency]);
   res.json({data:r.rows});
  }));
  app.get('/api/business/catalog/template.csv',auth,wrapped(async(_req,res)=>{
