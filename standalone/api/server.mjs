@@ -955,7 +955,190 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
    if(count==='exact'){const countSql=`SELECT count(*)::int n FROM ${ident(table)}${whereSql}${publicListingWhere}`;const counted=await pool.query(countSql,params);result={data,count:counted.rows[0].n};}else result={data};
  } else if(action==='insert'||action==='upsert'){
    const inserted=[];
-   for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>`${i+1}`).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);if((table==='ponude'||table==='zahtevi')&&r.rows[0])await notifyMatchingSavedSearches(table,r.rows[0]);}
+   for(const row of supplied){const keys=Object.keys(row||{});if(!keys.length)continue;const vals=keys.map(k=>row[k]);const sql=`INSERT INTO ${ident(table)} (${keys.map(ident).join(',')}) VALUES (${vals.map((_,i)=>' RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);if((table==='ponude'||table==='zahtevi')&&r.rows[0])await notifyMatchingSavedSearches(table,r.rows[0]);}
+   result={data:Array.isArray(values)?inserted:inserted[0]||null};
+ } else if(action==='update'){
+   const row=supplied[0]||{};const keys=Object.keys(row);if(!keys.length)return res.json({data:[]});const vals=keys.map(k=>row[k]);const sets=keys.map((k,i)=>`${ident(k)}=$${i+1}`).join(',');const updateWhere=where.map(w=>w.replace(/\$(\d+)/g,(_m,n)=>`$${Number(n)+vals.length}`)).join(' AND ');const all=[...vals,...params];const r=await pool.query(`UPDATE ${ident(table)} SET ${sets}${updateWhere?` WHERE ${updateWhere}`:''} RETURNING *`,all);if(table==='profiles'&&r.rows[0]){let updated=r.rows;if(!adminUser){const v=await pool.query(`UPDATE profiles SET firma_verifikovana=(tip_lica='pravno' AND pib IS NOT NULL AND EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib)) WHERE id=$1 RETURNING *`,[userId]);updated=v.rows;}const profile=updated[0];if(profile?.status_trgovca){await pool.query('UPDATE ponude SET status_trgovca=$1 WHERE user_id=$2',[profile.status_trgovca,profile.id]);await pool.query('UPDATE zahtevi SET status_trgovca=$1 WHERE user_id=$2',[profile.status_trgovca,profile.id]);}result={data:updated};}else result={data:r.rows};
+ } else if(action==='delete'){
+   const deleteWhere=whereSql||'';if(!deleteWhere)return res.status(400).json({error:'Brisanje bez filtera nije dozvoljeno.'});
+   if(table==='ponude'||table==='zahtevi'){const matches=await pool.query(`SELECT id FROM ${ident(table)}${deleteWhere}`,params);await cleanupListingFiles(table,matches.rows.map(x=>x.id));}
+   const r=await pool.query(`DELETE FROM ${ident(table)}${deleteWhere} RETURNING *`,params);result={data:r.rows};
+ } else return res.status(400).json({error:'Nepoznata operacija.'});
+ let data=result.data;
+ if(single){if(Array.isArray(data)){if(data.length!==1)return res.status(406).json({error:'Očekivan je jedan rezultat.'});data=data[0];}}
+ res.json({...result,data});
+}));
+app.post('/api/db/rpc', optionalAuth, asyncRoute(async(req,res)=>{
+ const {fn,args={}}=req.body||{}; const userId=req.user?.sub||null;
+ if(fn==='has_role'){const role=String(args._role||'admin');if(!['admin','moderator','user'].includes(role))return res.json({data:false});if(role==='admin')return res.json({data:!!(userId&&await isPlatformAdmin(req.user))});const r=userId?await pool.query('SELECT 1 FROM user_roles WHERE user_id=$1 AND role=$2',[userId,role]):{rowCount:0};return res.json({data:!!r.rowCount});}
+ if(fn==='pretrazi_ponude'||fn==='pretrazi_zahteve'){
+  if(!userId)return res.status(401).json({error:'Prijava je obavezna za pretragu oglasa.'});
+  const table=fn==='pretrazi_ponude'?'ponude':'zahtevi';
+  const amount=table==='ponude'?'cena':'budzet';
+  const term=String(args.q||'').trim().slice(0,200), mesto=String(args.mesto||'').trim().slice(0,100);
+  const kategorija=String(args.kategorija||'').trim().slice(0,100), valuta=String(args.valuta||'').trim().toUpperCase();
+  const minRaw=String(args.minCena??'').trim(), maxRaw=String(args.maxCena??'').trim();
+  const minCena=minRaw===''?null:Number(minRaw), maxCena=maxRaw===''?null:Number(maxRaw), sort=String(args.sort||'najnovije');
+  if(minCena!==null&&(!Number.isFinite(minCena)||minCena<0))return res.status(400).json({error:'Minimalna cena nije ispravna.'});
+  if(maxCena!==null&&(!Number.isFinite(maxCena)||maxCena<0))return res.status(400).json({error:'Maksimalna cena nije ispravna.'});
+  if(minCena!==null&&maxCena!==null&&minCena>maxCena)return res.status(400).json({error:'Minimalna cena ne može biti veća od maksimalne.'});
+  if(valuta&&!['EUR','RSD'].includes(valuta))return res.status(400).json({error:'Izabrana valuta nije podržana.'});
+  if((minCena!==null||maxCena!==null)&&!valuta)return res.status(400).json({error:'Izaberi valutu za precizno filtriranje cene.'});
+  const orderBy={najnovije:'created_at DESC',najstarije:'created_at ASC',cena_rastuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' ASC, created_at DESC',cena_opadajuce:'CASE WHEN '+amount+' IS NULL THEN 1 ELSE 0 END ASC, '+amount+' DESC, created_at DESC'}[sort]||'created_at DESC';
+  const sql='SELECT * FROM '+table+' WHERE pauziran=false AND moderacija_blokirana=false AND pretraga_uslov(concat_ws(\' \',naslov,opis,kategorija,lokacija),$1) AND pretraga_uslov(lokacija,$2) AND ($3=\'\' OR pretraga_uslov(kategorija,$3)) AND ($4::numeric IS NULL OR '+amount+'>=$4) AND ($5::numeric IS NULL OR '+amount+'<=$5) AND ($6=\'\' OR valuta=$6) ORDER BY '+orderBy+' LIMIT 200';
+  const {rows}=await pool.query(sql,[term,mesto,kategorija,minCena,maxCena,valuta]);return res.json({data:zastitiJavneKontakte(rows,Boolean(userId))});
+ }
+ return res.status(400).json({error:'Nepoznata funkcija.'});
+}));
+app.post('/api/storage/upload',auth,memoryUpload.single('file'),asyncRoute(async(req,res)=>{
+ const requested=safeObjectKey(req.body.path);if(!req.file)return res.status(400).json({error:'Fotografija nije poslata.'});
+ if(!requested.startsWith(`${req.user.sub}/`))return res.status(403).json({error:'Nedozvoljena putanja fotografije.'});
+ const key=requested;
+ const normalized=await normalizeImage(req.file.buffer);
+ await saveImage(key,normalized,'image/jpeg');res.status(201).json({path:key,storage:s3?'r2':filesystemStorage?'local':'postgres',width:800,height:600,format:'jpeg'});
+}));
+app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
+ const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const rawKey=safeObjectKey(item);const key=rawKey.startsWith('uploads/')?rawKey.slice('uploads/'.length):rawKey;if(!key.startsWith(`${req.user.sub}/`))continue;await removeImage(key);}res.json({ok:true});
+}));
+app.get('/api/storage/public',asyncRoute(async(req,res)=>{
+ const key=safeObjectKey(req.query.path);if(!key)return res.status(400).end();
+ if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=86400');object.Body.pipe(res);}
+  else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}
+}));
+app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=31536000, immutable');return object.Body.pipe(res);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}));
+app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
+
+async function ucitajKatalogPaketa() {
+ const result=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti,objavljen,pozicija,updated_at FROM business_package_catalog ORDER BY pozicija,slug');
+ return result.rows;
+}
+app.get('/api/business-packages',asyncRoute(async(_req,res)=>{
+ const result=await pool.query("SELECT slug,naziv,cena_eur,trajanje_meseci,opis,pogodnosti FROM business_package_catalog WHERE objavljen=true ORDER BY pozicija,slug");
+ res.set('Cache-Control','no-store');res.json({data:result.rows});
+}));
+app.get('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(_req,res)=>{res.json({data:await ucitajKatalogPaketa()});}));
+app.put('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(req,res)=>{
+ const items=Array.isArray(req.body?.packages)?req.body.packages:[];
+ const allowed=['light','average','advanced','total'];
+ if(items.length!==4||allowed.some(slug=>!items.some(item=>item.slug===slug)))return res.status(400).json({error:'Potrebna su sva četiri paketa: Light, Average, Advanced i Total.'});
+ for(const item of items){const price=Number(item.cena_eur),months=Number(item.trajanje_meseci),name=String(item.naziv||'').trim();if(!name||!Number.isFinite(price)||price<0||price>100000||!Number.isInteger(months)||months<1||months>36)return res.status(400).json({error:'Proveri naziv, cenu i trajanje svakog paketa.'});}
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  for(const item of items){
+   const slug=String(item.slug),naziv=String(item.naziv||'').trim().slice(0,40);
+   const cena=Number(item.cena_eur),months=Number(item.trajanje_meseci);
+   const opis=String(item.opis||'').trim().slice(0,2000);
+   const pogodnosti=Array.isArray(item.pogodnosti)?item.pogodnosti.map(x=>String(x).trim().slice(0,180)).filter(Boolean).slice(0,12):[];
+   await c.query('UPDATE business_package_catalog SET naziv=$2,cena_eur=$3,trajanje_meseci=$4,opis=$5,pogodnosti=$6,objavljen=$7,updated_at=now() WHERE slug=$1',[slug,naziv,cena,months,opis,pogodnosti,Boolean(item.objavljen)]);
+  }
+  await c.query('COMMIT');res.json({data:await ucitajKatalogPaketa(),poruka:'Ponuda paketa je sačuvana.'});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
+app.get('/api/admin/business-firms',auth,admin,asyncRoute(async(req,res)=>{
+ const q=String(req.query.q||'').trim().slice(0,100).replace(/[%_\\\\]/g,'');
+ const params=[];let where="p.tip_lica='pravno' AND p.firma_verifikovana=true";
+ if(q){params.push('%'+q+'%');where+=" AND (p.naziv_firme ILIKE $1 OR p.pib ILIKE $1 OR p.email ILIKE $1)";}
+ const r=await pool.query(`SELECT p.id AS user_id,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM profiles p WHERE ${where} ORDER BY p.naziv_firme NULLS LAST LIMIT 100`,params);
+ res.json({data:r.rows});
+}));
+app.get('/api/admin/business-packages',auth,admin,asyncRoute(async(_req,res)=>{
+ await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=(now() AT TIME ZONE 'Europe/Belgrade')::date");
+ const r=await pool.query(`SELECT k.*,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id ORDER BY CASE WHEN k.status='aktivan' THEN 0 ELSE 1 END,k.vazi_do ASC,k.created_at DESC LIMIT 300`);
+ res.json({data:r.rows});
+}));
+app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
+ const userId=String(req.body?.user_id||'');
+ const code=String(req.body?.paket||'');
+ const payment=String(req.body?.status_uplate||'ceka_uplatu');
+ const note=String(req.body?.napomena||'').trim().slice(0,1000);
+ const reference=String(req.body?.referenca_uplate||'').trim().slice(0,120);
+ const catalog=await pool.query('SELECT slug,naziv,cena_eur,trajanje_meseci FROM business_package_catalog WHERE slug=$1 AND objavljen=true',[code]);
+ const selected=catalog.rows[0]||null;
+ if(!userId||!selected)return res.status(400).json({error:'Izaberi firmu i objavljen paket.'});
+ if(!['ceka_uplatu','placeno','oslobodjeno'].includes(payment))return res.status(400).json({error:'Status uplate nije ispravan.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const firm=await c.query("SELECT id,tip_lica,firma_verifikovana FROM profiles WHERE id=$1 FOR UPDATE",[userId]);
+  if(!firm.rows[0]||firm.rows[0].tip_lica!=='pravno'){await c.query('ROLLBACK');return res.status(400).json({error:'Paket mogu dobiti samo registrovana pravna lica.'});}
+  if(!firm.rows[0].firma_verifikovana){await c.query('ROLLBACK');return res.status(400).json({error:'Firma prvo mora biti verifikovana u APR evidenciji.'});}
+  const active=payment==='placeno'||payment==='oslobodjeno';
+  if(active)await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
+  const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
+   VALUES($1,$2,$3,$4,$5,(now() AT TIME ZONE 'Europe/Belgrade')::date,((now() AT TIME ZONE 'Europe/Belgrade')::date + ($6::text || ' months')::interval)::date,$7,$8,$9) RETURNING *`,
+   [userId,code,selected.cena_eur,active?'aktivan':'na_cekanju',payment,selected.trajanje_meseci,note||null,reference||null,req.user.sub]);
+  await c.query('COMMIT');res.status(201).json({data:result.rows[0],poruka:active?'Paket je aktiviran.':'Paket je evidentiran i čeka uplatu.'});
+ }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
+}));
+app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(req,res)=>{
+ const r=await pool.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE id=$1 AND status IN ('aktivan','na_cekanju') RETURNING id",[req.params.id]);
+ if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
+ res.json({ok:true});
+}));
+app.post('/api/admin/apr-sync',auth,admin,asyncRoute(async(req,res)=>{
+ const url=process.env.APR_API_URL,key=process.env.APR_API_KEY;if(!url||!key)return res.status(503).json({error:'APR_API_URL i APR_API_KEY nisu podešeni.'});
+ try{const response=await fetch(url,{headers:{Authorization:`Bearer ${key}`,Accept:'application/json'}});if(!response.ok)throw new Error(`APR je vratio status ${response.status}`);const body=await response.json();const list=Array.isArray(body)?body:(body.data||[]);let n=0;
+  for(const f of list){const pib=String(f.pib||'').replace(/\D/g,'');const naziv=String(f.naziv||'').trim();if(!/^\d{9}$/.test(pib)||!naziv)continue;await pool.query(`INSERT INTO apr_firme(pib,maticni_broj,naziv,sediste,adresa,status,synced_at) VALUES($1,$2,$3,$4,$5,$6,now()) ON CONFLICT(pib) DO UPDATE SET maticni_broj=EXCLUDED.maticni_broj,naziv=EXCLUDED.naziv,sediste=EXCLUDED.sediste,adresa=EXCLUDED.adresa,status=EXCLUDED.status,synced_at=now()`,[pib,f.maticni_broj||null,naziv,f.sediste||null,f.adresa||null,f.status||null]);n++;}
+  await pool.query('UPDATE profiles SET firma_verifikovana=EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib) WHERE tip_lica=$1',['pravno']);await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,$2,true,$3)',[req.user.sub,n,`Sinhronizovano ${n} firmi.`]);res.json({ok:true,broj:n,poruka:`Sinhronizovano ${n} firmi.`});
+ }catch(e){await pool.query('INSERT INTO apr_sinhronizacije(pokrenuo,broj_firmi,uspeh,poruka) VALUES($1,0,false,$2)',[req.user.sub,e.message]);throw e;}
+}));
+
+
+let packageReminderRunning=false;
+async function sendBusinessPackageReminders(){
+ if(packageReminderRunning)return;
+ packageReminderRunning=true;
+ try{
+  await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=(now() AT TIME ZONE 'Europe/Belgrade')::date");
+  if(!process.env.SMTP_HOST||!process.env.SMTP_USER||!process.env.SMTP_PASS)return;
+  const due=await pool.query(`SELECT k.id,k.vazi_do,p.email,p.naziv_firme FROM paketi_firmi k JOIN profiles p ON p.id=k.user_id
+   WHERE k.status='aktivan' AND k.email_podsetnik_poslat_at IS NULL
+   AND k.vazi_do=(now() AT TIME ZONE 'Europe/Belgrade')::date + 10
+   AND p.email IS NOT NULL AND p.email<>'' ORDER BY k.vazi_do LIMIT 100`);
+  if(!due.rowCount)return;
+  const nodemailer=(await import('nodemailer')).default;
+  const transport=nodemailer.createTransport({host:process.env.SMTP_HOST,port:Number(process.env.SMTP_PORT||587),secure:process.env.SMTP_SECURE==='true',auth:{user:process.env.SMTP_USER,pass:process.env.SMTP_PASS}});
+  for(const item of due.rows){
+   try{
+    const date=new Date(item.vazi_do).toLocaleDateString('sr-RS',{timeZone:'Europe/Belgrade'});
+    await transport.sendMail({from:process.env.SMTP_FROM||process.env.SMTP_USER,to:item.email,subject:'PonudiMi — paket ističe za 10 dana',
+     text:`Poštovani, paket za firmu ${item.naziv_firme||''} ističe za 10 dana, dana ${date}. Obratite se administratoru platforme radi produženja.`,
+     html:`<p>Poštovani,</p><p>Paket za firmu <strong>${String(item.naziv_firme||'').replace(/[&<>"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]))}</strong> ističe za 10 dana, dana <strong>${date}</strong>.</p><p>Obratite se administratoru platforme radi produženja.</p><p>PonudiMi</p>`});
+    await pool.query('UPDATE paketi_firmi SET email_podsetnik_poslat_at=now(),email_podsetnik_greska=NULL WHERE id=$1',[item.id]);
+   }catch(error){await pool.query('UPDATE paketi_firmi SET email_podsetnik_greska=$2 WHERE id=$1',[item.id,String(error?.message||error).slice(0,500)]);}
+  }
+  await transport.close();
+ }catch(error){console.error('Podsetnici za istek paketa nisu poslati:',error);}
+ finally{packageReminderRunning=false;}
+}
+
+app.use((err,_req,res,_next)=>{
+ console.error(err);
+ if(err instanceof multer.MulterError){
+  const status=err.code==='LIMIT_FILE_SIZE'?413:400;
+  return res.status(status).json({error:err.code==='LIMIT_FILE_SIZE'?'Fotografija može imati najviše 20 MB.':err.code==='LIMIT_FILE_COUNT'?'Možeš dodati najviše 7 fotografija po oglasu.':'Podaci o fotografiji nisu ispravni.'});
+ }
+ if(/Dozvoljeni su samo JPG, PNG i WebP formati/.test(String(err?.message||'')))return res.status(400).json({error:err.message});
+ res.status(500).json({error:process.env.NODE_ENV==='production'?'Greška na serveru.':err.message});
+});
+const port=Number(process.env.PORT||process.env.API_PORT||4000);
+async function startServer(){
+ const schemaPath=path.resolve(__dirname,'../db/init.sql');
+ const schema=await readFile(schemaPath,'utf8');
+ await pool.query(schema);
+ console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
+  console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
+ await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=CURRENT_DATE");
+ app.listen(port,'0.0.0.0',()=>{
+  void sendBusinessPackageReminders();
+  const reminderTimer=setInterval(()=>void sendBusinessPackageReminders(),6*60*60*1000);reminderTimer.unref();
+  console.log(`PonudiMi API sluša na ${port}`);
+
+ });
+}
+startServer().catch(err=>{console.error('Pokretanje PonudiMi API-ja nije uspelo:',err);process.exit(1);});
++(i+1)).join(',')}) RETURNING *`;const r=await pool.query(sql,vals);inserted.push(r.rows[0]);if((table==='ponude'||table==='zahtevi')&&r.rows[0])await notifyMatchingSavedSearches(table,r.rows[0]);}
    result={data:Array.isArray(values)?inserted:inserted[0]||null};
  } else if(action==='update'){
    const row=supplied[0]||{};const keys=Object.keys(row);if(!keys.length)return res.json({data:[]});const vals=keys.map(k=>row[k]);const sets=keys.map((k,i)=>`${ident(k)}=$${i+1}`).join(',');const updateWhere=where.map(w=>w.replace(/\$(\d+)/g,(_m,n)=>`$${Number(n)+vals.length}`)).join(' AND ');const all=[...vals,...params];const r=await pool.query(`UPDATE ${ident(table)} SET ${sets}${updateWhere?` WHERE ${updateWhere}`:''} RETURNING *`,all);if(table==='profiles'&&r.rows[0]){let updated=r.rows;if(!adminUser){const v=await pool.query(`UPDATE profiles SET firma_verifikovana=(tip_lica='pravno' AND pib IS NOT NULL AND EXISTS(SELECT 1 FROM apr_firme f WHERE f.pib=profiles.pib)) WHERE id=$1 RETURNING *`,[userId]);updated=v.rows;}const profile=updated[0];if(profile?.status_trgovca){await pool.query('UPDATE ponude SET status_trgovca=$1 WHERE user_id=$2',[profile.status_trgovca,profile.id]);await pool.query('UPDATE zahtevi SET status_trgovca=$1 WHERE user_id=$2',[profile.status_trgovca,profile.id]);}result={data:updated};}else result={data:r.rows};
