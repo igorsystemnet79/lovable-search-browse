@@ -817,12 +817,12 @@ function PaketiFirmi() {
  return <div className="space-y-5">
   <section className="rounded-2xl border border-input bg-surface p-4">
    <h2 className="font-semibold">Dodela paketa pravnom licu</h2>
-   <p className="mt-1 text-sm text-muted-foreground">Tokom testiranja APR verifikacija nije obavezna. Aktivacija paketa moguća je nakon evidentirane uplate ili kada administrator označi da je paket oslobođen plaćanja.</p>
+   <p className="mt-1 text-sm text-muted-foreground">Svaki paket koji dodeliš firmi aktivira se odmah. Status uplate služi samo za evidenciju i ne utiče na pristup paketu.</p>
    <div className="mt-3 grid gap-3 md:grid-cols-2">
     <div><label className="mb-1 block text-xs font-medium">Pretraga firme po nazivu, PIB-u ili e-mailu</label><Input className={inputCls} value={q} onChange={e=>setQ(e.target.value)} placeholder="Unesi naziv firme, PIB ili e-mail"/></div>
     <div><label className="mb-1 block text-xs font-medium">Izaberi firmu</label><select className={inputCls} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Izaberi firmu</option>{firme.map(f=><option key={f.user_id} value={f.user_id}>{f.naziv_firme||"Firma"} · PIB {f.pib||"—"} · {f.firma_verifikovana?"Verifikovana":"Nije verifikovana"}</option>)}</select></div>
     <div><label className="mb-1 block text-xs font-medium">Paket</label><select className={inputCls} value={paket} onChange={e=>setPaket(e.target.value)}>{catalog.filter((p:any)=>p.objavljen).map((p:any)=><option key={p.slug} value={p.slug}>{p.naziv} — {Number(p.cena_eur).toFixed(2)} € / {p.trajanje_meseci} mes.</option>)}</select></div>
-    <div><label className="mb-1 block text-xs font-medium">Status uplate</label><select className={inputCls} value={uplata} onChange={e=>setUplata(e.target.value)}><option value="ceka_uplatu">Čeka uplatu — bez aktivacije</option><option value="placeno">Plaćeno — aktiviraj</option><option value="oslobodjeno">Oslobođeno plaćanja — aktiviraj</option></select></div>
+    <div><label className="mb-1 block text-xs font-medium">Status uplate</label><select className={inputCls} value={uplata} onChange={e=>setUplata(e.target.value)}><option value="ceka_uplatu">Čeka uplatu — paket se ipak odmah aktivira</option><option value="placeno">Plaćeno</option><option value="oslobodjeno">Oslobođeno plaćanja</option></select></div>
     <div><label className="mb-1 block text-xs font-medium">Referenca uplate (opciono)</label><Input className={inputCls} value={referenca} onChange={e=>setReferenca(e.target.value)} placeholder="Broj transakcije / poziv na broj"/></div>
     <div><label className="mb-1 block text-xs font-medium">Administratorska napomena (opciono)</label><Input className={inputCls} value={napomena} onChange={e=>setNapomena(e.target.value)} placeholder="Napomena"/></div>
    </div>
