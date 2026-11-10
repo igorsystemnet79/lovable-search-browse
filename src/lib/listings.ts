@@ -79,7 +79,7 @@ export const zahteviQuery = (limit?: number) => ({
   },
 });
 
-export type CatalogProduct = { id:string; sifra:string; naziv:string; opis:string|null; kategorija:string; cena:number|null; valuta:string; kolicina:number|null; proizvodjac:string|null; naziv_firme:string; grad:string|null; slike:any[] };
+export type CatalogProduct = { id:string; user_id:string; sifra:string; naziv:string; opis:string|null; kategorija:string; cena:number|null; valuta:string; kolicina:number|null; proizvodjac:string|null; naziv_firme:string; grad:string|null; slike:any[] };
 
 export type SearchResults = { ponude: Ponuda[]; zahtevi: Zahtev[]; artikliKataloga: CatalogProduct[] };
 
