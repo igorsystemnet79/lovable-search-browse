@@ -53,6 +53,12 @@ jobs:
             sleep 2
           done
           grep -q '"storage_backend":"postgres"' "$RUNNER_TEMP/ponudimi-health.json"
+          curl -fsS -X POST http://localhost/api/db/query -H 'Content-Type: application/json' -d '{"table":"ponude","action":"select","limit":5}' -o "$RUNNER_TEMP/ponudimi-preview.json"
+          grep -q '"data":\[\]' "$RUNNER_TEMP/ponudimi-preview.json"
+          search_status=$(curl -sS -o "$RUNNER_TEMP/ponudimi-search.json" -w '%{http_code}' -X POST http://localhost/api/db/rpc -H 'Content-Type: application/json' -d '{"fn":"pretrazi_ponude","args":{}}')
+          test "$search_status" = "401"
+          offers_status=$(curl -sS -o /dev/null -w '%{http_code}' http://localhost/api/ponude)
+          test "$offers_status" = "401"
           curl -fsS http://localhost/ -o /dev/null
           "${COMPOSE[@]}" ps
       - name: Print standalone Docker logs on failure

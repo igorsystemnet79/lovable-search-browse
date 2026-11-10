@@ -660,6 +660,7 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
  let result;
  if(action==='select'){
    const orderSql=(orders||[]).filter(o=>columns.includes(o.column)).map(o=>`${ident(o.column)} ${o.ascending===false?'DESC':'ASC'}`).join(',');
+   const publicListing=(table==='ponude'||table==='zahtevi')&&!adminUser;
    let lim=Number.isInteger(limit)?Math.max(0,Math.min(limit,500)):500; const off=Number.isInteger(offset)?Math.max(0,Math.min(offset,10000000)):0;
    if(publicListing && !userId){
      const idOnlyLookup=(filters||[]).length===1 && filters[0].column==='id' && filters[0].op==='eq' && !or;
@@ -669,7 +670,6 @@ app.post('/api/db/query', optionalAuth, asyncRoute(async(req,res)=>{
      else return res.status(401).json({error:'Prijava je obavezna za pretragu oglasa.'});
      if(count==='exact')return res.status(401).json({error:'Prijava je obavezna za pretragu oglasa.'});
    }
-   const publicListing=(table==='ponude'||table==='zahtevi')&&!adminUser;
    let publicListingWhere='';
    if(publicListing){
      if(userId){params.push(userId);const ownerParam='$'+params.length;publicListingWhere=whereSql?` AND ((pauziran=false AND moderacija_blokirana=false) OR user_id=${ownerParam})`:` WHERE ((pauziran=false AND moderacija_blokirana=false) OR user_id=${ownerParam})`;}
