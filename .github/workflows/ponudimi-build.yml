@@ -44,7 +44,7 @@ jobs:
       - name: Validate standalone Docker Compose configuration
         run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml config --quiet
       - name: Validate Caddy reverse proxy configuration
-        run: docker run --rm -e DOMAIN=:80 -v "$PWD/standalone/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine validate --config /etc/caddy/Caddyfile --adapter caddyfile
+        run: docker run --rm -e DOMAIN=:80 -v "$PWD/standalone/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Smoke test standalone Docker stack
         run: |
           set -euo pipefail
