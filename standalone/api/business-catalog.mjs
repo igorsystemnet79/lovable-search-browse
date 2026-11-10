@@ -195,7 +195,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    JOIN paketi_firmi k ON k.user_id=p.user_id AND k.status='aktivan' AND k.vazi_do >= (now() AT TIME ZONE 'Europe/Belgrade')::date
    WHERE p.aktivan AND pr.firma_verifikovana AND ($1='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija,pr.naziv_firme))) LIKE '%'||unaccent(lower($1))||'%')
    AND ($2='' OR lower(p.kategorija)=lower($2)) AND ($3='' OR lower(coalesce(pr.grad,'')) LIKE '%'||lower($3)||'%')
-   AND ($4='' OR p.cena >= $4) AND ($5='' OR p.cena <= $5) AND ($6='' OR p.valuta=$6)
+   AND (NULLIF($4::text,'') IS NULL OR p.cena >= NULLIF($4::text,'')::numeric) AND (NULLIF($5::text,'') IS NULL OR p.cena <= NULLIF($5::text,'')::numeric) AND ($6='' OR p.valuta=$6)
    ORDER BY ${order} LIMIT 100`,[q,category,place,min,max,currency]);
   res.json({data:r.rows});
  }));
