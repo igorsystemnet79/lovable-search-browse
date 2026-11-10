@@ -16,6 +16,8 @@ import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypt
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const pool = new pg.Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'true' ? { rejectUnauthorized: false } : undefined });
+// APR provera je privremeno isključena tokom testiranja. Kada platforma bude spremna za rad, promeniti na true.
+const APR_VERIFICATION_REQUIRED = false;
 const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imati najmanje 32 karaktera.');
 app.set('trust proxy', 1);
@@ -1054,7 +1056,7 @@ app.put('/api/admin/business-package-catalog',auth,admin,asyncRoute(async(req,re
 }));
 app.get('/api/admin/business-firms',auth,admin,asyncRoute(async(req,res)=>{
  const q=String(req.query.q||'').trim().slice(0,100).replace(/[%_\\\\]/g,'');
- const params=[];let where="p.tip_lica='pravno' AND p.firma_verifikovana=true";
+ const params=[];let where="p.tip_lica='pravno'"+(APR_VERIFICATION_REQUIRED?" AND p.firma_verifikovana=true":"");
  if(q){params.push('%'+q+'%');where+=" AND (p.naziv_firme ILIKE $1 OR p.pib ILIKE $1 OR p.email ILIKE $1)";}
  const r=await pool.query(`SELECT p.id AS user_id,p.naziv_firme,p.pib,p.email,p.telefon,p.firma_verifikovana FROM profiles p WHERE ${where} ORDER BY p.naziv_firme NULLS LAST LIMIT 100`,params);
  res.json({data:r.rows});
@@ -1079,7 +1081,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
   await c.query('BEGIN');
   const firm=await c.query("SELECT id,tip_lica,firma_verifikovana FROM profiles WHERE id=$1 FOR UPDATE",[userId]);
   if(!firm.rows[0]||firm.rows[0].tip_lica!=='pravno'){await c.query('ROLLBACK');return res.status(400).json({error:'Paket mogu dobiti samo registrovana pravna lica.'});}
-  if(!firm.rows[0].firma_verifikovana){await c.query('ROLLBACK');return res.status(400).json({error:'Firma prvo mora biti verifikovana u APR evidenciji.'});}
+  if(APR_VERIFICATION_REQUIRED && !firm.rows[0].firma_verifikovana){await c.query('ROLLBACK');return res.status(400).json({error:'Firma prvo mora biti verifikovana u APR evidenciji.'});}
   const active=payment==='placeno'||payment==='oslobodjeno';
   if(active)await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
   const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
