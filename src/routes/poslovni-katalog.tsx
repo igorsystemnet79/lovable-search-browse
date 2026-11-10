@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useAuth } from "@/hooks/use-auth";
@@ -33,7 +33,7 @@ function PoslovniKatalogPage() {
     finally{setBusy(false);}
   },[user,query]);
   useEffect(()=>{void load();},[load]);
-  async function addProduct(event:React.FormEvent){
+  async function addProduct(event:FormEvent){
     event.preventDefault();setBusy(true);setError("");setMessage("");
     try{await sacuvajArtikalKataloga({...form,cena:form.cena===""?null:Number(form.cena),kolicina:form.kolicina===""?null:Number(form.kolicina)});setForm({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});setMessage("Artikal je sačuvan.");await load();}
     catch(e:any){setError(e?.message||"Artikal nije sačuvan.");}finally{setBusy(false);}
