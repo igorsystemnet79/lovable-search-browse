@@ -146,7 +146,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   const found=await pool.query(`SELECT i.id,i.storage_path FROM business_catalog_product_images i JOIN business_catalog_products p ON p.id=i.product_id WHERE i.id=$1 AND p.user_id=$2`,[req.params.imageId,req.user.sub]);
   if(!found.rowCount)return res.status(404).json({error:'Fotografija nije pronađena.'});
   await pool.query('DELETE FROM business_catalog_product_images WHERE id=$1',[req.params.imageId]);
-  const key=String(found.rows[0].storage_path).replace(/^\\/uploads\\//,'');
+  const key=String(found.rows[0].storage_path).replace('/uploads/','');
   try{await removeImage(key);}catch(error){console.error('Fotografija kataloga nije očišćena iz skladišta:',error);}
   res.json({ok:true});
  }));
