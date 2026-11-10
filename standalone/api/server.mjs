@@ -126,7 +126,7 @@ app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
  const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
 }));
 app.patch('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
- const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return res.status(400).json({error:'Unesi ispravan naziv grupe od najmanje 2 karaktera.'});
  const current=await pool.query('SELECT naziv FROM platform_categories WHERE slug=$1',[slug]);
  if(!current.rows[0])return res.status(404).json({error:'Grupa nije pronađena.'});
@@ -146,7 +146,7 @@ app.patch('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
  res.json({data:updated.rows[0]});
 }));
 app.patch('/api/admin/categories/:slug/subcategories/:name',auth,admin,asyncRoute(async(req,res)=>{
- const slug=String(req.params.slug||'').trim(),oldName=String(req.params.name||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ const slug=String(req.params.slug||'').trim(),oldName=String(req.params.name||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||oldName.length<2||naziv.length<2)return res.status(400).json({error:'Podaci o podgrupi nisu ispravni.'});
  const c=await pool.connect();
  try{await c.query('BEGIN');
