@@ -31,7 +31,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -65,6 +65,7 @@ function AdminPage() {
             {tab === "Poruke korisnika" && <AdminKorisnickePoruke />}
             {tab === "APR firme" && <Apr />}
             {tab === "Paketi firmi" && <PaketiFirmi />}
+            {tab === "Paketi korisnika" && <PaketiKorisnika />}
             {tab === "Ponuda paketa" && <UpravljanjePonudomPaketa />}
             {tab === "Kategorije" && <UpravljanjeKategorijama />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
@@ -837,6 +838,50 @@ function PaketiFirmi() {
  </div>;
 }
 
+
+
+function PaketiKorisnika() {
+ const [q,setQ]=useState("");
+ const [users,setUsers]=useState<any[]>([]);
+ const [selected,setSelected]=useState("");
+ const [packageName,setPackageName]=useState("");
+ const [days,setDays]=useState("30");
+ const [gratis,setGratis]=useState(true);
+ const [price,setPrice]=useState("0");
+ const [note,setNote]=useState("");
+ const [grants,setGrants]=useState<any[]>([]);
+ const [busy,setBusy]=useState(false);
+ const [msg,setMsg]=useState("");
+ const loadGrants=useCallback(async()=>{try{const r=await ucitajAdminDodelePaketa();setGrants(r.data||[]);}catch(e){setMsg(e instanceof Error?e.message:"Dodele nije moguće učitati.");}},[]);
+ useEffect(()=>{void loadGrants();},[loadGrants]);
+ async function search(){setBusy(true);setMsg("");try{const r=await pretraziKorisnikeZaPaket(q);setUsers(r.data||[]);if(!r.data?.length)setMsg("Nije pronađen nijedan korisnik.");}catch(e){setMsg(e instanceof Error?e.message:"Pretraga korisnika nije uspela.");}finally{setBusy(false);}}
+ async function assign(){if(!selected||!packageName.trim()){setMsg("Izaberi korisnika i unesi naziv paketa.");return;}const duration=Number(days),amount=gratis?0:Number(price);if(!Number.isInteger(duration)||duration<1||duration>3650||!Number.isFinite(amount)||amount<0){setMsg("Proveri trajanje i cenu paketa.");return;}setBusy(true);setMsg("");try{const r=await dodeliPaketKorisniku({user_id:selected,package_name:packageName.trim(),duration_days:duration,gratis,cena_eur:amount,napomena:note});setMsg(r.poruka||"Paket je uspešno dodeljen.");setNote("");await loadGrants();}catch(e){setMsg(e instanceof Error?e.message:"Dodela paketa nije uspela.");}finally{setBusy(false);}}
+ async function cancel(id:string){if(!confirm("Otkazati ovu dodelu paketa?"))return;setBusy(true);try{await otkaziDodeluPaketa(id);setMsg("Dodela je otkazana.");await loadGrants();}catch(e){setMsg(e instanceof Error?e.message:"Otkazivanje nije uspelo.");}finally{setBusy(false);}}
+ return <section className="space-y-5">
+  <div><h2 className="text-xl font-semibold">Dodela paketa svim korisnicima</h2><p className="mt-1 text-sm text-muted-foreground">Paket ili besplatan period možeš dodeliti bilo kom registrovanom nalogu — fizičkom licu ili firmi. Svaka dodela ostaje evidentirana u istoriji korisnika.</p></div>
+  <div className="space-y-3 rounded-2xl border border-input bg-surface p-4">
+   <h3 className="font-semibold">1. Pronađi korisnika</h3>
+   <div className="flex flex-wrap gap-2"><Input className={inputCls+" min-w-0 flex-1"} value={q} onChange={e=>setQ(e.target.value)} placeholder="E-mail, ime, prezime, naziv firme ili PIB..." onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();void search();}}}/><button type="button" className={small} disabled={busy} onClick={()=>void search()}>Pretraži korisnike</button></div>
+   {users.length>0&&<select className={inputCls+" w-full"} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Izaberi korisnika...</option>{users.map(u=><option key={u.user_id} value={u.user_id}>{u.tip_lica==="pravno"?"Firma":"Fizičko lice"} · {u.naziv_firme||[u.ime,u.prezime].filter(Boolean).join(" ")||"Korisnik"} · {u.email||"bez e-maila"}{u.pib?" · PIB "+u.pib:""}</option>)}</select>}
+   {users.length>0&&<p className="text-xs text-muted-foreground">Pronađeno: {users.length}. Izaberi tačan nalog kome dodeljuješ pogodnost.</p>}
+  </div>
+  <div className="space-y-3 rounded-2xl border border-input bg-surface p-4">
+   <h3 className="font-semibold">2. Podesi paket ili gratis period</h3>
+   <label className="block space-y-1 text-sm font-medium">Naziv paketa / pogodnosti<Input className={inputCls} value={packageName} onChange={e=>setPackageName(e.target.value)} maxLength={80} placeholder="Npr. Premium, Poslovni paket, Probni pristup..."/></label>
+   <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={gratis} onChange={e=>{setGratis(e.target.checked);if(e.target.checked)setPrice("0");}}/> Dodeli gratis (besplatan period)</label>
+   <div className="grid gap-3 sm:grid-cols-2"><label className="space-y-1 text-sm font-medium">Trajanje (dana)<Input className={inputCls} type="number" min="1" max="3650" step="1" value={days} onChange={e=>setDays(e.target.value)}/></label><label className="space-y-1 text-sm font-medium">Cena (EUR){gratis&&<span className="ml-1 text-xs text-muted-foreground">— gratis</span>}<Input className={inputCls} type="number" min="0" max="100000" step="0.01" disabled={gratis} value={price} onChange={e=>setPrice(e.target.value)}/></label></div>
+   <label className="block space-y-1 text-sm font-medium">Napomena administratora (opciono)<textarea className={inputCls+" min-h-20 w-full"} value={note} onChange={e=>setNote(e.target.value)} maxLength={1000} placeholder="Razlog dodele, dogovor sa korisnikom..."/></label>
+   <button type="button" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground disabled:opacity-50" disabled={busy||!selected||!packageName.trim()} onClick={()=>void assign()}>{busy?"Sačekajte...":"Dodeli paket / aktiviraj period"}</button>
+  </div>
+  {msg&&<p role="status" className="text-sm text-brand">{msg}</p>}
+  <div className="space-y-3"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Evidencija dodeljenih paketa i gratis perioda</h3><button type="button" className={small} onClick={()=>void loadGrants()}>Osveži</button></div>
+   <div className="overflow-x-auto rounded-2xl border border-input bg-surface"><table className="w-full min-w-[850px] text-left text-sm"><thead className="bg-secondary/60 text-xs uppercase text-muted-foreground"><tr><th className="p-3">Korisnik</th><th className="p-3">Paket</th><th className="p-3">Period</th><th className="p-3">Cena / status</th><th className="p-3">Napomena</th><th className="p-3">Radnja</th></tr></thead><tbody>
+    {grants.map(g=><tr key={g.id} className="border-t border-input align-top"><td className="p-3">{g.naziv_firme||[g.ime,g.prezime].filter(Boolean).join(" ")||"Korisnik"}<div className="text-xs text-muted-foreground">{g.email} · {g.tip_lica==="pravno"?"Firma":"Fizičko lice"}</div></td><td className="p-3 font-medium">{g.package_name}{g.gratis&&<div className="text-xs font-semibold text-green-700">GRATIS</div>}</td><td className="p-3 whitespace-nowrap">{new Date(g.vazi_od).toLocaleDateString("sr-RS")} – {new Date(g.vazi_do).toLocaleDateString("sr-RS")}<div className="text-xs text-muted-foreground">{g.duration_days} dana</div></td><td className="p-3">{Number(g.cena_eur||0).toLocaleString("sr-RS")} €<div className="text-xs text-muted-foreground">{g.status==="aktivan"?"Aktivan":g.status==="istekao"?"Istekao":g.status==="zamenjen"?"Zamenjen":"Otkazan"}</div></td><td className="p-3 max-w-[220px] whitespace-pre-wrap">{g.napomena||"—"}</td><td className="p-3">{g.status==="aktivan"&&<button type="button" className={danger} disabled={busy} onClick={()=>void cancel(g.id)}>Otkazi</button>}</td></tr>)}
+    {!grants.length&&<tr><td colSpan={6} className="p-4 text-muted-foreground">Još nema dodeljenih paketa.</td></tr>}
+   </tbody></table></div>
+  </div>
+ </section>;
+}
 
 function UpravljanjePonudomPaketa(){
  const [items,setItems]=useState<any[]>([]),[busy,setBusy]=useState(false),[msg,setMsg]=useState("");
