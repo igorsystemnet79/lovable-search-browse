@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import * as XLSX from "xlsx";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useAuth } from "@/hooks/use-auth";
@@ -41,8 +42,21 @@ function PoslovniKatalogPage() {
   }
   async function importCsv(){
     if(!csvFile)return;setBusy(true);setError("");setMessage("");
-    try{const result=await uveziCSVKataloga(await csvFile.text());setMessage(`Uvoz završen: ${result.dodato} novih artikala, ${result.azurirano} ažuriranih.`);setCsvFile(null);await load();}
-    catch(e:any){setError(e?.message||"Uvoz CSV fajla nije uspeo.");}finally{setBusy(false);}
+    try{
+      let csvText="";
+      if(/\\.xlsx?$/i.test(csvFile.name)){
+        const workbook=XLSX.read(await csvFile.arrayBuffer(),{type:"array"});
+        const sheet=workbook.Sheets["Artikli"]||workbook.Sheets[workbook.SheetNames[0]];
+        if(!sheet)throw new Error("Excel fajl nema radni list sa artiklima.");
+        const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false}) as unknown[][];
+        const escapeCell=(value:unknown)=>{const text=String(value??"");return /[;"\\r\\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;};
+        csvText=rows.map(row=>row.map(escapeCell).join(";")).join("\\n");
+      }else{
+        csvText=await csvFile.text();
+      }
+      const result=await uveziCSVKataloga(csvText);setMessage(`Uvoz završen: ${result.dodato} novih artikala, ${result.azurirano} ažuriranih.`);setCsvFile(null);await load();
+    }
+    catch(e:any){setError(e?.message||"Uvoz Excel/CSV fajla nije uspeo.");}finally{setBusy(false);}
   }
   async function uploadImages(id:string,files:FileList|null){
     if(!files?.length)return;setBusy(true);setError("");setMessage("");
@@ -68,9 +82,9 @@ function PoslovniKatalogPage() {
         {[["Firma",summary.firma],["Paket",summary.paket],["Artikli",Number(summary.ukupno).toLocaleString("sr-RS")+" / "+Number(summary.limit).toLocaleString("sr-RS")],["Preostalo",Number(summary.preostalo).toLocaleString("sr-RS")]].map(([label,value])=><div key={label} className="rounded-2xl bg-surface p-4 shadow-card"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-lg font-semibold">{value}</p></div>)}
       </div>}
       <section className="rounded-2xl bg-surface p-5 shadow-card space-y-4">
-        <div><h2 className="text-xl font-semibold">Masovni uvoz artikala</h2><p className="text-sm text-muted-foreground">Popuni CSV obrazac u Excel-u ili drugom programu i sačuvaj ga kao CSV UTF-8. Do 5.000 redova po jednom uvozu. Ista šifra artikla ažurira postojeći artikal.</p></div>
-        <button type="button" onClick={downloadTemplate} className="min-h-10 rounded-full border border-input px-4 text-sm font-medium hover:bg-secondary">Preuzmi CSV / Excel obrazac</button>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><input type="file" accept=".csv,text/csv" onChange={e=>setCsvFile(e.target.files?.[0]||null)} className="min-w-0 text-sm"/><button type="button" disabled={!csvFile||busy} onClick={importCsv} className="min-h-10 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{busy?"Obrada...":"Uvezi artikle"}</button></div>
+        <div><h2 className="text-xl font-semibold">Masovni uvoz artikala</h2><p className="text-sm text-muted-foreground">Preuzmi Excel obrazac, popuni list Artikli i učitaj .xlsx fajl direktno. Podržan je i CSV UTF-8. Do 5.000 redova po jednom uvozu. Ista šifra artikla ažurira postojeći artikal.</p></div>
+        <button type="button" onClick={downloadTemplate} className="min-h-10 rounded-full border border-input px-4 text-sm font-medium hover:bg-secondary">Preuzmi Excel obrazac (.xlsx)</button>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center"><input type="file" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={e=>setCsvFile(e.target.files?.[0]||null)} className="min-w-0 text-sm"/><button type="button" disabled={!csvFile||busy} onClick={importCsv} className="min-h-10 rounded-full bg-brand px-5 text-sm font-semibold text-brand-foreground disabled:opacity-50">{busy?"Obrada...":"Uvezi Excel / CSV"}</button></div>
       </section>
       <section className="rounded-2xl bg-surface p-5 shadow-card space-y-4">
         <h2 className="text-xl font-semibold">Dodaj pojedinačni artikal</h2>
