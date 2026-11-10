@@ -81,6 +81,7 @@ export function SiteHeader() {
             <>
               {isAdmin && <Link to="/admin" className={outline}>Admin</Link>}
               <Link to="/moji-oglasi" className={outline}>Moji oglasi</Link>
+              {user.user_metadata?.tip_lica === "pravno" && <Link to="/poslovni-katalog" className={outline}>Poslovni katalog</Link>}
               <Link to="/poruke" className={outline}>Poruke</Link>
               <Link to="/obavestenja" className={outline}>Obaveštenja{unreadNotifications > 0 ? ` (${unreadNotifications > 99 ? "99+" : unreadNotifications})` : ""}</Link>
               <Link to="/praceni-oglasi" className={outline}>Prati oglase</Link>
