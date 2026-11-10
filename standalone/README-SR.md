@@ -60,8 +60,9 @@ Prvi nalog registrovan sa adresom navedenom u `ADMIN_EMAIL` automatski dobija ad
 - PostgreSQL podaci su u Docker volumenu `postgres_data`.
 - Po oglasu je dozvoljeno do 7 fotografija; ulazni fajl može imati do 20 MB. API ih obrađuje na serveru i čuva kao JPEG dimenzija 800 × 600 px, bez minimalne rezolucije i uz tehničku granicu od 100 MP radi stabilnosti.
 - Za Render i druge platforme bez trajnog diska može se uključiti S3-kompatibilno skladište, uključujući Cloudflare R2, kroz promenljive `S3_ENDPOINT`, `S3_BUCKET`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` i `S3_REGION`.
-- Bez S3 konfiguracije fotografije se čuvaju kao fajlovi na trajnom disku u `UPLOAD_DIR` (u Docker paketu: trajni volumen `uploads_data`, montiran na `/data/uploads`). PostgreSQL tabela `slike_oglasa` čuva vezu fotografije sa oglasom, putanju ili URL i redosled; binarna slika se ne upisuje u PostgreSQL. Stari objekti iz ranijih verzija u tabeli `storage_objects` ostaju čitljivi radi kompatibilnosti.
-- Pri prelasku na sopstveni server isključuju se S3 promenljive i koristi se trajni disk. Ako su fotografije ranije bile u R2, kopiraj ih na server pod istim ključevima (putanjama) pre isključivanja R2, ili ažuriraj putanje u bazi.
+- Bez S3 konfiguracije, podrazumevano čuvanje je u PostgreSQL tabeli `storage_objects` (`bytea`). Fotografije zato ostaju sačuvane i nakon restarta ili novog deploy-a na hostingu bez trajnog diska. Pošto slike povećavaju veličinu baze, redovno proveravaj zauzeće i čuvaj rezervne kopije.
+- Ako želiš čuvanje kao fajlove na sopstvenom trajnom disku, postavi `IMAGE_STORAGE_MODE=filesystem` i `UPLOAD_DIR` na putanju trajnog diska. U Docker paketu za to postoji volumen `uploads_data`, montiran na `/data/uploads`. Bez ove promenljive koristi se PostgreSQL.
+- Pri prelasku sa R2 na drugi način čuvanja, prvo kopiraj fotografije pod istim ključevima ili ih migriraj u `storage_objects`; tek nakon provere svih slika isključi R2.
 - Caddy sertifikati i podešavanja su u `caddy_data` i `caddy_config`.
 - Brisanje volumena može trajno obrisati podatke. Nemoj koristiti `docker compose down -v` osim ako namerno želiš potpuno brisanje instalacije.
 

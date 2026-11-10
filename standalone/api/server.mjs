@@ -29,7 +29,6 @@ app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
 const uploadDir = process.env.UPLOAD_DIR || path.join(__dirname, '../uploads');
 fs.mkdirSync(uploadDir, { recursive: true });
 app.use('/uploads', express.static(uploadDir, { maxAge: '7d', immutable: true }));
-const storage = multer.diskStorage({ destination: uploadDir, filename: (_req, file, cb) => cb(null, `${randomUUID()}${path.extname(file.originalname).toLowerCase()}`) });
 const memoryUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024, files: 7 }, fileFilter: (_req, f, cb) => imageMime.has(f.mimetype) ? cb(null, true) : cb(new Error('Dozvoljeni su samo JPG, PNG i WebP formati.')) });
 async function normalizeImage(buffer) {
  const output = await sharp(buffer, { limitInputPixels: 100000000 }).rotate().resize(800, 600, { fit: 'contain', background: '#ffffff', withoutEnlargement: false }).jpeg({ quality: 82, mozjpeg: true }).toBuffer();
@@ -37,21 +36,24 @@ async function normalizeImage(buffer) {
 }
 const s3Enabled = Boolean(process.env.S3_ENDPOINT && process.env.S3_BUCKET && process.env.S3_ACCESS_KEY_ID && process.env.S3_SECRET_ACCESS_KEY);
 const s3 = s3Enabled ? new S3Client({ region: process.env.S3_REGION || 'auto', endpoint: process.env.S3_ENDPOINT, forcePathStyle: true, credentials: { accessKeyId: process.env.S3_ACCESS_KEY_ID, secretAccessKey: process.env.S3_SECRET_ACCESS_KEY } }) : null;
+const filesystemStorage = !s3 && process.env.IMAGE_STORAGE_MODE === 'filesystem';
 const imageMime = new Set(['image/jpeg','image/png','image/webp']);
 const safeObjectKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 async function saveImage(key, buffer, contentType) {
- if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su JPG, PNG i WebP formati.');
+ if (!imageMime.has(contentType)) throw new Error('Dozvoljeni su samo JPG, PNG i WebP formati.');
  const safeKey=safeObjectKey(key);
  if(!safeKey)throw new Error('Putanja fotografije nije ispravna.');
  if (s3) {
   await s3.send(new PutObjectCommand({ Bucket: process.env.S3_BUCKET, Key: safeKey, Body: buffer, ContentType: contentType, CacheControl: 'public, max-age=31536000, immutable' }));
- } else {
+ } else if (filesystemStorage) {
   const root=path.resolve(uploadDir), target=path.resolve(root,safeKey);
   if(!target.startsWith(root+path.sep))throw new Error('Putanja fotografije nije dozvoljena.');
   await fs.promises.mkdir(path.dirname(target),{recursive:true});
-  const temporary=`${target}.${randomUUID()}.tmp`;
+  const temporary=target+'.'+randomUUID()+'.tmp';
   try { await fs.promises.writeFile(temporary,buffer,{flag:'wx'}); await fs.promises.rename(temporary,target); }
   catch(error) { try { await fs.promises.unlink(temporary); } catch {} throw error; }
+ } else {
+  await pool.query('INSERT INTO storage_objects(object_key,content_type,body) VALUES($1,$2,$3) ON CONFLICT(object_key) DO UPDATE SET content_type=EXCLUDED.content_type,body=EXCLUDED.body',[safeKey,contentType,buffer]);
  }
 }
 async function attachListingImages({ table, listingId, ownerId, files }) {
@@ -107,7 +109,7 @@ const sign = u => jwt.sign({ sub:u.id, email:u.email, role:'authenticated' }, JW
 const validPib = raw => { const p=String(raw||'').replace(/\s/g,''); if(!/^\d{9}$/.test(p)) return false; let s=10; for(let i=0;i<8;i++){s=(s+Number(p[i]))%10;if(s===0)s=10;s=(s*2)%11;} return (11-s)%10===Number(p[8]); };
 
 app.get('/', (_req,res)=>res.json({ ok:true, service:'PonudiMi API', message:'API je aktivan.', health:'/api/health' }));
-app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, checked_at:result.rows[0].checked_at }); }));
+app.get('/api/health', asyncRoute(async (_req,res)=>{ const result=await pool.query('SELECT current_database() AS database, now() AS checked_at'); res.json({ ok:true, service:'PonudiMi standalone API', database:'connected', database_name:result.rows[0].database, storage_backend:s3?'r2':filesystemStorage?'filesystem':'postgres', checked_at:result.rows[0].checked_at }); }));
 app.get('/api/platform-rules',asyncRoute(async(_req,res)=>{const r=await pool.query("SELECT id,sadrzaj,version,published_at FROM platform_rules WHERE singleton=true");res.set('Cache-Control','no-store');res.json({data:r.rows[0]||null});}));
 app.get('/api/admin/platform-rules/history',auth,admin,asyncRoute(async(_req,res)=>{const r=await pool.query('SELECT id,sadrzaj,version,published_at,published_by FROM platform_rules_versions ORDER BY version DESC LIMIT 50');res.json({data:r.rows});}));
 app.put('/api/admin/platform-rules',auth,admin,asyncRoute(async(req,res)=>{const sadrzaj=String(req.body?.sadrzaj||'').trim();if(sadrzaj.length<30||sadrzaj.length>50000)return res.status(400).json({error:'Tekst pravila mora imati između 30 i 50.000 karaktera.'});const c=await pool.connect();try{await c.query('BEGIN');const current=await c.query('SELECT COALESCE(MAX(version),0)::int AS version FROM platform_rules_versions');const version=current.rows[0].version+1;const inserted=await c.query('INSERT INTO platform_rules_versions(sadrzaj,version,published_by) VALUES($1,$2,$3) RETURNING id,sadrzaj,version,published_at,published_by',[sadrzaj,version,req.user.sub]);await c.query("INSERT INTO platform_rules(singleton,sadrzaj,version,published_by,published_at) VALUES(true,$1,$2,$3,now()) ON CONFLICT(singleton) DO UPDATE SET sadrzaj=EXCLUDED.sadrzaj,version=EXCLUDED.version,published_by=EXCLUDED.published_by,published_at=now()",[sadrzaj,version,req.user.sub]);await c.query('COMMIT');res.json({data:inserted.rows[0]});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
@@ -726,7 +728,7 @@ app.post('/api/storage/upload',auth,memoryUpload.single('file'),asyncRoute(async
  if(!requested.startsWith(`${req.user.sub}/`))return res.status(403).json({error:'Nedozvoljena putanja fotografije.'});
  const key=requested;
  const normalized=await normalizeImage(req.file.buffer);
- await saveImage(key,normalized,'image/jpeg');res.status(201).json({path:key,storage:s3?'r2':'local',width:800,height:600,format:'jpeg'});
+ await saveImage(key,normalized,'image/jpeg');res.status(201).json({path:key,storage:s3?'r2':filesystemStorage?'local':'postgres',width:800,height:600,format:'jpeg'});
 }));
 app.post('/api/storage/remove',auth,asyncRoute(async(req,res)=>{
  const paths=Array.isArray(req.body?.paths)?req.body.paths:[];for(const item of paths){const rawKey=safeObjectKey(item);const key=rawKey.startsWith('uploads/')?rawKey.slice('uploads/'.length):rawKey;if(!key.startsWith(`${req.user.sub}/`))continue;await removeImage(key);}res.json({ok:true});
@@ -837,6 +839,7 @@ async function startServer(){
  const schema=await readFile(schemaPath,'utf8');
  await pool.query(schema);
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
+  console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
  await pool.query("UPDATE paketi_firmi SET status='istekao',updated_at=now() WHERE status='aktivan' AND vazi_do<=CURRENT_DATE");
  app.listen(port,'0.0.0.0',()=>{
   void sendBusinessPackageReminders();
