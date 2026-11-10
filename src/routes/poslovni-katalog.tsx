@@ -13,7 +13,6 @@ export const Route = createFileRoute("/poslovni-katalog")({
   component: PoslovniKatalogPage,
 });
 
-const template = "sifra;naziv;opis;kategorija;cena;valuta;kolicina;proizvodjac;jedinica_mere;aktivan\nART-001;Primer proizvoda;Opis proizvoda;Tehnika;1299;RSD;25;Proizvođač;kom;da\n";
 
 function PoslovniKatalogPage() {
   const { user } = useAuth();
@@ -44,13 +43,13 @@ function PoslovniKatalogPage() {
     if(!csvFile)return;setBusy(true);setError("");setMessage("");
     try{
       let csvText="";
-      if(/\\.xlsx?$/i.test(csvFile.name)){
+      if(/\.xlsx?$/i.test(csvFile.name)){
         const workbook=XLSX.read(await csvFile.arrayBuffer(),{type:"array"});
         const sheet=workbook.Sheets["Artikli"]||workbook.Sheets[workbook.SheetNames[0]];
         if(!sheet)throw new Error("Excel fajl nema radni list sa artiklima.");
         const rows=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false}) as unknown[][];
-        const escapeCell=(value:unknown)=>{const text=String(value??"");return /[;"\\r\\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;};
-        csvText=rows.map(row=>row.map(escapeCell).join(";")).join("\\n");
+        const escapeCell=(value:unknown)=>{const text=String(value??"");return /[;"\r\n]/.test(text)?'"'+text.replace(/"/g,'""')+'"':text;};
+        csvText=rows.map(row=>row.map(escapeCell).join(";")).join("\n");
       }else{
         csvText=await csvFile.text();
       }
