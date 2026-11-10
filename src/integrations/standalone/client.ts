@@ -326,3 +326,11 @@ export async function pretraziArtikleKataloga(args:{q:string;kategorija?:string;
   const query=new URLSearchParams({q:args.q||"",kategorija:args.kategorija||"",mesto:args.mesto||"",minCena:args.minCena||"",maxCena:args.maxCena||"",valuta:args.valuta||"",sort:args.sort||"najnovije"});
   return api("/api/catalog/search?"+query.toString());
 }
+
+export async function dodajSlikeArtikluKataloga(id:string,files:File[]) {
+  const form=new FormData();files.forEach(file=>form.append("fotografije",file));
+  return api("/api/business/catalog/products/"+encodeURIComponent(id)+"/images",{method:"POST",body:form});
+}
+export async function obrisiSlikuArtiklaKataloga(id:string) {
+  return api("/api/business/catalog/images/"+encodeURIComponent(id),{method:"DELETE"});
+}
