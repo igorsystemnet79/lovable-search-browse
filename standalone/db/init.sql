@@ -416,3 +416,23 @@ CREATE TABLE IF NOT EXISTS message_admin_audit (
 );
 CREATE INDEX IF NOT EXISTS message_admin_audit_conversation_idx ON message_admin_audit(conversation_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS message_admin_audit_admin_idx ON message_admin_audit(admin_id,created_at DESC);
+
+
+-- Administratorske dodele paketa i besplatnih perioda za sve tipove naloga.
+CREATE TABLE IF NOT EXISTS user_access_grants (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ package_name text NOT NULL CHECK (char_length(package_name) BETWEEN 2 AND 80),
+ duration_days integer NOT NULL CHECK (duration_days BETWEEN 1 AND 3650),
+ gratis boolean NOT NULL DEFAULT false,
+ cena_eur numeric(10,2) NOT NULL DEFAULT 0 CHECK (cena_eur>=0),
+ status text NOT NULL DEFAULT 'aktivan' CHECK (status IN ('aktivan','istekao','zamenjen','otkazan')),
+ vazi_od timestamptz NOT NULL DEFAULT now(),
+ vazi_do timestamptz NOT NULL,
+ napomena text,
+ kreirao_id uuid REFERENCES users(id) ON DELETE SET NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (vazi_do>vazi_od)
+);
+CREATE INDEX IF NOT EXISTS user_access_grants_user_idx ON user_access_grants(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS user_access_grants_status_expiry_idx ON user_access_grants(status,vazi_do);
