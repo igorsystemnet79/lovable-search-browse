@@ -339,7 +339,7 @@ app.post('/api/auth/reset-request',resetRequestLimiter,asyncRoute(async(req,res)
 }));
 
 // Pametno povezivanje: obaveštenja se kreiraju samo za aktivne sačuvane kriterijume.
-const normalizeAlertText = value => String(value||'').trim().replace(/\\s+/g,' ').slice(0,160);
+const normalizeAlertText = value => String(value||'').trim().replace(/\s+/g,' ').slice(0,160);
 async function notifyMatchingSavedSearches(listingType, listing) {
  if(!listing?.id || !listing?.user_id || listing.pauziran || listing.moderacija_blokirana) return;
  const {rows}=await pool.query(`
