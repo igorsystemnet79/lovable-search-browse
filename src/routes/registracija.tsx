@@ -115,7 +115,7 @@ function Registracija() {
     return (
       <AuthShell title="Nalog je uspešno kreiran" subtitle="Dobro došao na PonudiMi!">
         <p className="text-sm">Registracija je završena. Možeš odmah da nastaviš na platformu — potvrda e-mail adrese i telefona trenutno nije potrebna.</p>
-        {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">Podaci o firmi mogu biti dodatno provereni kroz APR.</p>}
+        {tip === "pravno" && <p className="mt-3 text-sm text-muted-foreground">APR verifikacija firme trenutno nije uslov za korišćenje platforme tokom testiranja.</p>}
         <button type="button" onClick={() => navigate({ to: "/" })} className={btnCls + " mt-4"}>Nastavi na PonudiMi</button>
       </AuthShell>
     );
