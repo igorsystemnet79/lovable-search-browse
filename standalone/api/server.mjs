@@ -217,7 +217,7 @@ async function saveCategoryImage(req, slug, subcategory = null) {
  if(!current.rows[0])return {status:404,error:'Grupa nije pronađena.'};
  if(naziv && current.rows[0].naziv!==naziv)await pool.query('UPDATE platform_categories SET naziv=$2,updated_at=now() WHERE slug=$1',[slug,naziv]);
  if(suppliedSubs.length){
-  await pool.query('UPDATE platform_categories SET podkategorije=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(podkategorije,ARRAY[]::text[])||$2::text[]) AS value),updated_at=now() WHERE slug=$1',[slug,suppliedSubs]);
+  await pool.query('UPDATE platform_categories SET podkategorije=ARRAY(SELECT DISTINCT subcategory FROM unnest(COALESCE(podkategorije,ARRAY[]::text[])||$2::text[]) AS subs(subcategory)),updated_at=now() WHERE slug=$1',[slug,suppliedSubs]);
  }
  if (subcategory !== null) {
   const check=await pool.query('SELECT 1 FROM platform_categories WHERE slug=$1 AND $2=ANY(podkategorije)',[slug,subcategory]);
