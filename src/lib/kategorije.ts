@@ -5,6 +5,7 @@ export type Kategorija = {
   fotoAutor: string;
   fotoIzvor: string;
   podkategorije: string[];
+  podkategorijeSlike?: Record<string, string>;
 };
 
 // Fotografije su sa Pexels-a. Izvori i autori su evidentirani u

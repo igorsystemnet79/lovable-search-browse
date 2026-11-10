@@ -67,8 +67,9 @@ function KategorijaPage() {
                 key={pod}
                 to="/pretraga"
                 search={{ q: pod, lokacija: "" }}
-                className="rounded-full border border-input bg-surface px-4 py-2 text-sm font-medium transition-colors hover:border-brand hover:bg-secondary"
+                className="inline-flex items-center gap-2 rounded-xl border border-input bg-surface px-3 py-2 text-sm font-medium transition-colors hover:border-brand hover:bg-secondary"
               >
+                {kat.podkategorijeSlike?.[pod]&&<img src={kat.podkategorijeSlike[pod]} alt="" loading="lazy" className="h-10 w-12 rounded-md object-cover"/>}
                 {pod}
               </Link>
             ))}

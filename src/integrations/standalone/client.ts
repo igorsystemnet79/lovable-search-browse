@@ -241,13 +241,16 @@ export const ponudimi: any = {
 
 
 export async function ucitajKategorije(): Promise<Kategorija[]> {
- const response=await api("/api/categories"),additions=Array.isArray(response.data)?response.data as Partial<Kategorija>[]:[];
+ const response=await api("/api/categories"),additions=Array.isArray(response.data)?response.data as Array<Partial<Kategorija>&{podkategorije_slike?:Record<string,string>}>:[];
  const merged=podrazumevaneKategorije.map(base=>{const extra=additions.find(item=>item.slug===base.slug);return extra?{...base,...extra,slika:extra.slika||base.slika,fotoAutor:extra.fotoAutor||base.fotoAutor,fotoIzvor:extra.fotoIzvor||base.fotoIzvor,podkategorije:[...new Set([...base.podkategorije,...(extra.podkategorije||[])])]}:base;});
  for(const extra of additions)if(extra.slug&&!merged.some(item=>item.slug===extra.slug))merged.push({slug:extra.slug,naziv:extra.naziv||extra.slug,slika:extra.slika||podrazumevaneKategorije[0]?.slika||"",fotoAutor:extra.fotoAutor||"",fotoIzvor:extra.fotoIzvor||"",podkategorije:extra.podkategorije||[]});
- return merged;
+ return merged.map(category=>{const stored=additions.find(item=>item.slug===category.slug);return {...category,podkategorijeSlike:stored?.podkategorije_slike};});
 }
 export async function dodajKategoriju(naziv:string){return api("/api/admin/categories",{method:"POST",body:JSON.stringify({naziv})});}
 export async function dodajPotkategoriju(slug:string,naziv:string,grupa:string){return api(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories`,{method:"POST",body:JSON.stringify({naziv,grupa})});}
+async function sacuvajSlikuKategorije(path:string,file?:File|null,url?:string){if(file){const form=new FormData();form.append("file",file);return api(path,{method:"POST",body:form});}return api(path,{method:"PUT",body:JSON.stringify({url})});}
+export async function postaviSlikuKategorije(slug:string,file?:File|null,url?:string){return sacuvajSlikuKategorije(`/api/admin/categories/${encodeURIComponent(slug)}/image`,file,url);}
+export async function postaviSlikuPodkategorije(slug:string,naziv:string,file?:File|null,url?:string){return sacuvajSlikuKategorije(`/api/admin/categories/${encodeURIComponent(slug)}/subcategories/${encodeURIComponent(naziv)}/image`,file,url);}
 export async function ucitajPravilaPlatforme() {
   // Sprečava da pregledač ili posredni keš vrati staru verziju javno objavljenih pravila.
   return api(`/api/platform-rules?refresh=${Date.now()}`);
