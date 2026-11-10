@@ -265,6 +265,31 @@ VALUES
  ('advanced','Advanced',50,6,'','{}',false,3),
  ('total','Total',100,12,'','{}',false,4)
 ON CONFLICT(slug) DO NOTHING;
+
+-- Podrazumevani opisi i pogodnosti poslovnih paketa.
+-- Postojeći administratorski unosi se čuvaju; dopunjavaju se samo prazna polja.
+UPDATE business_package_catalog
+SET opis = CASE slug
+  WHEN 'light' THEN 'Paket za firme koje žele da započnu predstavljanje na PonudiMi platformi i provere kako im odgovara poslovno prisustvo tokom jednog meseca.'
+  WHEN 'average' THEN 'Paket za firme kojima je potrebno više vremena da predstave svoju ponudu, pronađu zainteresovane kupce i razviju poslovno prisustvo tokom tri meseca.'
+  WHEN 'advanced' THEN 'Paket za firme koje žele kontinuitet u predstavljanju svojih proizvoda ili usluga i aktivno korišćenje poslovnih mogućnosti platforme tokom šest meseci.'
+  WHEN 'total' THEN 'Paket za firme koje planiraju dugoročno prisustvo na PonudiMi platformi i žele da svoje poslovanje predstavljaju tokom cele godine.'
+  ELSE opis
+END,
+pogodnosti = CASE
+  WHEN cardinality(pogodnosti) = 0 THEN CASE slug
+    WHEN 'light' THEN ARRAY['Poslovni nalog za firmu','Predstavljanje firme i njene ponude','Objavljivanje ponuda i praćenje interesovanja','Komunikacija sa zainteresovanim korisnicima','Trajanje paketa: 1 mesec']
+    WHEN 'average' THEN ARRAY['Poslovni nalog za firmu','Predstavljanje firme i njene ponude','Objavljivanje ponuda i praćenje interesovanja','Komunikacija sa zainteresovanim korisnicima','Trajanje paketa: 3 meseca']
+    WHEN 'advanced' THEN ARRAY['Poslovni nalog za firmu','Predstavljanje firme i njene ponude','Objavljivanje ponuda i praćenje interesovanja','Komunikacija sa zainteresovanim korisnicima','Trajanje paketa: 6 meseci']
+    WHEN 'total' THEN ARRAY['Poslovni nalog za firmu','Predstavljanje firme i njene ponude','Objavljivanje ponuda i praćenje interesovanja','Komunikacija sa zainteresovanim korisnicima','Trajanje paketa: 12 meseci']
+    ELSE pogodnosti
+  END
+  ELSE pogodnosti
+END,
+updated_at = now()
+WHERE slug IN ('light','average','advanced','total')
+  AND (NULLIF(BTRIM(opis),'') IS NULL OR cardinality(pogodnosti) = 0);
+
 ALTER TABLE paketi_firmi DROP CONSTRAINT IF EXISTS paketi_firmi_paket_check;
 ALTER TABLE paketi_firmi ADD CONSTRAINT paketi_firmi_paket_check CHECK (paket IN ('mesecni','tromesecni','sestomesecni','godisnji','light','average','advanced','total'));
 ALTER TABLE paketi_firmi DROP CONSTRAINT IF EXISTS paketi_firmi_cena_eur_check;
