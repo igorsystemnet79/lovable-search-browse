@@ -43,6 +43,8 @@ jobs:
           node -e 'const fs=require("node:fs");const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/api-npm-audit.json","utf8"));for(const [name,item] of Object.entries(r.vulnerabilities||{})){console.log(JSON.stringify({name,severity:item.severity,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(v=>typeof v==="string"?v:{title:v.title,url:v.url,range:v.range})}));}if(Object.values(r.vulnerabilities||{}).some(v=>["high","critical"].includes(v.severity)))process.exit(1);'
       - name: Validate standalone Docker Compose configuration
         run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml config --quiet
+      - name: Validate Caddy reverse proxy configuration
+        run: docker run --rm -e DOMAIN=:80 -v "$PWD/standalone/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
       - name: Smoke test standalone Docker stack
         run: |
           set -euo pipefail

@@ -1,10 +1,22 @@
 {$DOMAIN:localhost} {
   encode gzip zstd
+
   @api path /api/*
-  handle @api { reverse_proxy api:4000 }
+  handle @api {
+    reverse_proxy api:4000
+  }
+
   @uploads path /uploads/*
-  handle @uploads { reverse_proxy api:4000 }
+  handle @uploads {
+    reverse_proxy api:4000
+  }
+
   @seo path /sitemap.xml /robots.txt
-  handle @seo { reverse_proxy api:4000 }
-  handle { reverse_proxy web:3000 }
+  handle @seo {
+    reverse_proxy api:4000
+  }
+
+  handle {
+    reverse_proxy web:3000
+  }
 }
