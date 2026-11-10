@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { useAuth } from "@/hooks/use-auth";
 import { ponudimi } from "@/integrations/standalone/client";
 import { pracenjaQuery } from "@/lib/my-listings";
@@ -10,15 +11,28 @@ export function FollowButton({ ponuda, zahtev }: { ponuda?: Ponuda; zahtev?: Zah
   const qc = useQueryClient();
   const [busy, setBusy] = useState(false);
   const q = useQuery({ ...pracenjaQuery(user?.id ?? ""), enabled: !!user });
-  if (!user) return null;
 
   const isOffer = !!ponuda;
   const item = ponuda ?? zahtev;
   if (!item) return null;
-  const f = q.data?.find((x) => isOffer ? x.ponuda_id === item.id : x.zahtev_id === item.id);
+
+  if (!user) {
+    return (
+      <Link
+        to="/prijava"
+        className="mt-2 inline-flex w-fit text-xs font-semibold text-brand hover:underline"
+      >
+        ☆ Prijavi se da pratiš oglas
+      </Link>
+    );
+  }
+
+  const f = q.data?.find((x) =>
+    isOffer ? x.ponuda_id === item.id : x.zahtev_id === item.id,
+  );
 
   async function toggle() {
-    if (!user || busy || q.isLoading) return;
+    if (!user || busy || q.isLoading || q.isError) return;
     setBusy(true);
     try {
       if (f) {
@@ -34,15 +48,36 @@ export function FollowButton({ ponuda, zahtev }: { ponuda?: Ponuda; zahtev?: Zah
       await qc.invalidateQueries({ queryKey: ["pracenja", user.id] });
     } catch (error) {
       console.error("Promena praćenja oglasa nije uspela:", error);
-      alert(f ? "Praćenje nije moglo da se ukloni. Pokušaj ponovo." : "Oglas nije mogao da se doda u praćenje. Možda ga već pratiš. Osveži stranicu i pokušaj ponovo.");
+      alert(
+        f
+          ? "Praćenje nije moglo da se ukloni. Pokušaj ponovo."
+          : "Oglas nije mogao da se doda u praćenje. Možda ga već pratiš. Osveži stranicu i pokušaj ponovo.",
+      );
     } finally {
       setBusy(false);
     }
   }
 
   return (
-    <button type="button" onClick={toggle} disabled={busy || q.isLoading} aria-pressed={!!f} className="mt-2 text-xs font-semibold text-brand hover:underline disabled:cursor-wait disabled:opacity-60">
-      {busy ? "Čuvanje..." : f ? (isOffer ? "✓ Pratiš ponudu (prestani)" : "✓ Pratiš zahtev (prestani)") : (isOffer ? "☆ Prati ponudu" : "☆ Prati zahtev")}
-    </button>
+    <div className="mt-2 flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={toggle}
+        disabled={busy || q.isLoading || q.isError}
+        aria-pressed={!!f}
+        className="text-xs font-semibold text-brand hover:underline disabled:cursor-wait disabled:opacity-60"
+      >
+        {busy
+          ? "Čuvanje..."
+          : f
+            ? "🔕 Ne prati više oglas"
+            : "🔔 Prati oglas"}
+      </button>
+      {q.isError && (
+        <span role="status" className="text-xs text-destructive">
+          Praćenje trenutno nije dostupno. Pokušaj ponovo.
+        </span>
+      )}
+    </div>
   );
 }
