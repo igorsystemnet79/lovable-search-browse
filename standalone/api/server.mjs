@@ -120,6 +120,22 @@ app.post('/api/admin/categories',auth,admin,asyncRoute(async(req,res)=>{
  if(exists.rowCount)return res.status(409).json({error:'Grupa sa tim nazivom već postoji.'});
  const r=await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,ARRAY[]::text[]) RETURNING slug,naziv,slika,podkategorije',[slug,naziv,DEFAULT_CATEGORY_IMAGE]);res.status(201).json({data:r.rows[0]});
 }));
+app.delete('/api/admin/categories/:slug',auth,admin,asyncRoute(async(req,res)=>{
+ const slug=String(req.params.slug||'').trim(),found=await pool.query('SELECT slug,naziv FROM platform_categories WHERE slug=$1',[slug]);
+ if(!found.rows[0])return res.status(404).json({error:'Grupa nije pronađena ili je već obrisana.'});
+ const naziv=found.rows[0].naziv;
+ const used=await pool.query("SELECT EXISTS(SELECT 1 FROM ponude WHERE lower(kategorija)=lower($1)) OR EXISTS(SELECT 1 FROM zahtevi WHERE lower(kategorija)=lower($1)) AS used",[naziv]);
+ if(used.rows[0]?.used)return res.status(409).json({error:'Grupa se ne može obrisati jer postoje aktivni ili raniji oglasi/zahtevi u toj kategoriji. Prvo premesti te oglase i zahteve u drugu grupu.'});
+ await pool.query('DELETE FROM platform_categories WHERE slug=$1',[slug]);
+ res.json({ok:true,message:'Grupa je obrisana.'});
+}));
+app.delete('/api/admin/categories/:slug/subcategories/:name',auth,admin,asyncRoute(async(req,res)=>{
+ const slug=String(req.params.slug||'').trim(),name=String(req.params.name||'').trim();
+ if(!name)return res.status(400).json({error:'Nije navedena podgrupa za brisanje.'});
+ const result=await pool.query("UPDATE platform_categories SET podkategorije=array_remove(podkategorije,$2),podkategorije_slike=COALESCE(podkategorije_slike,'{}'::jsonb)-$2,updated_at=now() WHERE slug=$1 AND $2=ANY(podkategorije) RETURNING slug,naziv,podkategorije",[slug,name]);
+ if(!result.rows[0])return res.status(404).json({error:'Podgrupa nije pronađena ili je već obrisana.'});
+ res.json({data:result.rows[0],message:'Podgrupa je obrisana.'});
+}));
 app.post('/api/admin/categories/:slug/subcategories',auth,admin,asyncRoute(async(req,res)=>{
  const slug=String(req.params.slug||'').trim(),naziv=String(req.body?.naziv||'').trim().replace(/\s+/g,' ').slice(0,80);
  if(naziv.length<2)return res.status(400).json({error:'Unesi naziv podgrupe od najmanje 2 karaktera.'});
