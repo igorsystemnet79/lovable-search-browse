@@ -314,6 +314,9 @@ export async function izmeniArtikalKataloga(id:string,item:any) {
 export async function obrisiArtikalKataloga(id:string) {
   return api("/api/business/catalog/products/"+encodeURIComponent(id),{method:"DELETE"});
 }
+export async function obrisiCeoKatalog() {
+  return api("/api/business/catalog",{method:"DELETE"});
+}
 export async function uveziCSVKataloga(csv:string) {
   return api("/api/business/catalog/import-csv",{method:"POST",body:JSON.stringify({csv})});
 }
