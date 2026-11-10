@@ -38,7 +38,8 @@ async function ensureApiReady(): Promise<void> {
 
   apiReadyPromise = (async () => {
     let lastError: unknown;
-    const maxAttempts = 9;
+    // Free Render cold starts can take well over a minute; allow a full recovery window.
+    const maxAttempts = 15;
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
       try {
         const apiOrigin = typeof window === "undefined"
