@@ -300,3 +300,24 @@ export async function podesiRezimOdrzavanja(enabled: boolean, message?: string) 
 export async function ucitajJavnePaketeFirmi() {
   return api("/api/business-packages?refresh=" + Date.now());
 }
+
+export async function ucitajPoslovniKatalog() { return api("/api/business/catalog/summary"); }
+export async function ucitajArtikleKataloga(q="",limit=100,offset=0) {
+  return api("/api/business/catalog/products?q="+encodeURIComponent(q)+"&limit="+limit+"&offset="+offset);
+}
+export async function sacuvajArtikalKataloga(item:any) {
+  return api("/api/business/catalog/products",{method:"POST",body:JSON.stringify(item)});
+}
+export async function izmeniArtikalKataloga(id:string,item:any) {
+  return api("/api/business/catalog/products/"+encodeURIComponent(id),{method:"PATCH",body:JSON.stringify(item)});
+}
+export async function obrisiArtikalKataloga(id:string) {
+  return api("/api/business/catalog/products/"+encodeURIComponent(id),{method:"DELETE"});
+}
+export async function uveziCSVKataloga(csv:string) {
+  return api("/api/business/catalog/import-csv",{method:"POST",body:JSON.stringify({csv})});
+}
+export async function preuzmiObrazacKataloga() {
+  const result=await api("/api/business/catalog/template.csv");
+  return result;
+}
