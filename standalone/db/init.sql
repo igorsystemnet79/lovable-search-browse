@@ -87,6 +87,34 @@ ALTER TABLE pracenja DROP CONSTRAINT IF EXISTS pracenja_jedan_oglas;
 ALTER TABLE pracenja ADD CONSTRAINT pracenja_jedan_oglas CHECK ((ponuda_id IS NOT NULL)::int + (zahtev_id IS NOT NULL)::int = 1);
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_ponuda_unique ON pracenja(user_id,ponuda_id) WHERE ponuda_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS pracenja_user_zahtev_unique ON pracenja(user_id,zahtev_id) WHERE zahtev_id IS NOT NULL;
+-- Sačuvane pretrage i obaveštenja o novim odgovarajućim ponudama/potražnjama.
+CREATE TABLE IF NOT EXISTS saved_search_alerts (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ query_text text NOT NULL DEFAULT '',
+ category text,
+ target_type text NOT NULL DEFAULT 'ponude' CHECK (target_type IN ('ponude','zahtevi','oba')),
+ active boolean NOT NULL DEFAULT true,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ updated_at timestamptz NOT NULL DEFAULT now(),
+ CHECK (length(query_text) >= 2 OR NULLIF(BTRIM(category),'') IS NOT NULL)
+);
+CREATE INDEX IF NOT EXISTS saved_search_alerts_active_idx ON saved_search_alerts(active,target_type);
+CREATE INDEX IF NOT EXISTS saved_search_alerts_user_idx ON saved_search_alerts(user_id,created_at DESC);
+CREATE TABLE IF NOT EXISTS user_notifications (
+ id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+ user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+ listing_type text NOT NULL CHECK (listing_type IN ('ponude','zahtevi')),
+ listing_id uuid NOT NULL,
+ title text NOT NULL,
+ message text NOT NULL,
+ created_at timestamptz NOT NULL DEFAULT now(),
+ read_at timestamptz,
+ UNIQUE(user_id,listing_type,listing_id)
+);
+CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS user_notifications_unread_idx ON user_notifications(user_id,read_at) WHERE read_at IS NULL;
+
 CREATE TABLE IF NOT EXISTS moderator_proposals (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  tabela text NOT NULL CHECK (tabela IN ('ponude','zahtevi')),
