@@ -62,6 +62,7 @@ function csvRows(input) {
  return rows;
 }
 const clean = (v,max=2000)=>String(v??'').trim().slice(0,max);
+const normalizeProduct = row => row ? ({ ...row, kolicina: row.kolicina == null ? null : Number(row.kolicina), cena: row.cena == null ? null : Number(row.cena) }) : row;
 const numeric = (v)=>{
  if(v===null||v===undefined||String(v).trim()==='')return null;
  const raw=String(v).trim().replace(/\s/g,'');
@@ -121,7 +122,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    AND ($2='' OR unaccent(lower(concat_ws(' ',p.sifra,p.naziv,p.opis,p.kategorija))) LIKE '%'||unaccent(lower($2))||'%')
    AND ($3='' OR lower(p.kategorija)=lower($3))
    ORDER BY p.updated_at DESC LIMIT $4 OFFSET $5`,[req.user.sub,q,cat,limit,offset]);
-  res.json({data:r.rows});
+  res.json({data:r.rows.map(normalizeProduct)});
  }));
  app.post('/api/business/catalog/products',auth,wrapped(async(req,res,{limit})=>{
   const b=req.body||{},sku=clean(b.sifra,100),name=clean(b.naziv,200),category=clean(b.kategorija,120);
@@ -137,7 +138,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    cena=EXCLUDED.cena,valuta=EXCLUDED.valuta,kolicina=EXCLUDED.kolicina,proizvodjac=EXCLUDED.proizvodjac,
    jedinica_mere=EXCLUDED.jedinica_mere,aktivan=EXCLUDED.aktivan,updated_at=now() RETURNING *`,
    [req.user.sub,sku,name,clean(b.opis),category,price,clean(b.valuta,3)||'RSD',stock,clean(b.proizvodjac,160)||null,clean(b.jedinica_mere,30)||null,b.aktivan!==false]);
-  res.status(exists.rowCount?200:201).json({data:r.rows[0]});
+  res.status(exists.rowCount?200:201).json({data:normalizeProduct(r.rows[0])});
  }));
  app.patch('/api/business/catalog/products/:id',auth,wrapped(async(req,res)=>{
   const fields={naziv:'naziv',opis:'opis',kategorija:'kategorija',cena:'cena',valuta:'valuta',kolicina:'kolicina',proizvodjac:'proizvodjac',jedinica_mere:'jedinica_mere',aktivan:'aktivan'};
@@ -148,7 +149,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   const sets=keys.map((k,i)=>`${fields[k]}=$${i+1}`).join(',');
   const r=await pool.query(`UPDATE business_catalog_products SET ${sets},updated_at=now() WHERE id=$${keys.length+1} AND user_id=$${keys.length+2} RETURNING *`,[...values,req.params.id,req.user.sub]);
   if(!r.rowCount)return res.status(404).json({error:'Artikal nije pronađen.'});
-  res.json({data:r.rows[0]});
+  res.json({data:normalizeProduct(r.rows[0])});
  }));
  app.delete('/api/business/catalog/products/:id',auth,wrapped(async(req,res)=>{
   const r=await pool.query('DELETE FROM business_catalog_products WHERE id=$1 AND user_id=$2 RETURNING id',[req.params.id,req.user.sub]);
@@ -224,7 +225,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   const products=await pool.query(`SELECT p.*,COALESCE((SELECT json_agg(i ORDER BY i.pozicija) FROM
    (SELECT id,storage_path,pozicija FROM business_catalog_product_images WHERE product_id=p.id) i),'[]') slike
    FROM business_catalog_products p WHERE p.user_id=$1 AND p.aktivan ORDER BY p.naziv LIMIT 500`,[req.params.userId]);
-  res.json({company:company.rows[0],data:products.rows});
+  res.json({company:company.rows[0],data:products.rows.map(normalizeProduct)});
  }));
  app.get('/api/catalog/search',auth,asyncRoute(async(req,res)=>{
   const q=clean(req.query.q,120),category=clean(req.query.kategorija,120),place=clean(req.query.mesto,100),currency=clean(req.query.valuta,3);
@@ -246,7 +247,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
    AND ($2='' OR lower(p.kategorija)=lower($2)) AND ($3='' OR lower(coalesce(pr.grad,'')) LIKE '%'||lower($3)||'%')
    AND (NULLIF($4::text,'') IS NULL OR p.cena >= NULLIF($4::text,'')::numeric) AND (NULLIF($5::text,'') IS NULL OR p.cena <= NULLIF($5::text,'')::numeric) AND ($6='' OR p.valuta=$6)
    ORDER BY ${order} LIMIT 100`,[q,category,place,min,max,currency]);
-  res.json({data:r.rows});
+  res.json({data:r.rows.map(normalizeProduct)});
  }));
  app.get('/api/business/catalog/template.csv',auth,wrapped(async(_req,res)=>{
   res.type('text/csv; charset=utf-8').set('Content-Disposition','attachment; filename="ponudimi-katalog-obrazac.csv"')
