@@ -452,7 +452,8 @@ app.post('/api/listings/:type/:id/view',optionalAuth,asyncRoute(async(req,res)=>
  await ensureListingViewTable();
  const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].trim();
  const ua=String(req.headers['user-agent']||'').slice(0,300);
- const viewerKey=createHash('sha256').update(req.user?.sub ? 'user:'+req.user.sub : 'guest:'+ip+'|'+ua).digest('hex');
+ const day=new Date().toISOString().slice(0,10);
+ const viewerKey=createHash('sha256').update((req.user?.sub ? 'user:'+req.user.sub : 'guest:'+ip+'|'+ua)+'|'+day).digest('hex');
  const inserted=await pool.query(`INSERT INTO listing_view_events(listing_type,listing_id,viewer_key)
   VALUES($1,$2,$3) ON CONFLICT(listing_type,listing_id,viewer_key) DO UPDATE SET viewed_at=CASE
    WHEN listing_view_events.viewed_at < now()-interval '24 hours' THEN now()
