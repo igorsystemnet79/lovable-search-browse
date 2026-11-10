@@ -26,53 +26,27 @@ function PoslovniKatalogPage() {
   const [form,setForm]=useState({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});
   const [editingId,setEditingId]=useState<string|null>(null);
 
-  // On mobile, return the catalog to the device width after a two-finger pinch.
-  // This does not disable zoom: the user can still enlarge the page while touching it.
+  // Keep this page at device width on touch devices. Prevent pinch zoom only
+  // inside the catalog page; normal scrolling and all other routes remain unchanged.
   useEffect(() => {
-    let pinchInProgress = false;
-    let resetTimer: number | undefined;
-    let restoreTimer: number | undefined;
+    const page = document.querySelector<HTMLElement>(".catalog-page-zoom-locked");
+    if (!page) return;
 
-    const resetPinchZoom = () => {
-      if (!pinchInProgress) return;
-      pinchInProgress = false;
-      window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(() => {
-        const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-        const visualViewport = window.visualViewport;
-        if (!viewport || !visualViewport || visualViewport.scale <= 1.01) return;
-
-        const originalContent = viewport.content || "width=device-width, initial-scale=1";
-        viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-        window.requestAnimationFrame(() => {
-          restoreTimer = window.setTimeout(() => {
-            viewport.content = originalContent;
-          }, 80);
-        });
-      }, 120);
+    const preventPinchMove = (event: TouchEvent) => {
+      if (event.touches.length > 1 && event.cancelable) event.preventDefault();
+    };
+    const preventSafariGesture = (event: Event) => {
+      if (event.cancelable) event.preventDefault();
     };
 
-    const onTouchStart = (event: TouchEvent) => {
-      if (event.touches.length > 1) {
-        pinchInProgress = true;
-        window.clearTimeout(resetTimer);
-      }
-    };
-    const onTouchEnd = (event: TouchEvent) => {
-      if (pinchInProgress && event.touches.length < 2) resetPinchZoom();
-    };
-    const onTouchCancel = () => resetPinchZoom();
-
-    document.addEventListener("touchstart", onTouchStart, { passive: true });
-    document.addEventListener("touchend", onTouchEnd, { passive: true });
-    document.addEventListener("touchcancel", onTouchCancel, { passive: true });
+    page.addEventListener("touchmove", preventPinchMove, { passive: false });
+    page.addEventListener("gesturestart", preventSafariGesture, { passive: false });
+    page.addEventListener("gesturechange", preventSafariGesture, { passive: false });
 
     return () => {
-      window.clearTimeout(resetTimer);
-      window.clearTimeout(restoreTimer);
-      document.removeEventListener("touchstart", onTouchStart);
-      document.removeEventListener("touchend", onTouchEnd);
-      document.removeEventListener("touchcancel", onTouchCancel);
+      page.removeEventListener("touchmove", preventPinchMove);
+      page.removeEventListener("gesturestart", preventSafariGesture);
+      page.removeEventListener("gesturechange", preventSafariGesture);
     };
   }, []);
   const load=useCallback(async()=>{
@@ -154,7 +128,7 @@ function PoslovniKatalogPage() {
     XLSX.utils.book_append_sheet(workbook,instructions,"Uputstvo");
     XLSX.writeFile(workbook,"ponudimi-obrazac-poslovni-katalog.xlsx");
   }
-  return <div className="min-h-screen bg-background text-foreground"><SiteHeader/><main className="catalog-page mx-auto w-full max-w-full min-w-0 overflow-x-clip py-8 space-y-6">
+  return <div className="catalog-page-zoom-locked min-h-screen bg-background text-foreground"><SiteHeader/><main className="catalog-page mx-auto w-full max-w-full min-w-0 overflow-x-clip py-8 space-y-6">
     <div><Link to="/" className="text-sm text-brand hover:underline">← Početna</Link><h1 className="mt-3 text-3xl font-bold">Poslovni katalog</h1><p className="mt-2 text-sm text-muted-foreground">Upravljaj artiklima svoje firme. Katalog je odvojen od klasičnih oglasa i svaki artikal ima svoju šifru.</p></div>
     {!user?<div className="rounded-xl border p-5">Za pristup katalogu potrebno je da se <Link to="/prijava" className="text-brand underline">prijaviš</Link>.</div>:<>
       {error&&<p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
