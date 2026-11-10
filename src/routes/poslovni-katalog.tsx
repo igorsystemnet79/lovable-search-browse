@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useAuth } from "@/hooks/use-auth";
+import { API_ORIGIN, dodajSlikeArtikluKataloga } from "@/integrations/standalone/client";
 import { inputCls } from "@/components/auth-shell";
 import { ucitajPoslovniKatalog, ucitajArtikleKataloga, sacuvajArtikalKataloga, obrisiArtikalKataloga, uveziCSVKataloga } from "@/integrations/standalone/client";
 
@@ -43,6 +44,11 @@ function PoslovniKatalogPage() {
     try{const result=await uveziCSVKataloga(await csvFile.text());setMessage(`Uvoz završen: ${result.dodato} novih artikala, ${result.azurirano} ažuriranih.`);setCsvFile(null);await load();}
     catch(e:any){setError(e?.message||"Uvoz CSV fajla nije uspeo.");}finally{setBusy(false);}
   }
+  async function uploadImages(id:string,files:FileList|null){
+    if(!files?.length)return;setBusy(true);setError("");setMessage("");
+    try{await dodajSlikeArtikluKataloga(id,Array.from(files));setMessage("Fotografije artikla su sačuvane.");await load();}
+    catch(e:any){setError(e?.message||"Fotografije nisu sačuvane.");}finally{setBusy(false);}
+  }
   async function removeItem(id:string){
     if(!window.confirm("Da li sigurno želiš da obrišeš ovaj artikal?"))return;
     setBusy(true);setError("");
@@ -76,7 +82,7 @@ function PoslovniKatalogPage() {
       </section>
       <section className="space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">Artikli firme</h2><div className="flex gap-2"><input className={inputCls+" min-w-0"} placeholder="Pretraži katalog..." value={query} onChange={e=>setQuery(e.target.value)}/><button type="button" className="rounded-full border px-4 text-sm" onClick={()=>void load()}>Pretraži</button></div></div>
-        {busy&&!items.length?<p className="text-sm text-muted-foreground">Učitavanje kataloga...</p>:items.length===0?<p className="rounded-xl border p-5 text-sm text-muted-foreground">Još nema artikala u katalogu.</p>:<div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[720px] text-sm"><thead className="bg-secondary"><tr>{["Šifra","Naziv","Kategorija","Cena","Količina","Status",""].map(x=><th key={x} className="p-3 text-left">{x}</th>)}</tr></thead><tbody>{items.map(item=><tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.sifra}</td><td className="p-3">{item.naziv}</td><td className="p-3">{item.kategorija}</td><td className="p-3">{item.cena==null?"Na upit":Number(item.cena).toLocaleString("sr-RS")+" "+item.valuta}</td><td className="p-3">{item.kolicina??"—"}</td><td className="p-3">{item.aktivan?"Aktivan":"Neaktivan"}</td><td className="p-3"><button type="button" onClick={()=>void removeItem(item.id)} className="text-destructive hover:underline">Obriši</button></td></tr>)}</tbody></table></div>}
+        {busy&&!items.length?<p className="text-sm text-muted-foreground">Učitavanje kataloga...</p>:items.length===0?<p className="rounded-xl border p-5 text-sm text-muted-foreground">Još nema artikala u katalogu.</p>:<div className="overflow-x-auto rounded-2xl border"><table className="w-full min-w-[720px] text-sm"><thead className="bg-secondary"><tr>{["Šifra","Naziv","Kategorija","Cena","Količina","Status",""].map(x=><th key={x} className="p-3 text-left">{x}</th>)}</tr></thead><tbody>{items.map(item=><tr key={item.id} className="border-t"><td className="p-3 font-medium">{item.sifra}</td><td className="p-3">{item.naziv}</td><td className="p-3">{item.kategorija}</td><td className="p-3">{item.cena==null?"Na upit":Number(item.cena).toLocaleString("sr-RS")+" "+item.valuta}</td><td className="p-3">{item.kolicina??"—"}</td><td className="p-3">{item.aktivan?"Aktivan":"Neaktivan"}</td><td className="p-3"><div className="flex flex-col gap-2"><span className="text-xs text-muted-foreground">{(item.slike||[]).length} / 7 fotografija</span><input aria-label={"Dodaj fotografije za "+item.naziv} type="file" accept="image/jpeg,image/png,image/webp" multiple className="max-w-40 text-xs" onChange={e=>void uploadImages(item.id,e.target.files)}/><button type="button" onClick={()=>void removeItem(item.id)} className="text-left text-destructive hover:underline">Obriši artikal</button></div></td></tr>)}</tbody></table></div>}
       </section>
     </>}</main><SiteFooter/></div>;
 }
