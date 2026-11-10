@@ -22,7 +22,9 @@ app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(express.json({ limit: '2mb' }));
 app.use((req,_res,next)=>{const raw=String(req.headers.cookie||'');req.cookies=Object.fromEntries(raw.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}));next();});
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30 }));
+// Google OAuth ima zaseban limit, da ponovljeni pokušaji ne blokiraju običnu prijavu.
+app.use('/api/auth/google', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja Google prijave. Sačekaj nekoliko minuta i pokušaj ponovo.' } }));
+app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path.startsWith('/google') }));
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
 app.use('/api/storage', rateLimit({ windowMs: 60 * 1000, limit: 60 }));
