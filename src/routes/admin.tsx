@@ -816,7 +816,7 @@ function PaketiFirmi() {
  return <div className="space-y-5">
   <section className="rounded-2xl border border-input bg-surface p-4">
    <h2 className="font-semibold">Dodela paketa pravnom licu</h2>
-   <p className="mt-1 text-sm text-muted-foreground">Paket može dobiti samo APR-verifikovana firma. Aktivacija je moguća nakon evidentirane uplate ili kada administrator označi da je paket oslobođen plaćanja.</p>
+   <p className="mt-1 text-sm text-muted-foreground">Tokom testiranja APR verifikacija nije obavezna. Aktivacija paketa moguća je nakon evidentirane uplate ili kada administrator označi da je paket oslobođen plaćanja.</p>
    <div className="mt-3 grid gap-3 md:grid-cols-2">
     <div><label className="mb-1 block text-xs font-medium">Pretraga firme po nazivu, PIB-u ili e-mailu</label><Input className={inputCls} value={q} onChange={e=>setQ(e.target.value)} placeholder="Unesi naziv firme, PIB ili e-mail"/></div>
     <div><label className="mb-1 block text-xs font-medium">Izaberi firmu</label><select className={inputCls} value={selected} onChange={e=>setSelected(e.target.value)}><option value="">Izaberi firmu</option>{firme.map(f=><option key={f.user_id} value={f.user_id}>{f.naziv_firme||"Firma"} · PIB {f.pib||"—"} · {f.firma_verifikovana?"Verifikovana":"Nije verifikovana"}</option>)}</select></div>
