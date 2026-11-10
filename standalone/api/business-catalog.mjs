@@ -3,10 +3,6 @@ import { randomUUID } from 'node:crypto';
 const schema = `
 ALTER TABLE business_package_catalog
   ADD COLUMN IF NOT EXISTS max_artikala integer NOT NULL DEFAULT 1000;
-UPDATE business_package_catalog SET max_artikala=CASE slug
-  WHEN 'light' THEN 100 WHEN 'average' THEN 1000
-  WHEN 'advanced' THEN 10000 WHEN 'total' THEN 50000
-  ELSE max_artikala END;
 CREATE TABLE IF NOT EXISTS business_catalog_products (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
