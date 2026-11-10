@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS saved_search_alerts (
 );
 CREATE INDEX IF NOT EXISTS saved_search_alerts_active_idx ON saved_search_alerts(active,target_type);
 CREATE INDEX IF NOT EXISTS saved_search_alerts_user_idx ON saved_search_alerts(user_id,created_at DESC);
-CREATE TABLE IF NOT EXISTS user_notifications (
+CREATE TABLE IF NOT EXISTS ponudimi_smart_notifications (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  listing_type text NOT NULL CHECK (listing_type IN ('ponude','zahtevi')),
@@ -112,8 +112,8 @@ CREATE TABLE IF NOT EXISTS user_notifications (
  read_at timestamptz,
  UNIQUE(user_id,listing_type,listing_id)
 );
-CREATE INDEX IF NOT EXISTS user_notifications_user_idx ON user_notifications(user_id,created_at DESC);
-CREATE INDEX IF NOT EXISTS user_notifications_unread_idx ON user_notifications(user_id,read_at) WHERE read_at IS NULL;
+CREATE INDEX IF NOT EXISTS ponudimi_smart_notifications_user_idx ON ponudimi_smart_notifications(user_id,created_at DESC);
+CREATE INDEX IF NOT EXISTS ponudimi_smart_notifications_unread_idx ON ponudimi_smart_notifications(user_id,read_at) WHERE read_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS moderator_proposals (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
