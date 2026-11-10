@@ -101,7 +101,7 @@ function PretragaPage() {
                     <p className="mt-3 text-lg font-bold text-brand">{item.cena == null ? "Cena na upit" : `${Number(item.cena).toLocaleString("sr-RS")} ${item.valuta}`}</p>
                     {item.kolicina != null && <p className="text-xs text-muted-foreground">Dostupna količina: {item.kolicina}</p>}
                     <div className="mt-3 border-t border-border pt-3 text-sm">
-                      <p className="font-medium">{item.naziv_firme}</p>
+                      <Link to="/firma/$id" params={{id:item.user_id}} className="font-medium text-brand hover:underline">{item.naziv_firme} · Pogledaj katalog</Link>
                       {item.grad && <p className="text-xs text-muted-foreground">{item.grad}</p>}
                       {item.proizvodjac && <p className="mt-1 text-xs text-muted-foreground">Proizvođač: {item.proizvodjac}</p>}
                     </div>
