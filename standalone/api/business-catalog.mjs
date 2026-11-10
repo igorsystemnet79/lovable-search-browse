@@ -162,7 +162,7 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   const removed=await pool.query('DELETE FROM business_catalog_products WHERE user_id=$1 RETURNING id',[req.user.sub]);
   let storageErrors=0;
   for(const image of images.rows){
-   const key=String(image.storage_path).replace(/^\\/uploads\\//,'');
+   const key=String(image.storage_path).replace(/^\/uploads\//,'');
    try{await removeImage(key);}catch(error){storageErrors++;console.error('Fotografija kataloga nije očišćena iz skladišta:',error);}
   }
   res.json({ok:true,obrisano:removed.rowCount||0,storage_errors:storageErrors});
