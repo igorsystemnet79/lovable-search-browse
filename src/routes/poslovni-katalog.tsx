@@ -104,7 +104,7 @@ function PoslovniKatalogPage() {
     XLSX.utils.book_append_sheet(workbook,instructions,"Uputstvo");
     XLSX.writeFile(workbook,"ponudimi-obrazac-poslovni-katalog.xlsx");
   }
-  return <div className="min-h-screen bg-background text-foreground"><SiteHeader/><main className="container-page py-8 space-y-6">
+  return <div className="min-h-screen bg-background text-foreground"><SiteHeader/><main className="w-full max-w-none px-4 py-8 space-y-6 sm:px-6 lg:px-8">
     <div><Link to="/" className="text-sm text-brand hover:underline">← Početna</Link><h1 className="mt-3 text-3xl font-bold">Poslovni katalog</h1><p className="mt-2 text-sm text-muted-foreground">Upravljaj artiklima svoje firme. Katalog je odvojen od klasičnih oglasa i svaki artikal ima svoju šifru.</p></div>
     {!user?<div className="rounded-xl border p-5">Za pristup katalogu potrebno je da se <Link to="/prijava" className="text-brand underline">prijaviš</Link>.</div>:<>
       {error&&<p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
