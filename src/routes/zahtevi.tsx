@@ -1,5 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -35,7 +36,11 @@ export const Route = createFileRoute("/zahtevi")({
 
 function ZahteviPage() {
   const { q, lokacija, kategorija, minCena, maxCena, valuta, sort } = Route.useSearch();
-  const { data, isLoading, isError } = useQuery(pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }));
+  const { user, loading: authLoading } = useAuth();
+  const { data, isLoading, isError } = useQuery({
+    ...pretragaQuery(q, lokacija, { kategorija, minCena, maxCena, valuta, sort }),
+    enabled: !authLoading && !!user,
+  });
   const items = data?.zahtevi ?? [];
 
   return (
@@ -44,17 +49,32 @@ function ZahteviPage() {
       <main className="container-page py-10">
         <BackLink className="text-sm text-muted-foreground hover:underline">← Nazad na početnu</BackLink>
         <h1 className="mt-4 text-3xl font-bold">Svi zahtevi</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          {isLoading ? "Učitavanje..." : `Pronađeno ${items.length} zahteva.`}
-        </p>
-        <div className="mt-6">
-          <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced searchPath="/zahtevi" />
-        </div>
-        {isError && <p role="alert" className="mt-8 text-sm text-destructive">Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.</p>}
-        {!isLoading && !isError && items.length === 0 && <p className="mt-8 text-sm text-muted-foreground">Nema rezultata za izabrane kriterijume. Promeni filtere i pokušaj ponovo.</p>}
-        <ul className="mt-6 grid w-full min-w-0 grid-cols-1 gap-3">
-          {items.map((item) => <ZahtevItem key={item.id} zahtev={item} compact />)}
-        </ul>
+        {authLoading ? (
+          <p className="mt-4 text-sm text-muted-foreground">Proveravam prijavu...</p>
+        ) : !user ? (
+          <section className="mt-8 rounded-2xl border border-border bg-secondary/60 p-6 text-center">
+            <h2 className="text-lg font-semibold">Prijava je potrebna za pretragu</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Registruj se besplatno ili se prijavi da pregledaš i pretražuješ zahteve na platformi.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Link to="/registracija" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Registruj se</Link>
+              <Link to="/prijava" className="rounded-full border border-input px-5 py-2.5 text-sm font-semibold">Prijavi se</Link>
+            </div>
+          </section>
+        ) : (
+          <>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {isLoading ? "Učitavanje..." : `Pronađeno ${items.length} zahteva.`}
+            </p>
+            <div className="mt-6">
+              <SearchPanel defaultQ={q} defaultLokacija={lokacija} defaultKategorija={kategorija} defaultMinCena={minCena} defaultMaxCena={maxCena} defaultValuta={valuta} defaultSort={sort} advanced searchPath="/zahtevi" />
+            </div>
+            {isError && <p role="alert" className="mt-8 text-sm text-destructive">Trenutno ne možemo da učitamo rezultate. Pokušaj ponovo.</p>}
+            {!isLoading && !isError && items.length === 0 && <p className="mt-8 text-sm text-muted-foreground">Nema rezultata za izabrane kriterijume. Promeni filtere i pokušaj ponovo.</p>}
+            <ul className="mt-6 grid w-full min-w-0 grid-cols-1 gap-3">
+              {items.map((item) => <ZahtevItem key={item.id} zahtev={item} compact />)}
+            </ul>
+          </>
+        )}
       </main>
       <SiteFooter />
     </div>

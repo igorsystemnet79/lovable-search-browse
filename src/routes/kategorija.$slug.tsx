@@ -1,5 +1,6 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/use-auth";
 import { ponudimi } from "@/integrations/standalone/client";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -43,6 +44,7 @@ export const Route = createFileRoute("/kategorija/$slug")({
 
 function KategorijaPage() {
   const { kat } = Route.useLoaderData();
+  const { user, loading: authLoading } = useAuth();
   const { data, isLoading } = useQuery({
     queryKey: ["kategorija", kat.slug],
     queryFn: async () => {
@@ -54,6 +56,7 @@ function KategorijaPage() {
       if (z.error) throw z.error;
       return { ponude: p.data as Ponuda[], zahtevi: z.data as Zahtev[] };
     },
+    enabled: !authLoading && !!user,
   });
 
   return (
@@ -105,22 +108,35 @@ function KategorijaPage() {
           </nav>
         </section>
 
-        <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-6">
-          <article className="rounded-2xl bg-secondary/60 p-5">
-            <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
-            <ul className="mt-4 space-y-3">
-              {data?.ponude.map((p) => <PonudaItem key={p.id} ponuda={p} />)}
-            </ul>
-            {!isLoading && !data?.ponude.length && <p className="mt-4 text-sm text-muted-foreground">Trenutno nema ponuda u ovoj kategoriji.</p>}
-          </article>
-          <article className="rounded-2xl bg-secondary/60 p-5">
-            <h2 className="text-xl font-semibold">Zahtevi ({data?.zahtevi.length ?? 0})</h2>
-            <ul className="mt-4 space-y-3">
-              {data?.zahtevi.map((z) => <ZahtevItem key={z.id} zahtev={z} />)}
-            </ul>
-            {!isLoading && !data?.zahtevi.length && <p className="mt-4 text-sm text-muted-foreground">Trenutno nema zahteva u ovoj kategoriji.</p>}
-          </article>
-        </div>
+        {authLoading ? (
+          <p className="mt-8 text-sm text-muted-foreground">Proveravam prijavu...</p>
+        ) : !user ? (
+          <section className="mt-8 rounded-2xl border border-border bg-secondary/60 p-6 text-center">
+            <h2 className="text-lg font-semibold">Prijava je potrebna za pregled oglasa</h2>
+            <p className="mt-2 text-sm text-muted-foreground">Registruj se besplatno ili se prijavi da pregledaš ponude i zahteve u ovoj kategoriji.</p>
+            <div className="mt-4 flex flex-wrap justify-center gap-3">
+              <Link to="/registracija" className="rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Registruj se</Link>
+              <Link to="/prijava" className="rounded-full border border-input px-5 py-2.5 text-sm font-semibold">Prijavi se</Link>
+            </div>
+          </section>
+        ) : (
+          <div className="mt-8 grid w-full min-w-0 grid-cols-1 gap-6">
+            <article className="rounded-2xl bg-secondary/60 p-5">
+              <h2 className="text-xl font-semibold">Ponude ({data?.ponude.length ?? 0})</h2>
+              <ul className="mt-4 space-y-3">
+                {data?.ponude.map((p) => <PonudaItem key={p.id} ponuda={p} />)}
+              </ul>
+              {!isLoading && !data?.ponude.length && <p className="mt-4 text-sm text-muted-foreground">Trenutno nema ponuda u ovoj kategoriji.</p>}
+            </article>
+            <article className="rounded-2xl bg-secondary/60 p-5">
+              <h2 className="text-xl font-semibold">Zahtevi ({data?.zahtevi.length ?? 0})</h2>
+              <ul className="mt-4 space-y-3">
+                {data?.zahtevi.map((z) => <ZahtevItem key={z.id} zahtev={z} />)}
+              </ul>
+              {!isLoading && !data?.zahtevi.length && <p className="mt-4 text-sm text-muted-foreground">Trenutno nema zahteva u ovoj kategoriji.</p>}
+            </article>
+          </div>
+        )}
       </main>
       <SiteFooter />
     </div>

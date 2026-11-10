@@ -113,7 +113,7 @@ function Index() {
             <section className="mt-12 rounded-2xl border border-border bg-secondary/60 p-5 text-center">
               <h2 className="text-lg font-semibold">Pronađi ono što ti treba</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Pretražuj ponude i zahteve bez registracije. Za objavljivanje i praćenje oglasa napravi nalog.
+                Pregledaj najnovije ponude i zahteve. Za pretragu, objavljivanje i praćenje oglasa napravi nalog.
               </p>
               <Link
                 to="/registracija"

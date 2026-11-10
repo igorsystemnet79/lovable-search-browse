@@ -1,7 +1,4 @@
-import { ponudimi } from "@/integrations/standalone/client";
-
-// Administratorske rute su na zasebnom Render API servisu, ne na frontend hostu.
-const API_ORIGIN = "https://ponudimi-test-api.onrender.com";
+import { API_ORIGIN, ponudimi } from "@/integrations/standalone/client";
 
 async function adminRequest(path: string, method = "POST", body?: unknown) {
   const { data } = await ponudimi.auth.getSession();
