@@ -213,6 +213,6 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
  }));
  app.get('/api/business/catalog/template.csv',auth,wrapped(async(_req,res)=>{
   res.type('text/csv; charset=utf-8').set('Content-Disposition','attachment; filename="ponudimi-katalog-obrazac.csv"')
-   .send('sifra,naziv,opis,kategorija,cena,valuta,kolicina,proizvodjac,jedinica_mere,aktivan\nART-001,Primer proizvoda,Opis proizvoda,Tehnika,1299,RSD,25,Proizvođač,kom,da\n');
+   .send('sifra;naziv;opis;kategorija;cena;valuta;kolicina;proizvodjac;jedinica_mere;aktivan\\nART-001;Primer proizvoda;Opis proizvoda;Tehnika;1299;RSD;25;Proizvođač;kom;da\\n');
  }));
 }
