@@ -156,6 +156,17 @@ export async function registerBusinessCatalog({app,pool,auth,asyncRoute,memoryUp
   if(!r.rowCount)return res.status(404).json({error:'Artikal nije pronađen.'});
   res.json({ok:true});
  }));
+ app.delete('/api/business/catalog',auth,wrapped(async(req,res)=>{
+  const images=await pool.query(`SELECT i.storage_path FROM business_catalog_product_images i
+   JOIN business_catalog_products p ON p.id=i.product_id WHERE p.user_id=$1`,[req.user.sub]);
+  const removed=await pool.query('DELETE FROM business_catalog_products WHERE user_id=$1 RETURNING id',[req.user.sub]);
+  let storageErrors=0;
+  for(const image of images.rows){
+   const key=String(image.storage_path).replace(/^\\/uploads\\//,'');
+   try{await removeImage(key);}catch(error){storageErrors++;console.error('Fotografija kataloga nije očišćena iz skladišta:',error);}
+  }
+  res.json({ok:true,obrisano:removed.rowCount||0,storage_errors:storageErrors});
+ }));
  app.post('/api/business/catalog/products/:id/images',auth,memoryUpload.array('fotografije',7),wrapped(async(req,res)=>{
   const files=req.files||[];
   if(!files.length)return res.status(400).json({error:'Izaberi najmanje jednu fotografiju.'});
