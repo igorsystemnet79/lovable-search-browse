@@ -154,7 +154,7 @@ function MojiOglasi() {
               <h2 className="text-xl font-semibold">Moje ponude</h2>
               {q.data?.ponude.length === 0 && <p className="mt-3 text-sm text-muted-foreground">Još nemaš objavljenih oglasa.</p>}
               {q.data && q.data.ponude.length > 0 && prikazi(q.data.ponude).length === 0 && <p className="mt-3 text-sm text-muted-foreground">{pojamPretrage ? "Nema ponuda koje odgovaraju pretrazi i izabranom statusu." : "Nema ponuda u izabranom statusu."}</p>}
-              <ul className="mt-4 space-y-4">{prikazi(q.data?.ponude ?? []).map((p) => <div key={p.id}><PonudaItem ponuda={p} hideFollow />{actions("ponuda", p, p.cena)}</div>)}</ul>
+              <ul className="mt-4 space-y-4">{prikazi(q.data?.ponude ?? []).map((p) => <div key={p.id}><PonudaItem ponuda={p} />{actions("ponuda", p, p.cena)}</div>)}</ul>
             </section>
             <section className="rounded-2xl bg-secondary/60 p-5">
               <h2 className="text-xl font-semibold">Moji zahtevi</h2>
