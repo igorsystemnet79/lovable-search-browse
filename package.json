@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "start": "node .output/server/index.mjs",
-    "audit:security": "npm audit"
+    "audit:security": "npm install --package-lock-only --ignore-scripts --no-audit --no-fund && npm audit && npm --prefix standalone/api install --package-lock-only --ignore-scripts --no-audit --no-fund && npm --prefix standalone/api audit"
   },
   "overrides": {
     "rolldown": "1.2.1",

@@ -30,6 +30,12 @@ jobs:
         run: node --check standalone/api/server.mjs
       - name: Run automated tests
         run: bun test tests
+      - name: Report frontend dependency vulnerabilities
+        continue-on-error: true
+        run: |
+          npm install --package-lock-only --ignore-scripts --no-audit --no-fund
+          npm audit --json > "$RUNNER_TEMP/frontend-npm-audit.json" || true
+          node -e 'const fs=require("node:fs");const r=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+"/frontend-npm-audit.json","utf8"));for(const [name,item] of Object.entries(r.vulnerabilities||{})){console.log(JSON.stringify({name,severity:item.severity,range:item.range,fixAvailable:item.fixAvailable,via:item.via.map(v=>typeof v==="string"?v:{title:v.title,url:v.url,range:v.range})}));}'
       - name: Report standalone API dependency vulnerabilities
         continue-on-error: true
         run: |

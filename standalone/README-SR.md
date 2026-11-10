@@ -88,7 +88,7 @@ Skripta traži potvrdu pre upisa. SQL vraćanje radi u postojeću bazu i može p
 
 Paketi pravnih lica imaju cene 10 € mesečno, 20 € za tri meseca, 50 € za šest meseci i 100 € za 12 meseci. Paket može biti aktiviran samo za APR-verifikovano pravno lice nakon evidentirane uplate ili administratorskog oslobađanja. API proverava pakete na svakih šest sati i šalje e-mail podsetnik 10 dana pre isteka kada su SMTP podešavanja dostupna. SMS podsetnici nisu uključeni jer SMS provajder još nije konfigurisan.
 
-Oporavak lozinke šalje jednokratni link koji važi jedan sat. Za to moraju biti podešeni SMTP podaci. APR sinhronizacija radi samo kada dobiješ i uneseš važeći pristup APR API servisu. Google OAuth nije uključen u ovu samostalnu verziju; email i lozinka rade bez spoljnog identiteta.
+Oporavak lozinke šalje jednokratni link koji važi jedan sat. Za to moraju biti podešeni SMTP podaci. APR sinhronizacija radi samo kada dobiješ i uneseš važeći pristup APR API servisu. Google OAuth je podržan i u samostalnoj verziji. U `.env` unesi postojeći `GOOGLE_CLIENT_ID` i `GOOGLE_CLIENT_SECRET`, a `GOOGLE_REDIRECT_URI` mora potpuno da se poklapa sa URI-jem dodatim u Google Cloud Console: `https://TVOJ-DOMEN/api/auth/google/callback`. Postojeći OAuth klijent možeš da koristiš ponovo; samo dodaj produkcioni callback URL među Authorized redirect URIs. Ako je `GOOGLE_REDIRECT_URI` prazan, API ga izvodi iz `PUBLIC_APP_URL`. Novi Google korisnik se prvo preusmerava na standardnu registraciju sa unapred popunjenom email adresom, gde mora da unese obavezne podatke i potvrdi pravila i punoletstvo; postojeći registrovani korisnici mogu odmah da se prijave preko Google naloga.
 
 ## Migracija starih naloga i podataka
 
@@ -102,7 +102,7 @@ Nova instalacija ne povezuje se sa starom Supabase bazom. Ne pokreći Supabase m
 
 ## Cloudflare R2 (opciono)
 
-Za R2 napravi privatni bucket i S3 API token sa pravima čitanja i upisa samo za taj bucket. U Render API servisu postavi endpoint oblika `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, naziv bucket-a, Access Key ID, Secret Access Key i region `auto`. Tajne vrednosti unose se isključivo u Render Environment, ne u GitHub. Bez kompletne konfiguracije API koristi lokalni disk. R2 i dalje zahteva praćenje besplatnih kvota i eventualnih troškova ako se one prekorače.
+Za R2 napravi privatni bucket i S3 API token sa pravima čitanja i upisa samo za taj bucket. U Render API servisu postavi endpoint oblika `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, naziv bucket-a, Access Key ID, Secret Access Key i region `auto`. Tajne vrednosti unose se isključivo u Environment podešavanja servera, ne u GitHub. Bez kompletne S3 konfiguracije API koristi PostgreSQL bazu; lokalni disk se uključuje samo promenljivom `IMAGE_STORAGE_MODE=filesystem` uz trajni `UPLOAD_DIR`. R2 i dalje zahteva praćenje besplatnih kvota i eventualnih troškova ako se one prekorače.
 
 ## Status provere
 

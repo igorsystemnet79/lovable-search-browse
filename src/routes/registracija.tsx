@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
 import { ispravanPib } from "@/lib/pib";
@@ -40,6 +40,7 @@ function Registracija() {
   const [statusTrgovca, setStatusTrgovca] = useState<"trgovac" | "nije_trgovac" | "">("");
   const [f, setF] = useState({ ime: "", prezime: "", korisnicko_ime: "", telefon: "", grad: "", adresa: "", email: "", lozinka: "", naziv_firme: "", pib: "" });
   const [greska, setGreska] = useState("");
+  const [googleNotice, setGoogleNotice] = useState("");
   const [uspeh, setUspeh] = useState(false);
   const [busy, setBusy] = useState(false);
   const [prikaziLozinku, setPrikaziLozinku] = useState(false);
@@ -47,6 +48,14 @@ function Registracija() {
   const [potvrdioPunoletstvo, setPotvrdioPunoletstvo] = useState(false);
   const [upoznatSaPrivatnoscu, setUpoznatSaPrivatnoscu] = useState(false);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const googleEmail = params.get("google_email");
+    if (!googleEmail) return;
+    setF(current => ({ ...current, email: googleEmail.trim().toLowerCase() }));
+    setGoogleNotice("Google nalog je potvrđen. Dopuni podatke i prihvati pravila i potvrdu punoletstva da bi otvorio PonudiMi nalog.");
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -118,6 +127,7 @@ function Registracija() {
   return (
     <AuthShell title="Registracija" subtitle="Napravi besplatan nalog za par sekundi.">
       <div className="mb-4 flex rounded-full border border-input p-1">{tab("fizicko", "Fizičko lice")}{tab("pravno", "Pravno lice")}</div>
+      {googleNotice && <p role="status" className="mb-3 rounded-xl border border-input bg-secondary/60 p-3 text-sm">{googleNotice}</p>}
       <form onSubmit={onSubmit} className="space-y-3">
         {tip === "pravno" && (
           <>

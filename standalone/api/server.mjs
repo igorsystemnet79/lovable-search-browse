@@ -117,21 +117,21 @@ app.post('/api/admin/platform-rules/restore',auth,admin,asyncRoute(async(req,res
 app.get('/sitemap.xml', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); const routes=['/','/ponude','/zahtevi','/podrska','/registracija','/prijava','/kriterijumi-rangiranja']; const xml='<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'+routes.map(route=>`<url><loc>${base}${route}</loc></url>`).join('')+'</urlset>'; res.type('application/xml').send(xml); });
 app.get('/robots.txt', (_req,res)=>{ const base=String(process.env.PUBLIC_APP_URL||'http://localhost').replace(/\/$/,''); res.type('text/plain').send(`User-agent: *\nAllow: /\nDisallow: /admin\nSitemap: ${base}/sitemap.xml\n`); });
 
-const googleRedirectUri = () => String(process.env.GOOGLE_REDIRECT_URI || 'https://ponudimi-test-api.onrender.com/api/auth/google/callback').trim();
+const googleRedirectUri = () => { const configured=String(process.env.GOOGLE_REDIRECT_URI||'').trim(); return configured || googleFrontendUrl()+'/api/auth/google/callback'; };
 const googleFrontendUrl = () => String(process.env.PUBLIC_APP_URL || 'https://ponudimi-novo.onrender.com').trim().replace(/\/+$/,'');
 app.get('/api/auth/google', (req,res) => {
  const clientId=String(process.env.GOOGLE_CLIENT_ID||'').trim();
  const secret=String(process.env.GOOGLE_CLIENT_SECRET||'').trim();
  if(!clientId || !secret) return res.status(503).json({error:'Google prijava nije podešena na API servisu.'});
  const state=randomBytes(32).toString('hex');
- res.cookie('ponudimi_google_state',state,{httpOnly:true,secure:true,sameSite:'lax',maxAge:10*60*1000,path:'/api/auth/google'});
+ res.cookie('ponudimi_google_state',state,{httpOnly:true,secure:googleFrontendUrl().startsWith('https://'),sameSite:'lax',maxAge:10*60*1000,path:'/api/auth/google'});
  const params=new URLSearchParams({client_id:clientId,redirect_uri:googleRedirectUri(),response_type:'code',scope:'openid email profile',state,prompt:'select_account'});
  res.redirect(302,'https://accounts.google.com/o/oauth2/v2/auth?'+params.toString());
 });
 app.get('/api/auth/google/callback',asyncRoute(async(req,res)=>{
  const expected=String(req.cookies?.ponudimi_google_state||'');
  const received=String(req.query?.state||'');
- res.clearCookie('ponudimi_google_state',{httpOnly:true,secure:true,sameSite:'lax',path:'/api/auth/google'});
+ res.clearCookie('ponudimi_google_state',{httpOnly:true,secure:googleFrontendUrl().startsWith('https://'),sameSite:'lax',path:'/api/auth/google'});
  const fail=(message)=>res.redirect(302,googleFrontendUrl()+'/prijava?google_error='+encodeURIComponent(message));
  if(!expected || !received || expected.length!==received.length || !timingSafeEqual(Buffer.from(expected),Buffer.from(received))) return fail('Google prijava nije potvrđena. Pokušaj ponovo.');
  const code=String(req.query?.code||'');
@@ -152,16 +152,8 @@ app.get('/api/auth/google/callback',asyncRoute(async(req,res)=>{
   let found=await c.query('SELECT * FROM users WHERE email=$1 FOR UPDATE',[email]);
   let user=found.rows[0];
   if(!user){
-   const displayName=String(googleUser.name||'').trim();
-   const parts=displayName.split(/\s+/).filter(Boolean);
-   const base=String(email.split('@')[0]||'korisnik').toLowerCase().replace(/[^a-z0-9._-]/g,'').slice(0,20)||'korisnik';
-   const username=base+'_'+randomBytes(3).toString('hex');
-   const metadata={ime:String(googleUser.given_name||parts[0]||'').slice(0,60),prezime:String(googleUser.family_name||parts.slice(1).join(' ')||'').slice(0,60),google_sub:String(googleUser.sub||''),provider:'google'};
-   const randomPassword=randomBytes(48).toString('base64url');
-   const inserted=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,now(),$3) RETURNING *',[email,await bcrypt.hash(randomPassword,12),JSON.stringify(metadata)]);
-   user=inserted.rows[0];
-   await c.query('INSERT INTO profiles(id,ime,prezime,korisnicko_ime,tip_lica,email) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(id) DO NOTHING',[user.id,metadata.ime||null,metadata.prezime||null,username,'fizicko',email]);
-   await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user') ON CONFLICT(user_id,role) DO NOTHING",[user.id]);
+   await c.query('ROLLBACK');
+   return res.redirect(302,googleFrontendUrl()+'/registracija?google_email='+encodeURIComponent(email));
   }else{
    await c.query("UPDATE users SET email_confirmed_at=COALESCE(email_confirmed_at,now()),metadata=COALESCE(metadata,'{}'::jsonb) || $2::jsonb WHERE id=$1",[user.id,JSON.stringify({google_sub:String(googleUser.sub||''),provider:'google'})]);
    await c.query('INSERT INTO profiles(id,email) VALUES($1,$2) ON CONFLICT(id) DO UPDATE SET email=COALESCE(profiles.email,EXCLUDED.email)',[user.id,email]);
