@@ -432,6 +432,48 @@ app.delete('/api/alert-searches/:id',auth,asyncRoute(async(req,res)=>{
  if(!r.rowCount)return res.status(404).json({error:'Sačuvani kriterijum nije pronađen.'});
  res.json({ok:true});
 }));
+// Statistika pregleda oglasa i zahteva. Čuvamo samo heš posetioca, nikada sirovu IP adresu.
+const ensureListingViewTable = async () => {
+ await pool.query(`CREATE TABLE IF NOT EXISTS listing_view_events (
+  listing_type text NOT NULL CHECK (listing_type IN ('ponude','zahtevi')),
+  listing_id uuid NOT NULL,
+  viewer_key text NOT NULL,
+  viewed_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (listing_type, listing_id, viewer_key)
+ )`);
+ await pool.query('CREATE INDEX IF NOT EXISTS listing_view_events_listing_date_idx ON listing_view_events(listing_type,listing_id,viewed_at DESC)');
+};
+app.post('/api/listings/:type/:id/view',optionalAuth,asyncRoute(async(req,res)=>{
+ const type=String(req.params.type||''),id=String(req.params.id||'');
+ if(!['ponude','zahtevi'].includes(type)||! /^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:'Oglas nije ispravan.'});
+ const found=await pool.query(`SELECT id,user_id FROM ${type} WHERE id=$1`,[id]);
+ if(!found.rows[0])return res.status(404).json({error:'Oglas nije pronađen.'});
+ if(req.user?.sub && found.rows[0].user_id===req.user.sub)return res.json({counted:false});
+ await ensureListingViewTable();
+ const ip=String(req.headers['x-forwarded-for']||req.socket.remoteAddress||'').split(',')[0].trim();
+ const ua=String(req.headers['user-agent']||'').slice(0,300);
+ const viewerKey=createHash('sha256').update(req.user?.sub ? 'user:'+req.user.sub : 'guest:'+ip+'|'+ua).digest('hex');
+ const inserted=await pool.query(`INSERT INTO listing_view_events(listing_type,listing_id,viewer_key)
+  VALUES($1,$2,$3) ON CONFLICT(listing_type,listing_id,viewer_key) DO UPDATE SET viewed_at=CASE
+   WHEN listing_view_events.viewed_at < now()-interval '24 hours' THEN now()
+   ELSE listing_view_events.viewed_at END
+  RETURNING (xmax=0) AS first_view`,[type,id,viewerKey]);
+ // Poseta se broji jednom po posetiocu u periodu od 24 sata.
+ const stats=await pool.query('SELECT count(*)::int AS total FROM listing_view_events WHERE listing_type=$1 AND listing_id=$2',[type,id]);
+ res.set('Cache-Control','no-store');res.json({counted:Boolean(inserted.rows[0]?.first_view),total:stats.rows[0].total});
+}));
+app.get('/api/listings/:type/:id/stats',auth,asyncRoute(async(req,res)=>{
+ const type=String(req.params.type||''),id=String(req.params.id||'');
+ if(!['ponude','zahtevi'].includes(type)||! /^[0-9a-f-]{36}$/i.test(id))return res.status(400).json({error:'Oglas nije ispravan.'});
+ const found=await pool.query(`SELECT id FROM ${type} WHERE id=$1 AND user_id=$2`,[id,req.user.sub]);
+ if(!found.rowCount)return res.status(404).json({error:'Statistika je dostupna samo vlasniku oglasa.'});
+ await ensureListingViewTable();
+ const stats=await pool.query(`SELECT count(*)::int AS ukupno,
+  count(*) FILTER(WHERE viewed_at>=date_trunc('day',now()))::int AS danas,
+  count(*) FILTER(WHERE viewed_at>=now()-interval '7 days')::int AS poslednjih_7_dana
+  FROM listing_view_events WHERE listing_type=$1 AND listing_id=$2`,[type,id]);
+ res.set('Cache-Control','private, no-store');res.json(stats.rows[0]);
+}));
 app.get('/api/notifications',auth,asyncRoute(async(req,res)=>{
  const r=await pool.query(`SELECT n.id,n.listing_type,n.listing_id,n.title,n.message,n.created_at,n.read_at,
   CASE WHEN n.listing_type='ponude' THEN 'ponuda' ELSE 'zahtev' END AS listing_kind
