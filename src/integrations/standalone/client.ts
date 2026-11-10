@@ -321,3 +321,8 @@ export async function preuzmiObrazacKataloga() {
   const result=await api("/api/business/catalog/template.csv");
   return result;
 }
+
+export async function pretraziArtikleKataloga(args:{q:string;kategorija?:string;mesto?:string;minCena?:string;maxCena?:string;valuta?:string;sort?:string}) {
+  const query=new URLSearchParams({q:args.q||"",kategorija:args.kategorija||"",mesto:args.mesto||"",minCena:args.minCena||"",maxCena:args.maxCena||"",valuta:args.valuta||"",sort:args.sort||"najnovije"});
+  return api("/api/catalog/search?"+query.toString());
+}
