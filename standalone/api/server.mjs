@@ -201,9 +201,28 @@ function validCategoryImageUrl(raw) {
  return parsed.href;
 }
 async function saveCategoryImage(req, slug, subcategory = null) {
- const category = await pool.query('SELECT slug,podkategorije FROM platform_categories WHERE slug=$1',[slug]);
- if (!category.rows[0]) return { status:404, error:'Grupa nije pronađena.' };
- if (subcategory !== null && !(category.rows[0].podkategorije || []).includes(subcategory)) return { status:404, error:'Podgrupa nije pronađena u izabranoj grupi.' };
+ const naziv=String(req.body?.naziv||'').trim().replace(/\\s+/g,' ').slice(0,80);
+ let suppliedSubs=req.body?.podkategorije||[];
+ if(typeof suppliedSubs==='string'){try{suppliedSubs=JSON.parse(suppliedSubs);}catch{suppliedSubs=[];}}
+ if(!Array.isArray(suppliedSubs))suppliedSubs=[];
+ suppliedSubs=[...new Set(suppliedSubs.map(value=>String(value||'').trim()).filter(value=>value.length>=2&&value.length<=80))];
+ const category = await pool.query('SELECT slug,naziv,podkategorije FROM platform_categories WHERE slug=$1',[slug]);
+ // Podrazumevane grupe postoje i u aplikaciji, ali nisu sve nužno inicijalno upisane u bazu.
+ // Prilikom prve promene slike kreiramo njihov zapis sa nazivom i poznatim podgrupama iz UI-ja.
+ if(!category.rows[0]){
+  if(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug)||naziv.length<2)return {status:404,error:'Grupa nije pronađena. Osveži stranicu i pokušaj ponovo.'};
+  await pool.query('INSERT INTO platform_categories(slug,naziv,slika,podkategorije) VALUES($1,$2,$3,$4::text[]) ON CONFLICT(slug) DO NOTHING',[slug,naziv,'',suppliedSubs]);
+ }
+ let current=await pool.query('SELECT slug,naziv,podkategorije FROM platform_categories WHERE slug=$1',[slug]);
+ if(!current.rows[0])return {status:404,error:'Grupa nije pronađena.'};
+ if(naziv && current.rows[0].naziv!==naziv)await pool.query('UPDATE platform_categories SET naziv=$2,updated_at=now() WHERE slug=$1',[slug,naziv]);
+ if(suppliedSubs.length){
+  await pool.query('UPDATE platform_categories SET podkategorije=ARRAY(SELECT DISTINCT value FROM unnest(COALESCE(podkategorije,ARRAY[]::text[])||$2::text[]) AS value),updated_at=now() WHERE slug=$1',[slug,suppliedSubs]);
+ }
+ if (subcategory !== null) {
+  const check=await pool.query('SELECT 1 FROM platform_categories WHERE slug=$1 AND $2=ANY(podkategorije)',[slug,subcategory]);
+  if(!check.rowCount)return {status:404,error:'Podgrupa nije pronađena u izabranoj grupi. Osveži stranicu i pokušaj ponovo.'};
+ }
  let imageUrl = '';
  if (req.file) {
   const normalized = await normalizeImage(req.file.buffer);
