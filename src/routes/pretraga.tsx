@@ -8,6 +8,7 @@ import { BackLink } from "@/components/back-link";
 import { SearchPanel } from "@/components/search-panel";
 import { PonudaItem, ZahtevItem } from "@/components/listing-items";
 import { pretragaQuery } from "@/lib/listings";
+import { API_ORIGIN } from "@/integrations/standalone/client";
 
 type PretragaSearch = { q: string; lokacija: string; kategorija: string; minCena: string; maxCena: string; valuta: string; sort: string };
 
@@ -94,6 +95,7 @@ function PretragaPage() {
                 {data?.artikliKataloga.map((item) => (
                   <article key={item.id} className="rounded-2xl border border-border bg-surface p-4 shadow-card">
                     <p className="text-xs font-medium text-muted-foreground">{item.kategorija} · Šifra: {item.sifra}</p>
+                    {item.slike?.[0]?.storage_path && <img src={API_ORIGIN+item.slike[0].storage_path} alt={item.naziv} loading="lazy" className="mt-3 h-36 w-full rounded-xl object-cover"/>}
                     <h3 className="mt-2 font-semibold">{item.naziv}</h3>
                     {item.opis && <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{item.opis}</p>}
                     <p className="mt-3 text-lg font-bold text-brand">{item.cena == null ? "Cena na upit" : `${Number(item.cena).toLocaleString("sr-RS")} ${item.valuta}`}</p>
