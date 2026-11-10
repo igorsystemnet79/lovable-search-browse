@@ -20,6 +20,7 @@ Licenca dozvoljava besplatnu komercijalnu upotrebu na sajtovima i aplikacijama, 
 | Kućni ljubimci | Alex Jaison | https://www.pexels.com/photo/dog-and-cat-standing-together-in-nature-28852102/ |
 | Muzika i instrumenti | Weavehall Collective | https://www.pexels.com/photo/electric-piano-and-guitars-in-a-room-18762059/ |
 | Usluge | Mikael Blomkvist | https://www.pexels.com/photo/laptop-on-desk-6483627/ |
+| Kupatila | Alex Tyson | https://www.pexels.com/photo/interior-of-a-modern-bathroom-19991843/ |
 
 ## Važne napomene
 
