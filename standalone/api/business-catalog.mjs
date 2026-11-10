@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 // PonudiMi poslovni katalog — odvojen od klasičnih oglasa.
 const schema = `
 ALTER TABLE business_package_catalog
-  ADD COLUMN IF NOT EXISTS max_artikala integer NOT NULL DEFAULT 1000;
+  ADD COLUMN IF NOT EXISTS max_artikala integer;
+UPDATE business_package_catalog SET max_artikala=CASE slug
+  WHEN 'light' THEN 100 WHEN 'average' THEN 1000
+  WHEN 'advanced' THEN 10000 WHEN 'total' THEN 50000
+  ELSE 1000 END WHERE max_artikala IS NULL;
+ALTER TABLE business_package_catalog ALTER COLUMN max_artikala SET DEFAULT 1000;
+ALTER TABLE business_package_catalog ALTER COLUMN max_artikala SET NOT NULL;
 CREATE TABLE IF NOT EXISTS business_catalog_products (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
