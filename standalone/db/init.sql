@@ -20,6 +20,12 @@ CREATE TABLE IF NOT EXISTS platform_categories (
 );
 ALTER TABLE platform_categories ADD COLUMN IF NOT EXISTS podkategorije_slike jsonb NOT NULL DEFAULT '{}'::jsonb;
 CREATE INDEX IF NOT EXISTS platform_categories_created_idx ON platform_categories(created_at,slug);
+CREATE TABLE IF NOT EXISTS platform_category_exclusions (
+ slug text NOT NULL,
+ subcategory text NOT NULL DEFAULT '',
+ created_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(slug,subcategory)
+);
 
 CREATE TABLE IF NOT EXISTS platform_maintenance (
  singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton=true), enabled boolean NOT NULL DEFAULT false,
