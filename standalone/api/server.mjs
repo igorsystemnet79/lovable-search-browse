@@ -332,7 +332,7 @@ app.post('/api/auth/register', registerLimiter, asyncRoute(async(req,res)=>{
  if(!/^[+0-9 ()-]{6,30}$/.test(String(metadata.telefon||'')) || String(metadata.telefon||'').replace(/\D/g,'').length<6) return res.status(400).json({error:'Unesi ispravan broj telefona.'});
  if(metadata.tip_lica==='pravno' && (!String(metadata.naziv_firme||'').trim() || !validPib(metadata.pib))) return res.status(400).json({error:'Naziv firme ili PIB nisu ispravni.'});
  const korisnickoIme=String(metadata.korisnicko_ime||'').trim().toLowerCase();
- if(!/^[a-z0-9._-]{3,30}$/.test(korisnickoIme)) return res.status(400).json({error:'Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.'});
+ if(!korisnickoIme || [...korisnickoIme].length>20) return res.status(400).json({error:'Korisničko ime je obavezno i može imati najviše 20 karaktera.'});
  if(!['trgovac','nije_trgovac'].includes(String(metadata.status_trgovca||''))) return res.status(400).json({error:'Izaberi da li nastupaš kao trgovac ili kao privatni prodavac.'});
  if(metadata.prihvatio_uslove!==true||metadata.upoznat_sa_privatnoscu!==true||metadata.potvrdio_punoletstvo!==true) return res.status(400).json({error:'Prihvati pravila, potvrdi da si upoznat sa obaveštenjem o privatnosti i potvrdi punoletstvo.'});
  const c=await pool.connect(); try { await c.query('BEGIN');
