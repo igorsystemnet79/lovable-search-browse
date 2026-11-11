@@ -644,6 +644,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const [rows, setRows] = useState<Oglas[]>([]);
   const [edit, setEdit] = useState<Oglas | null>(null);
   const [msg, setMsg] = useState("");
+  const [saveBusy, setSaveBusy] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [images, setImages] = useState<Record<string, AdminImage[]>>({});
   const [imageBusy, setImageBusy] = useState(false);
@@ -655,10 +656,11 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   const load = useCallback(async () => {
     const { data, error } = await ponudimi.from(tabela).select("*").includePausedListings().order("created_at", { ascending: false });
     if (error) {
-      setMsg("Učitavanje nije uspelo. Osvežite stranicu i pokušajte ponovo.");
-      return;
+      setMsg(error.message || "Učitavanje nije uspelo. Osvežite stranicu i pokušajte ponovo.");
+      return false;
     }
     setRows((data ?? []) as Oglas[]);
+    return true;
   }, [tabela]);
   useEffect(() => { load(); }, [load]);
 
@@ -683,13 +685,24 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
   });
 
   async function sacuvaj() {
-    if (!edit) return;
+    if (!edit || saveBusy) return;
     const iznos = edit[polje];
     const patch = { naslov: edit.naslov, opis: edit.opis, lokacija: edit.lokacija, kontakt_ime: edit.kontakt_ime, telefon: edit.telefon, [polje]: iznos === undefined || iznos === null || Number.isNaN(iznos) ? null : iznos };
-    const { error } = await ponudimi.from(tabela).update(patch as never).eq("id", edit.id);
-    setMsg(error ? "Čuvanje nije uspelo." : "Sačuvano.");
-    setEdit(null);
-    load();
+    setSaveBusy(true);
+    setMsg("");
+    try {
+      const { data, error } = await ponudimi.from(tabela).update(patch as never).eq("id", edit.id);
+      if (error) throw new Error(error.message || "Čuvanje izmene nije uspelo.");
+      if (!Array.isArray(data) || data.length !== 1) throw new Error("Ponuda nije pronađena ili nije izmenjena. Forma je ostala otvorena.");
+      const refreshed = await load();
+      if (!refreshed) throw new Error("Izmena je poslata, ali osvežavanje liste nije uspelo. Proveri ponudu pre ponovnog čuvanja.");
+      setEdit(null);
+      setMsg("Izmene su sačuvane i potvrđene u bazi.");
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Čuvanje izmene nije uspelo. Pokušaj ponovo.");
+    } finally {
+      setSaveBusy(false);
+    }
   }
   async function obrisi(id: string) {
     if (!confirm("Obrisati ovaj oglas?")) return;
@@ -779,7 +792,7 @@ function Oglasi({ tabela }: { tabela: "ponude" | "zahtevi" }) {
               <Input className={inputCls} placeholder="Telefon" value={edit.telefon ?? ""} onChange={(e) => setEdit({ ...edit, telefon: e.target.value })} />
               <Input className={inputCls} type="number" min={0} placeholder={tabela === "ponude" ? "Cena" : "Budžet"} value={edit[polje] ?? ""} onChange={(e) => setEdit({ ...edit, [polje]: e.target.value === "" ? null : Number(e.target.value) })} />
               <textarea className={inputCls + " sm:col-span-2"} rows={3} value={edit.opis ?? ""} onChange={(e) => setEdit({ ...edit, opis: e.target.value })} />
-              <div className="flex gap-2"><button className={small} onClick={sacuvaj}>Sačuvaj</button><button className={small} onClick={() => setEdit(null)}>Otkaži</button></div>
+              <div className="flex gap-2"><button type="button" className={small} disabled={saveBusy} onClick={() => void sacuvaj()}>{saveBusy ? "Čuvanje..." : "Sačuvaj"}</button><button type="button" className={small} disabled={saveBusy} onClick={() => setEdit(null)}>Otkaži</button></div>
             </div>
           ) : (
             <div className="flex flex-wrap items-start justify-between gap-3 text-sm">
