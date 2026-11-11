@@ -2,7 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ponudimi } from "@/integrations/standalone/client";
 import { AuthShell, inputCls, btnCls } from "@/components/auth-shell";
-import { ispravanPib } from "@/lib/pib";
 
 export const Route = createFileRoute("/registracija")({
   head: () => ({
@@ -72,7 +71,6 @@ function Registracija() {
     if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     if (tip === "pravno") {
       if (f.naziv_firme.trim().length < 2) return setGreska("Unesi naziv firme.");
-      if (!ispravanPib(f.pib)) return setGreska("PIB nije ispravan (9 cifara sa ispravnom kontrolnom cifrom).");
     }
     setBusy(true);
     setGreska("");
@@ -94,7 +92,7 @@ function Registracija() {
             prihvatio_uslove: prihvatioUslove,
             upoznat_sa_privatnoscu: upoznatSaPrivatnoscu,
             potvrdio_punoletstvo: potvrdioPunoletstvo,
-            ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.replace(/\s/g, "") } : {}),
+            ...(tip === "pravno" ? { naziv_firme: f.naziv_firme.trim(), pib: f.pib.trim() } : {}),
           },
         },
       });
@@ -133,7 +131,7 @@ function Registracija() {
         {tip === "pravno" && (
           <>
             <input className={inputCls} required maxLength={150} placeholder="Naziv firme" value={f.naziv_firme} onChange={set("naziv_firme")} />
-            <input className={inputCls} required inputMode="numeric" maxLength={9} placeholder="PIB (9 cifara)" value={f.pib} onChange={set("pib")} />
+            <input className={inputCls} maxLength={30} placeholder="PIB (opciono)" value={f.pib} onChange={set("pib")} />
           </>
         )}
         <div>
