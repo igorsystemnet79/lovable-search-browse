@@ -430,7 +430,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   }
   async function update(id: string, patch: Partial<Profil>) {
     const { error } = await ponudimi.from("profiles").update(patch).eq("id", id);
-    setMsg(error ? "Čuvanje nije uspelo." : "Sačuvano.");
+    setMsg(error ? "Čuvanje statusa nije uspelo." : "Status korisnika je sačuvan.");
     load();
   }
   async function obrisi(p: Profil) {
@@ -472,7 +472,7 @@ function Korisnici({ selfId }: { selfId: string }) {
       // Update the visible row from the exact record returned by PostgreSQL.
       setProfili(current => current.map(profile => profile.id === id ? { ...profile, ...savedProfile } as Profil : profile));
       setEdit(null);
-      setMsg("Podaci naloga su sačuvani i potvrđeni u bazi.");
+      setMsg("PROFIL JE SAČUVAN — server je potvrdio izmenu ovog naloga.");
     } catch (error) {
       setMsg(error instanceof Error ? error.message : "Čuvanje podataka naloga nije uspelo.");
     } finally {
@@ -618,7 +618,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button type="button" className={small} disabled={savingProfile} onClick={() => void sacuvajIzmenuProfila()}>{savingProfile ? "Čuvanje..." : "Sačuvaj izmene"}</button>
+                          <button type="button" className={small} disabled={savingProfile} onClick={(event) => { event.preventDefault(); event.stopPropagation(); void sacuvajIzmenuProfila(); }}>{savingProfile ? "Čuvanje..." : "Sačuvaj izmene"}</button>
                           <button type="button" className={small} disabled={savingProfile} onClick={otkaziIzmenuProfila}>Otkaži</button>
                         </div>
                       </td>
