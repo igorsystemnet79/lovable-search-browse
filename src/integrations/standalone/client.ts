@@ -103,6 +103,16 @@ async function api(path: string, init: RequestInit = {}) {
   return body;
 }
 
+// Jedinstven ulaz za administratorske i ostale API pozive: ista adresa,
+// provera dostupnosti baze i isti važeći token sesije.
+export async function requestPonudiMiApi(path: string, method = "GET", body?: unknown) {
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  return api(path, {
+    method,
+    ...(body !== undefined ? { body: isForm ? body as FormData : JSON.stringify(body) } : {}),
+  });
+}
+
 class QueryBuilder implements PromiseLike<any> {
   private action = "select";
   private columns = "*";
