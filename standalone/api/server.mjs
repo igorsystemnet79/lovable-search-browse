@@ -1054,7 +1054,10 @@ app.put('/api/admin/users/:id/profile',(req,res,next)=>{req.adminProfileDiagnost
   if(patch.firma_status_verifikacije!==undefined)patch.firma_verifikovana=patch.firma_status_verifikacije==='verifikovana';
   const sets=Object.keys(patch).map((key,index)=>'"'+key+'"=$'+(index+1)).join(',');
   const values=Object.values(patch);
-  const updated=await c.query('UPDATE profiles SET '+sets+' WHERE id=  await c.query(`CREATE TABLE IF NOT EXISTS admin_audit_logs(id bigserial PRIMARY KEY,admin_user_id uuid NOT NULL,target_user_id uuid NOT NULL,action text NOT NULL,before_data jsonb NOT NULL,after_data jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now())`);
+  const values=Object.values(patch);
+  const updated=await c.query('UPDATE profiles SET '+sets+' WHERE id=$'+(values.length+1)+' RETURNING *',[...values,req.params.id]);
+  if(!updated.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički nalog nije pronađen.'});}
+  await c.query(`CREATE TABLE IF NOT EXISTS admin_audit_logs(id bigserial PRIMARY KEY,admin_user_id uuid NOT NULL,target_user_id uuid NOT NULL,action text NOT NULL,before_data jsonb NOT NULL,after_data jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now())`);
   await c.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,action,before_data,after_data) VALUES($1,$2,$3,$4::jsonb,$5::jsonb)',[req.user.sub,req.params.id,'izmena_profila',JSON.stringify(before.rows[0]),JSON.stringify(updated.rows[0])]);
   await c.query('COMMIT');
   res.json({data:updated.rows[0]});
