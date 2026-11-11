@@ -1,20 +1,7 @@
-import { API_ORIGIN, ponudimi } from "@/integrations/standalone/client";
+import { requestPonudiMiApi } from "@/integrations/standalone/client";
 
 async function adminRequest(path: string, method = "POST", body?: unknown) {
-  const { data } = await ponudimi.auth.getSession();
-  const token = data.session?.access_token;
-  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
-  const response = await fetch(`${API_ORIGIN}${path}`, {
-    method,
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(body && !isForm ? { "Content-Type": "application/json" } : {}),
-    },
-    body: body ? (isForm ? body as FormData : JSON.stringify(body)) : undefined,
-  });
-  const result = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(result.error || "Administratorska operacija nije uspela.");
-  return result;
+  return requestPonudiMiApi(path, method, body);
 }
 
 export async function obrisiKorisnika({ data }: { data: { userId: string } }) {
