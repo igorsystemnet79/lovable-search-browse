@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "re
 import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju, obrisiKategoriju, obrisiPotkategoriju, izmeniKategoriju, izmeniPotkategoriju, postaviSlikuKategorije, postaviSlikuPodkategorije } from "@/integrations/standalone/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, obrisiEvidencijuPaketaFirme, reaktivirajPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa } from "@/lib/admin.functions";
+import { obrisiKorisnika, sacuvajAdminProfil, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, obrisiEvidencijuPaketaFirme, reaktivirajPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
@@ -445,6 +445,19 @@ function Korisnici({ selfId }: { selfId: string }) {
     setMsg(error ? "Slanje linka za reset lozinke nije uspelo: " + error.message : "Link za postavljanje nove lozinke poslat je na " + p.email + ".");
   }
 
+  async function sacuvajIzmenuProfila() {
+    if (!edit) return;
+    const { id, ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any;
+    try {
+      await sacuvajAdminProfil(id, { ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica });
+      setMsg("Podaci naloga su sačuvani. Izmena je evidentirana u administratorskom dnevniku.");
+      setEdit(null);
+      load();
+    } catch (error) {
+      setMsg(error instanceof Error ? error.message : "Čuvanje podataka naloga nije uspelo.");
+    }
+  }
+
   const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
   const normalizujPretragu = (value: string) =>
     value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
@@ -577,7 +590,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
+                          <button className={small} onClick={() => void sacuvajIzmenuProfila()}>Sačuvaj izmene</button>
                           <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                         </div>
                       </td>
