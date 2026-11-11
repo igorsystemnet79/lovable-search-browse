@@ -452,7 +452,7 @@ function Korisnici({ selfId }: { selfId: string }) {
     setSavingProfile(true);
     setMsg("");
     try {
-      await sacuvajAdminProfil(id, {
+      const result = await sacuvajAdminProfil(id, {
         ime: ime ?? null,
         prezime: prezime ?? null,
         korisnicko_ime: korisnicko_ime ?? null,
@@ -465,9 +465,14 @@ function Korisnici({ selfId }: { selfId: string }) {
         pib: pib ?? null,
         tip_lica: tip_lica ?? "fizicko",
       });
+      const savedProfile = result?.data;
+      if (!savedProfile || savedProfile.id !== id) {
+        throw new Error("Server nije potvrdio izmenu profila. Podaci nisu osveženi.");
+      }
+      // Update the visible row from the exact record returned by PostgreSQL.
+      setProfili(current => current.map(profile => profile.id === id ? { ...profile, ...savedProfile } as Profil : profile));
       setEdit(null);
-      setMsg("Podaci naloga su sačuvani. Izmena je evidentirana u administratorskom dnevniku.");
-      await load();
+      setMsg("Podaci naloga su sačuvani i potvrđeni u bazi.");
     } catch (error) {
       setMsg(error instanceof Error ? error.message : "Čuvanje podataka naloga nije uspelo.");
     } finally {
