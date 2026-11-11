@@ -66,7 +66,8 @@ function Registracija() {
     if (!statusTrgovca) return setGreska("Izaberi da li nastupaš kao trgovac ili privatni prodavac.");
     if (!prihvatioUslove || !upoznatSaPrivatnoscu || !potvrdioPunoletstvo) return setGreska("Prihvati pravila, potvrdi da si upoznat sa obaveštenjem o privatnosti i potvrdi punoletstvo.");
     if (f.ime.trim().length < 2 || f.prezime.trim().length < 2) return setGreska("Ime i prezime su obavezni.");
-    if (!/^[a-zA-Z0-9._-]{3,30}$/.test(f.korisnicko_ime.trim())) return setGreska("Korisničko ime mora imati 3–30 znakova: slova, brojeve, tačku, donju crtu ili crticu.");
+    if (!f.korisnicko_ime.trim()) return setGreska("Unesi korisničko ime.");
+    if ([...f.korisnicko_ime.trim()].length > 20) return setGreska("Korisničko ime može imati najviše 20 karaktera.");
     if (f.grad.trim().length < 2) return setGreska("Mesto stanovanja je obavezno.");
     if (!/^[+0-9 ()-]{6,30}$/.test(f.telefon.trim()) || f.telefon.replace(/[^0-9]/g, "").length < 6) return setGreska("Unesi ispravan broj telefona.");
     if (tip === "pravno") {
@@ -146,8 +147,8 @@ function Registracija() {
         </div>
         <input className={inputCls} required maxLength={60} autoComplete="given-name" placeholder="Ime" value={f.ime} onChange={set("ime")} />
         <input className={inputCls} required maxLength={60} autoComplete="family-name" placeholder="Prezime" value={f.prezime} onChange={set("prezime")} />
-        <input className={inputCls} required minLength={3} maxLength={30} autoComplete="username" placeholder="Korisničko ime (3–30 znakova)" value={f.korisnicko_ime} onChange={set("korisnicko_ime")} />
-        <p className="-mt-2 text-xs text-muted-foreground">Dozvoljena su slova bez razmaka, brojevi, tačka, donja crta i crtica.</p>
+        <input className={inputCls} required maxLength={20} autoComplete="username" placeholder="Korisničko ime (najviše 20 karaktera)" value={f.korisnicko_ime} onChange={set("korisnicko_ime")} />
+        <p className="-mt-2 text-xs text-muted-foreground">Možeš koristiti bilo koja slova, brojeve, razmake i specijalne znakove. Najviše 20 karaktera.</p>
         <input className={inputCls} type="tel" required maxLength={30} autoComplete="tel" placeholder="Telefon" value={f.telefon} onChange={set("telefon")} />
         <input className={inputCls} required maxLength={60} autoComplete="address-level2" placeholder="Mesto stanovanja" value={f.grad} onChange={set("grad")} />
         <input className={inputCls} maxLength={150} placeholder={tip === "pravno" ? "Adresa sedišta (ulica i broj)" : "Adresa stanovanja (ulica i broj)"} value={f.adresa} onChange={set("adresa")} />
@@ -192,7 +193,7 @@ function Registracija() {
           <p className="text-xs leading-5 text-muted-foreground">Datum i verzija prihvaćenih pravila, potvrda punoletstva i tehnički podaci o registraciji beleže se radi evidencije prihvatanja. Obaveštenje o privatnosti mora biti dovršeno pre javnog puštanja platforme.</p>
         </div>
         {greska && <p role="alert" className="text-sm text-destructive">{greska}</p>}
-        <button className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
+        <button type="submit" className={btnCls} disabled={busy}>{busy ? "Slanje..." : "Registruj se"}</button>
       </form>
       <p className="mt-4 text-center text-sm text-muted-foreground">
         Već imaš nalog? <Link to="/prijava" className="font-semibold text-brand hover:underline">Prijavi se</Link>
