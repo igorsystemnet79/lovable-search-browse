@@ -1032,7 +1032,7 @@ app.put('/api/admin/users/:id/profile',(req,res,next)=>{req.adminProfileDiagnost
  console.info('[ADMIN_PROFILE_SAVE_BEGIN]',JSON.stringify({diagnostic_id:diagnosticId,target_user_id:req.params.id,admin_user_id:req.user?.sub||null,field_names:keys}));
  if(!keys.length||keys.some(key=>!allowed.includes(key)))return res.status(400).json({error:'Podaci profila nisu ispravni.'});
  const patch={...input};
- if(patch.email!==undefined){patch.email=String(patch.email||'').trim().toLowerCase();if(!/^\\S+@\\S+\\.\\S+$/.test(patch.email))return res.status(400).json({error:'Unesi ispravnu email adresu.'});}
+ if(patch.email!==undefined){patch.email=String(patch.email||'').trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(patch.email))return res.status(400).json({error:'Unesi ispravnu email adresu.'});}
  if(patch.korisnicko_ime!==undefined){patch.korisnicko_ime=String(patch.korisnicko_ime||'').trim().toLowerCase();if(!patch.korisnicko_ime||[...patch.korisnicko_ime].length>20)return res.status(400).json({error:'Korisničko ime može imati najviše 20 karaktera.'});}
  if(patch.tip_lica!==undefined&&!['fizicko','pravno'].includes(patch.tip_lica))return res.status(400).json({error:'Vrsta naloga nije ispravna.'});
  if(patch.status_trgovca!==undefined&&!['trgovac','nije_trgovac','nepotvrdjeno'].includes(patch.status_trgovca))return res.status(400).json({error:'Status prodavca nije ispravan.'});
