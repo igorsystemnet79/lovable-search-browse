@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import * as XLSX from "xlsx";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -26,72 +26,44 @@ function PoslovniKatalogPage() {
   const [form,setForm]=useState({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});
   const [editingId,setEditingId]=useState<string|null>(null);
 
-  const catalogContentRef = useRef<HTMLElement>(null);
-
-  // Allow a controlled two-finger zoom on the catalog content only.
-  // When the gesture ends, smoothly restore the exact device-width layout.
+  // Match the homepage behavior: use the browser's native pinch zoom,
+  // then restore the page viewport to device width when the gesture ends.
   useEffect(() => {
-    const page = document.querySelector<HTMLElement>(".catalog-page-zoom-locked");
-    const content = catalogContentRef.current;
-    if (!page || !content) return;
-
-    let startDistance = 0;
-    let startScale = 1;
-    let focalX = 0;
-    let focalY = 0;
+    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const originalContent = viewport?.content || "width=device-width, initial-scale=1";
     let resetTimer: number | undefined;
 
-    const distance = (a: Touch, b: Touch) =>
-      Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
-
-    const beginPinch = (event: TouchEvent) => {
-      if (event.touches.length !== 2) return;
+    const restoreViewport = () => {
+      if (!viewport) return;
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      const rect = content.getBoundingClientRect();
-      startDistance = distance(event.touches[0], event.touches[1]);
-      startScale = 1;
-      focalX = (event.touches[0].clientX + event.touches[1].clientX) / 2 - rect.left;
-      focalY = (event.touches[0].clientY + event.touches[1].clientY) / 2 - rect.top;
-      content.style.transition = "none";
-      content.style.transformOrigin = "0 0";
+
+      // Briefly constrain the viewport to its baseline, then restore the
+      // site's normal viewport settings so pinch zoom remains available.
+      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+      resetTimer = window.setTimeout(() => {
+        viewport.content = originalContent;
+      }, 120);
     };
 
-    const movePinch = (event: TouchEvent) => {
-      if (event.touches.length !== 2 || !startDistance) return;
-      if (event.cancelable) event.preventDefault();
-      const scale = Math.min(2.5, Math.max(1, startScale * distance(event.touches[0], event.touches[1]) / startDistance));
-      const x = focalX * (1 - scale);
-      const y = focalY * (1 - scale);
-      content.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
-    };
-
-    const endPinch = (event: TouchEvent) => {
-      if (startDistance && event.touches.length < 2) {
-        startDistance = 0;
-        content.style.transition = "transform 180ms ease-out";
-        content.style.transform = "translate3d(0, 0, 0) scale(1)";
+    document.addEventListener("gestureend", restoreViewport, { passive: true });
+    document.addEventListener("touchend", (event: TouchEvent) => {
+      if (event.touches.length === 0) {
+        // iOS Safari emits gestureend for native pinch; this fallback covers
+        // embedded browsers that only expose touch events.
+        if (resetTimer !== undefined) window.clearTimeout(resetTimer);
         resetTimer = window.setTimeout(() => {
-          content.style.transition = "";
-          content.style.transform = "";
-          content.style.transformOrigin = "";
-        }, 200);
+          if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
+            viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+            window.setTimeout(() => { viewport.content = originalContent; }, 120);
+          }
+        }, 80);
       }
-    };
-
-    page.addEventListener("touchstart", beginPinch, { passive: true });
-    page.addEventListener("touchmove", movePinch, { passive: false });
-    page.addEventListener("touchend", endPinch, { passive: true });
-    page.addEventListener("touchcancel", endPinch, { passive: true });
+    }, { passive: true });
 
     return () => {
-      page.removeEventListener("touchstart", beginPinch);
-      page.removeEventListener("touchmove", movePinch);
-      page.removeEventListener("touchend", endPinch);
-      page.removeEventListener("touchcancel", endPinch);
+      document.removeEventListener("gestureend", restoreViewport);
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      content.style.transition = "";
-      content.style.transform = "";
-      content.style.transformOrigin = "";
+      if (viewport) viewport.content = originalContent;
     };
   }, []);
   const load=useCallback(async()=>{
@@ -173,7 +145,7 @@ function PoslovniKatalogPage() {
     XLSX.utils.book_append_sheet(workbook,instructions,"Uputstvo");
     XLSX.writeFile(workbook,"ponudimi-obrazac-poslovni-katalog.xlsx");
   }
-  return <div className="catalog-page-zoom-locked min-h-screen bg-background text-foreground"><SiteHeader/><main ref={catalogContentRef} className="catalog-page mx-auto w-full max-w-full min-w-0 overflow-x-clip py-8 space-y-6">
+  return <div className="catalog-page-zoom-locked min-h-screen bg-background text-foreground"><SiteHeader/><main className="catalog-page mx-auto w-full max-w-full min-w-0 overflow-x-clip py-8 space-y-6">
     <div><Link to="/" className="text-sm text-brand hover:underline">← Početna</Link><h1 className="mt-3 text-3xl font-bold">Poslovni katalog</h1><p className="mt-2 text-sm text-muted-foreground">Upravljaj artiklima svoje firme. Katalog je odvojen od klasičnih oglasa i svaki artikal ima svoju šifru.</p></div>
     {!user?<div className="rounded-xl border p-5">Za pristup katalogu potrebno je da se <Link to="/prijava" className="text-brand underline">prijaviš</Link>.</div>:<>
       {error&&<p role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error}</p>}
