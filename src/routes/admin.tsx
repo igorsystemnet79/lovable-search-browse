@@ -388,6 +388,7 @@ function Korisnici({ selfId }: { selfId: string }) {
   const [edit, setEdit] = useState<Profil | null>(null);
   const [msg, setMsg] = useState("");
   const [passwordInfoOpen, setPasswordInfoOpen] = useState<Record<string, boolean>>({});
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const load = useCallback(async () => {
     const ucitajSve = async (tabela: "profiles" | "user_roles" | "ponude" | "zahtevi") => {
@@ -446,16 +447,38 @@ function Korisnici({ selfId }: { selfId: string }) {
   }
 
   async function sacuvajIzmenuProfila() {
-    if (!edit) return;
+    if (!edit || savingProfile) return;
     const { id, ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any;
+    setSavingProfile(true);
+    setMsg("");
     try {
-      await sacuvajAdminProfil(id, { ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica });
-      setMsg("Podaci naloga su sačuvani. Izmena je evidentirana u administratorskom dnevniku.");
+      await sacuvajAdminProfil(id, {
+        ime: ime ?? null,
+        prezime: prezime ?? null,
+        korisnicko_ime: korisnicko_ime ?? null,
+        email: email ?? null,
+        status_trgovca: status_trgovca ?? "nepotvrdjeno",
+        telefon: telefon ?? null,
+        grad: grad ?? null,
+        adresa: adresa ?? null,
+        naziv_firme: naziv_firme ?? null,
+        pib: pib ?? null,
+        tip_lica: tip_lica ?? "fizicko",
+      });
       setEdit(null);
-      load();
+      setMsg("Podaci naloga su sačuvani. Izmena je evidentirana u administratorskom dnevniku.");
+      await load();
     } catch (error) {
       setMsg(error instanceof Error ? error.message : "Čuvanje podataka naloga nije uspelo.");
+    } finally {
+      setSavingProfile(false);
     }
+  }
+
+  function otkaziIzmenuProfila() {
+    if (savingProfile) return;
+    setEdit(null);
+    setMsg("");
   }
 
   const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
@@ -590,8 +613,8 @@ function Korisnici({ selfId }: { selfId: string }) {
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className={small} onClick={() => void sacuvajIzmenuProfila()}>Sačuvaj izmene</button>
-                          <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
+                          <button type="button" className={small} disabled={savingProfile} onClick={() => void sacuvajIzmenuProfila()}>{savingProfile ? "Čuvanje..." : "Sačuvaj izmene"}</button>
+                          <button type="button" className={small} disabled={savingProfile} onClick={otkaziIzmenuProfila}>Otkaži</button>
                         </div>
                       </td>
                     </tr>
