@@ -342,8 +342,3 @@ table { max-width: 100%; }
   }
 }
 
-
-/* Pinch zoom is disabled only on the business catalog page. */
-.catalog-page-zoom-locked {
-  touch-action: pan-x pan-y;
-}
