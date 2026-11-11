@@ -438,6 +438,13 @@ function Korisnici({ selfId }: { selfId: string }) {
     load();
   }
 
+  async function pokreniResetLozinke(p: Profil) {
+    if (!p.email) { setMsg("Korisnik nema evidentiranu email adresu."); return; }
+    if (!confirm("Poslati korisniku " + p.email + " link za postavljanje nove lozinke?")) return;
+    const { error } = await ponudimi.auth.resetPasswordForEmail(p.email);
+    setMsg(error ? "Slanje linka za reset lozinke nije uspelo: " + error.message : "Link za postavljanje nove lozinke poslat je na " + p.email + ".");
+  }
+
   const [prikaz, setPrikaz] = useState<"fizicka" | "firme">("fizicka");
   const normalizujPretragu = (value: string) =>
     value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/g, "d").replace(/Đ/g, "D").toLocaleLowerCase("sr");
@@ -543,6 +550,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <td className="px-3 py-3">
                       <div className="flex min-w-[150px] flex-wrap gap-1">
                         <button className={small} onClick={() => setEdit(p)}>Izmeni</button>
+                        <button className={small} disabled={!p.email} onClick={() => void pokreniResetLozinke(p)}>Reset lozinke</button>
                         <button className={small} disabled={p.id === selfId} onClick={() => toggleUloga(p.id, "admin")}>{roles.includes("admin") ? "Ukini admina" : "Daj admina"}</button>
                         <button className={small} onClick={() => toggleUloga(p.id, "moderator")}>{roles.includes("moderator") ? "Ukini moderatora" : "Daj moderatora"}</button>
                         <button className={small} disabled={p.id === selfId} onClick={() => update(p.id, { blokiran: !p.blokiran })}>{p.blokiran ? "Odblokiraj" : "Blokiraj"}</button>
@@ -555,7 +563,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                     <tr className="border-t border-input bg-background">
                       <td colSpan={9} className="p-4">
                         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-                          {(["ime", "prezime", "korisnicko_ime", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
+                          {(["ime", "prezime", "korisnicko_ime", "email", "telefon", "grad", "adresa", "naziv_firme", "pib"] as const).map((k) => (
                             <Input key={k} className={inputCls} placeholder={k === "prezime" ? "Prezime" : k === "korisnicko_ime" ? "Korisničko ime" : k} value={(edit as any)[k] ?? ""} onChange={(e) => setEdit({ ...edit, [k]: e.target.value || null } as Profil)} />
                           ))}
                           <select className={inputCls} value={edit.status_trgovca || "nepotvrdjeno"} onChange={(e) => setEdit({ ...edit, status_trgovca: e.target.value } as Profil)}>
@@ -569,7 +577,7 @@ function Korisnici({ selfId }: { selfId: string }) {
                           </select>
                         </div>
                         <div className="mt-3 flex gap-2">
-                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
+                          <button className={small} onClick={() => { const { id, ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica } = edit as any; update(id, { ime, prezime, korisnicko_ime, email, status_trgovca, telefon, grad, adresa, naziv_firme, pib, tip_lica }); setEdit(null); }}>Sačuvaj izmene</button>
                           <button className={small} onClick={() => setEdit(null)}>Otkaži</button>
                         </div>
                       </td>
