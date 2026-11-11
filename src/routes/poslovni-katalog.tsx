@@ -45,23 +45,24 @@ function PoslovniKatalogPage() {
       }, 120);
     };
 
+    const restoreAfterTouch = (event: TouchEvent) => {
+      if (event.touches.length !== 0) return;
+      // Fallback for embedded browsers that expose pinch only as touch events.
+      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => {
+        if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
+          viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+          resetTimer = window.setTimeout(() => { viewport.content = originalContent; }, 120);
+        }
+      }, 80);
+    };
+
     document.addEventListener("gestureend", restoreViewport, { passive: true });
-    document.addEventListener("touchend", (event: TouchEvent) => {
-      if (event.touches.length === 0) {
-        // iOS Safari emits gestureend for native pinch; this fallback covers
-        // embedded browsers that only expose touch events.
-        if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-        resetTimer = window.setTimeout(() => {
-          if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
-            viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-            window.setTimeout(() => { viewport.content = originalContent; }, 120);
-          }
-        }, 80);
-      }
-    }, { passive: true });
+    document.addEventListener("touchend", restoreAfterTouch, { passive: true });
 
     return () => {
       document.removeEventListener("gestureend", restoreViewport);
+      document.removeEventListener("touchend", restoreAfterTouch);
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
       if (viewport) viewport.content = originalContent;
     };
