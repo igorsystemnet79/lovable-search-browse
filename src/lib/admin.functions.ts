@@ -78,3 +78,7 @@ export async function pretraziKorisnikeZaPaket(q:string){return adminRequest(`/a
 export async function ucitajAdminDodelePaketa(){return adminRequest("/api/admin/access-grants","GET") as Promise<{data:any[]}>;}
 export async function dodeliPaketKorisniku(data:{user_id:string;package_name:string;duration_days:number;gratis:boolean;cena_eur:number;napomena?:string}){return adminRequest("/api/admin/access-grants","POST",data);}
 export async function otkaziDodeluPaketa(id:string){return adminRequest(`/api/admin/access-grants/${encodeURIComponent(id)}/cancel`,"POST",{});}
+
+export async function sacuvajAdminProfil(userId: string, patch: Record<string, unknown>) {
+  return adminRequest(`/api/admin/users/${encodeURIComponent(userId)}/profile`, "PUT", patch);
+}
