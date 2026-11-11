@@ -3,7 +3,7 @@ import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "re
 import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju, obrisiKategoriju, obrisiPotkategoriju, izmeniKategoriju, izmeniPotkategoriju, postaviSlikuKategorije, postaviSlikuPodkategorije } from "@/integrations/standalone/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@/hooks/use-is-admin";
-import { obrisiKorisnika, sacuvajAdminProfil, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, obrisiEvidencijuPaketaFirme, reaktivirajPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa } from "@/lib/admin.functions";
+import { obrisiKorisnika, sacuvajAdminProfil, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, obrisiEvidencijuPaketaFirme, reaktivirajPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa, pretraziKorisnikeZaPaket, ucitajAdminDodelePaketa, dodeliPaketKorisniku, otkaziDodeluPaketa } from "@/lib/admin.functions";
 import { SiteHeader } from "@/components/site-header";
 import { defaultPlatformRulesText } from "@/routes/pravila-platforme";
 import { SiteFooter } from "@/components/site-footer";
