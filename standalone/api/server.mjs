@@ -1024,6 +1024,41 @@ app.get('/api/storage/public',asyncRoute(async(req,res)=>{
   else {const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}
 }));
 app.get('/uploads/*filepath',asyncRoute(async(req,res)=>{const parts=req.params.filepath;const key=safeObjectKey(Array.isArray(parts)?parts.join('/'):parts);if(!key)return res.status(404).end();const stored=await pool.query('SELECT content_type,body FROM storage_objects WHERE object_key=$1',[key]);if(stored.rows[0]){res.setHeader('Content-Type',stored.rows[0].content_type);res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.send(stored.rows[0].body);}if(s3){const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:key}));res.setHeader('Content-Type',object.ContentType||'application/octet-stream');res.setHeader('Cache-Control','public, max-age=31536000, immutable');return object.Body.pipe(res);}const root=path.resolve(uploadDir),target=path.resolve(root,key);if(!target.startsWith(root+path.sep))return res.status(404).end();res.setHeader('Cache-Control','public, max-age=31536000, immutable');return res.type('image/jpeg').sendFile(target,error=>{if(error&&!res.headersSent)res.status(error.statusCode===404?404:500).end();});}));
+app.put('/api/admin/users/:id/profile',auth,admin,asyncRoute(async(req,res)=>{
+ const allowed=['ime','prezime','korisnicko_ime','email','telefon','grad','adresa','tip_lica','naziv_firme','pib','status_trgovca','firma_verifikovana','firma_status_verifikacije'];
+ const input=req.body&&typeof req.body==='object'?req.body:{};
+ const keys=Object.keys(input);
+ if(!keys.length||keys.some(key=>!allowed.includes(key)))return res.status(400).json({error:'Podaci profila nisu ispravni.'});
+ const patch={...input};
+ if(patch.email!==undefined){patch.email=String(patch.email||'').trim().toLowerCase();if(!/^\\S+@\\S+\\.\\S+$/.test(patch.email))return res.status(400).json({error:'Unesi ispravnu email adresu.'});}
+ if(patch.korisnicko_ime!==undefined){patch.korisnicko_ime=String(patch.korisnicko_ime||'').trim().toLowerCase();if(!patch.korisnicko_ime||[...patch.korisnicko_ime].length>20)return res.status(400).json({error:'Korisničko ime može imati najviše 20 karaktera.'});}
+ if(patch.tip_lica!==undefined&&!['fizicko','pravno'].includes(patch.tip_lica))return res.status(400).json({error:'Vrsta naloga nije ispravna.'});
+ if(patch.status_trgovca!==undefined&&!['trgovac','nije_trgovac','nepotvrdjeno'].includes(patch.status_trgovca))return res.status(400).json({error:'Status prodavca nije ispravan.'});
+ if(patch.firma_status_verifikacije!==undefined&&!['na_cekanju','verifikovana','odbijena'].includes(patch.firma_status_verifikacije))return res.status(400).json({error:'Status verifikacije firme nije ispravan.'});
+ const c=await pool.connect();
+ try{
+  await c.query('BEGIN');
+  const before=await c.query('SELECT * FROM profiles WHERE id=$1 FOR UPDATE',[req.params.id]);
+  if(!before.rows[0]){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički nalog nije pronađen.'});}
+  if(patch.email!==undefined){
+   const duplicate=await c.query('SELECT id FROM users WHERE lower(email)=lower($1) AND id<>$2',[patch.email,req.params.id]);
+   if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ova email adresa je već povezana sa drugim nalogom.'});}
+   await c.query('UPDATE users SET email=$1 WHERE id=$2',[patch.email,req.params.id]);
+  }
+  if(patch.korisnicko_ime!==undefined){
+   const duplicate=await c.query('SELECT id FROM profiles WHERE lower(korisnicko_ime)=lower($1) AND id<>$2',[patch.korisnicko_ime,req.params.id]);
+   if(duplicate.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovo korisničko ime je već zauzeto.'});}
+  }
+  if(patch.firma_status_verifikacije!==undefined)patch.firma_verifikovana=patch.firma_status_verifikacije==='verifikovana';
+  const sets=Object.keys(patch).map((key,index)=>`"${key}"=${index+1}`).join(',');
+  const updated=await c.query(`UPDATE profiles SET ${sets} WHERE id=${Object.keys(patch).length+1} RETURNING *`,[...Object.values(patch),req.params.id]);
+  if(patch.status_trgovca!==undefined){await c.query('UPDATE ponude SET status_trgovca=$1 WHERE user_id=$2',[patch.status_trgovca,req.params.id]);await c.query('UPDATE zahtevi SET status_trgovca=$1 WHERE user_id=$2',[patch.status_trgovca,req.params.id]);}
+  await c.query(`CREATE TABLE IF NOT EXISTS admin_audit_logs(id bigserial PRIMARY KEY,admin_user_id uuid NOT NULL,target_user_id uuid NOT NULL,action text NOT NULL,before_data jsonb NOT NULL,after_data jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now())`);
+  await c.query('INSERT INTO admin_audit_logs(admin_user_id,target_user_id,action,before_data,after_data) VALUES($1,$2,$3,$4::jsonb,$5::jsonb)',[req.user.sub,req.params.id,'izmena_profila',JSON.stringify(before.rows[0]),JSON.stringify(updated.rows[0])]);
+  await c.query('COMMIT');
+  res.json({data:updated.rows[0]});
+ }catch(error){await c.query('ROLLBACK');throw error;}finally{c.release();}
+}));
 app.delete('/api/admin/users/:id',auth,admin,asyncRoute(async(req,res)=>{if(req.params.id===req.user.sub)return res.status(400).json({error:'Ne možete obrisati sopstveni nalog.'});const c=await pool.connect();try{await c.query('BEGIN');const p=await c.query('SELECT id FROM ponude WHERE user_id=$1',[req.params.id]);const z=await c.query('SELECT id FROM zahtevi WHERE user_id=$1',[req.params.id]);await cleanupListingFiles('ponude',p.rows.map(x=>x.id));await cleanupListingFiles('zahtevi',z.rows.map(x=>x.id));await c.query('DELETE FROM izmene_oglasa WHERE oglas_id IN (SELECT id FROM ponude WHERE user_id=$1 UNION ALL SELECT id FROM zahtevi WHERE user_id=$1)',[req.params.id]);await c.query('DELETE FROM ponude WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM zahtevi WHERE user_id=$1',[req.params.id]);await c.query('DELETE FROM users WHERE id=$1',[req.params.id]);await c.query('COMMIT');res.json({ok:true});}catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}}));
 
 async function ucitajKatalogPaketa() {
