@@ -1054,7 +1054,6 @@ app.put('/api/admin/users/:id/profile',(req,res,next)=>{req.adminProfileDiagnost
   if(patch.firma_status_verifikacije!==undefined)patch.firma_verifikovana=patch.firma_status_verifikacije==='verifikovana';
   const sets=Object.keys(patch).map((key,index)=>'"'+key+'"=$'+(index+1)).join(',');
   const values=Object.values(patch);
-  const values=Object.values(patch);
   const updated=await c.query('UPDATE profiles SET '+sets+' WHERE id=$'+(values.length+1)+' RETURNING *',[...values,req.params.id]);
   if(!updated.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički nalog nije pronađen.'});}
   await c.query(`CREATE TABLE IF NOT EXISTS admin_audit_logs(id bigserial PRIMARY KEY,admin_user_id uuid NOT NULL,target_user_id uuid NOT NULL,action text NOT NULL,before_data jsonb NOT NULL,after_data jsonb NOT NULL,created_at timestamptz NOT NULL DEFAULT now())`);
