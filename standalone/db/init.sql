@@ -231,14 +231,14 @@ BEGIN
     promene := promene || ('Cena/budžet: ' || coalesce(iznos_old::text, 'po dogovoru') || ' → ' || coalesce(iznos_new::text, 'po dogovoru') || ' ' || NEW.valuta);
   END IF;
   IF OLD.naslov IS DISTINCT FROM NEW.naslov THEN promene := promene || ('Naslov: ' || NEW.naslov); END IF;
-  IF OLD.opis IS DISTINCT FROM NEW.opis THEN promene := promene || 'Opis je izmenjen'; END IF;
+  IF OLD.opis IS DISTINCT FROM NEW.opis THEN promene := array_append(promene, 'Opis je izmenjen'); END IF;
   IF OLD.lokacija IS DISTINCT FROM NEW.lokacija THEN promene := promene || ('Lokacija: ' || NEW.lokacija); END IF;
-  IF OLD.telefon IS DISTINCT FROM NEW.telefon OR OLD.kontakt_ime IS DISTINCT FROM NEW.kontakt_ime THEN promene := promene || 'Kontakt je izmenjen'; END IF;
+  IF OLD.telefon IS DISTINCT FROM NEW.telefon OR OLD.kontakt_ime IS DISTINCT FROM NEW.kontakt_ime THEN promene := array_append(promene, 'Kontakt je izmenjen'); END IF;
   IF OLD.zavrseno IS DISTINCT FROM NEW.zavrseno THEN
-    promene := promene || CASE WHEN NEW.zavrseno THEN 'Oglas je završen' ELSE 'Oglas je ponovo aktivan' END;
+    promene := array_append(promene, CASE WHEN NEW.zavrseno THEN 'Oglas je završen' ELSE 'Oglas je ponovo aktivan' END);
   END IF;
   IF OLD.pauziran IS DISTINCT FROM NEW.pauziran THEN
-    promene := promene || CASE WHEN NEW.pauziran THEN 'Oglas je pauziran' ELSE 'Oglas je ponovo aktiviran nakon pauze' END;
+    promene := array_append(promene, CASE WHEN NEW.pauziran THEN 'Oglas je pauziran' ELSE 'Oglas je ponovo aktiviran nakon pauze' END);
   END IF;
   IF cardinality(promene) > 0 THEN
     NEW.updated_at := now();
