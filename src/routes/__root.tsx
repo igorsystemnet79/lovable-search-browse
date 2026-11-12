@@ -188,18 +188,33 @@ function RootComponent() {
       cancelAnimationFrame(cleanupFrame);
 
       const pageTop = window.scrollY;
+      // Force WebKit to commit the unscaled layout before clearing the
+      // compositor layer. Catalog pages can also contain their own
+      // horizontally-scrollable tables/carousels, so reset those as well.
+      void root.getBoundingClientRect().width;
       cleanupFrame = requestAnimationFrame(() => {
-        // Restore horizontal alignment only after the unscaled frame has
-        // been committed by WebKit. Keep the user's vertical position.
         window.scrollTo({ left: 0, top: pageTop, behavior: "instant" });
         document.documentElement.scrollLeft = 0;
         document.body.scrollLeft = 0;
+
+        document.querySelectorAll<HTMLElement>(".catalog-page").forEach((page) => {
+          page.scrollLeft = 0;
+          page.querySelectorAll<HTMLElement>("*").forEach((element) => {
+            if (element.scrollWidth > element.clientWidth) element.scrollLeft = 0;
+          });
+        });
 
         cleanupFrame = requestAnimationFrame(() => {
           root.style.removeProperty("transform");
           root.style.removeProperty("transform-origin");
           root.style.removeProperty("transition");
           root.style.removeProperty("will-change");
+          // A second layout read prevents iOS Safari from retaining the
+          // previous transformed horizontal bounds after the gesture.
+          void root.getBoundingClientRect().width;
+          window.scrollTo({ left: 0, top: pageTop, behavior: "instant" });
+          document.documentElement.scrollLeft = 0;
+          document.body.scrollLeft = 0;
           cleanupFrame = 0;
         });
       });
