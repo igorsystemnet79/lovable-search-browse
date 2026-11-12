@@ -150,106 +150,114 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // iOS Safari may keep the visual viewport magnified after a pinch even when
-  // the viewport meta tag is reset. Try the native reset first; if Safari keeps
-  // the zoom, visually normalize the app root without changing catalog layout.
+  // Handle pinch zoom ourselves so the page always returns to its exact
+  // original layout when the fingers are released. Native iOS visual-viewport
+  // zoom cannot be reliably reset from page JavaScript.
   useEffect(() => {
-    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    const appRoot = document.getElementById("root");
-    if (!viewport || !appRoot) return;
+    const root = document.getElementById("root");
+    const html = document.documentElement;
+    const body = document.body;
+    if (!root || !body) return;
 
-    const originalContent = viewport.content || "width=device-width, initial-scale=1";
+    const previousHtmlTouchAction = html.style.touchAction;
+    const previousBodyTouchAction = body.style.touchAction;
+    const previousRootTouchAction = root.style.touchAction;
+    html.style.touchAction = "pan-x pan-y";
+    body.style.touchAction = "pan-x pan-y";
+    root.style.touchAction = "pan-x pan-y";
+
+    let pinchStartDistance = 0;
+    let pinchScale = 1;
+    let pinchOriginX = 0;
+    let pinchOriginY = 0;
     let resetTimer: number | undefined;
-    let restoreTimer: number | undefined;
-    let transitionTimer: number | undefined;
-    let compensationActive = false;
+    let pinching = false;
 
-    const clearCompensation = () => {
-      compensationActive = false;
-      appRoot.style.removeProperty("transform");
-      appRoot.style.removeProperty("transform-origin");
-      appRoot.style.removeProperty("will-change");
-      appRoot.style.removeProperty("transition");
-      window.visualViewport?.removeEventListener("resize", updateCompensation);
-      window.visualViewport?.removeEventListener("scroll", updateCompensation);
-      window.removeEventListener("scroll", updateCompensation);
-    };
-
-    const updateCompensation = () => {
-      const visualViewport = window.visualViewport;
-      if (!visualViewport || visualViewport.scale <= 1.02) {
-        clearCompensation();
-        return;
-      }
-
-      const scale = visualViewport.scale;
-      // Counter the visual viewport scale and its pan while retaining the
-      // current document scroll position. This changes no element dimensions.
-      const x = visualViewport.offsetLeft + window.scrollX * (1 - 1 / scale);
-      const y = visualViewport.offsetTop + window.scrollY * (1 - 1 / scale);
-      appRoot.style.transformOrigin = "0 0";
-      appRoot.style.willChange = "transform";
-      appRoot.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${1 / scale})`;
-    };
-
-    const enableCompensation = () => {
-      const visualViewport = window.visualViewport;
-      if (!visualViewport || visualViewport.scale <= 1.02) return;
-      compensationActive = true;
-      appRoot.style.transition = "transform 240ms ease-out";
-      updateCompensation();
-      visualViewport.addEventListener("resize", updateCompensation, { passive: true });
-      visualViewport.addEventListener("scroll", updateCompensation, { passive: true });
-      window.addEventListener("scroll", updateCompensation, { passive: true });
-      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
-      transitionTimer = window.setTimeout(() => {
-        appRoot.style.removeProperty("transition");
-        transitionTimer = undefined;
-      }, 280);
-    };
-
-    const restoreDeviceScale = () => {
-      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      restoreTimer = window.setTimeout(() => {
-        if ((window.visualViewport?.scale ?? 1) > 1.02) {
-          enableCompensation();
-        } else {
-          clearCompensation();
-        }
-        viewport.content = originalContent;
-        restoreTimer = undefined;
-      }, 450);
-    };
-
-    const scheduleReset = () => {
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(() => {
-        resetTimer = undefined;
-        if ((window.visualViewport?.scale ?? 1) > 1.02) restoreDeviceScale();
-      }, 220);
-    };
+    const distance = (a: Touch, b: Touch) =>
+      Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 
     const onTouchStart = (event: TouchEvent) => {
-      // Let a new two-finger gesture zoom naturally; normalize again on release.
-      if (event.touches.length >= 2 && compensationActive) clearCompensation();
+      if (event.touches.length !== 2) return;
+      if (resetTimer !== undefined) {
+        window.clearTimeout(resetTimer);
+        resetTimer = undefined;
+      }
+      const rect = root.getBoundingClientRect();
+      const a = event.touches[0];
+      const b = event.touches[1];
+      pinchStartDistance = Math.max(1, distance(a, b));
+      pinchScale = 1;
+      pinchOriginX = (a.clientX + b.clientX) / 2 - rect.left;
+      pinchOriginY = (a.clientY + b.clientY) / 2 - rect.top;
+      pinching = true;
+      root.style.transition = "none";
+      root.style.transformOrigin = `${pinchOriginX}px ${pinchOriginY}px`;
+      root.style.willChange = "transform";
     };
+
+    const onTouchMove = (event: TouchEvent) => {
+      if (!pinching || event.touches.length !== 2) return;
+      event.preventDefault();
+      const nextScale = Math.min(2.5, Math.max(1, distance(event.touches[0], event.touches[1]) / pinchStartDistance));
+      pinchScale = nextScale;
+      root.style.transform = `scale(${pinchScale})`;
+    };
+
+    const resetPage = () => {
+      if (!pinching) return;
+      pinching = false;
+      root.style.transition = "transform 180ms ease-out";
+      root.style.transform = "scale(1)";
+      resetTimer = window.setTimeout(() => {
+        root.style.removeProperty("transform");
+        root.style.removeProperty("transform-origin");
+        root.style.removeProperty("transition");
+        root.style.removeProperty("will-change");
+        resetTimer = undefined;
+      }, 200);
+      pinchStartDistance = 0;
+      pinchScale = 1;
+    };
+
     const onTouchEnd = (event: TouchEvent) => {
-      if (event.touches.length === 0) scheduleReset();
+      if (pinching && event.touches.length < 2) resetPage();
+    };
+
+    const onGestureStart = (event: Event) => {
+      event.preventDefault();
+    };
+    const onGestureChange = (event: Event) => {
+      event.preventDefault();
+    };
+    const onGestureEnd = (event: Event) => {
+      event.preventDefault();
+      resetPage();
     };
 
     document.addEventListener("touchstart", onTouchStart, { passive: true });
+    document.addEventListener("touchmove", onTouchMove, { passive: false });
     document.addEventListener("touchend", onTouchEnd, { passive: true });
-    document.addEventListener("gestureend", scheduleReset, { passive: true });
+    document.addEventListener("touchcancel", resetPage, { passive: true });
+    document.addEventListener("gesturestart", onGestureStart, { passive: false });
+    document.addEventListener("gesturechange", onGestureChange, { passive: false });
+    document.addEventListener("gestureend", onGestureEnd, { passive: false });
 
     return () => {
       document.removeEventListener("touchstart", onTouchStart);
+      document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
-      document.removeEventListener("gestureend", scheduleReset);
+      document.removeEventListener("touchcancel", resetPage);
+      document.removeEventListener("gesturestart", onGestureStart);
+      document.removeEventListener("gesturechange", onGestureChange);
+      document.removeEventListener("gestureend", onGestureEnd);
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
-      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
-      clearCompensation();
-      viewport.content = originalContent;
+      root.style.removeProperty("transform");
+      root.style.removeProperty("transform-origin");
+      root.style.removeProperty("transition");
+      root.style.removeProperty("will-change");
+      html.style.touchAction = previousHtmlTouchAction;
+      body.style.touchAction = previousBodyTouchAction;
+      root.style.touchAction = previousRootTouchAction;
     };
   }, []);
 
