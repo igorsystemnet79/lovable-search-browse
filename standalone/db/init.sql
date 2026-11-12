@@ -228,11 +228,11 @@ BEGIN
     iznos_old := OLD.budzet; iznos_new := NEW.budzet;
   END IF;
   IF iznos_old IS DISTINCT FROM iznos_new THEN
-    promene := promene || ('Cena/budžet: ' || coalesce(iznos_old::text, 'po dogovoru') || ' → ' || coalesce(iznos_new::text, 'po dogovoru') || ' ' || NEW.valuta);
+    promene := array_append(promene, 'Cena/budžet: ' || coalesce(iznos_old::text, 'po dogovoru') || ' → ' || coalesce(iznos_new::text, 'po dogovoru') || ' ' || NEW.valuta);
   END IF;
-  IF OLD.naslov IS DISTINCT FROM NEW.naslov THEN promene := promene || ('Naslov: ' || NEW.naslov); END IF;
+  IF OLD.naslov IS DISTINCT FROM NEW.naslov THEN promene := array_append(promene, 'Naslov: ' || NEW.naslov); END IF;
   IF OLD.opis IS DISTINCT FROM NEW.opis THEN promene := array_append(promene, 'Opis je izmenjen'); END IF;
-  IF OLD.lokacija IS DISTINCT FROM NEW.lokacija THEN promene := promene || ('Lokacija: ' || NEW.lokacija); END IF;
+  IF OLD.lokacija IS DISTINCT FROM NEW.lokacija THEN promene := array_append(promene, 'Lokacija: ' || NEW.lokacija); END IF;
   IF OLD.telefon IS DISTINCT FROM NEW.telefon OR OLD.kontakt_ime IS DISTINCT FROM NEW.kontakt_ime THEN promene := array_append(promene, 'Kontakt je izmenjen'); END IF;
   IF OLD.zavrseno IS DISTINCT FROM NEW.zavrseno THEN
     promene := array_append(promene, CASE WHEN NEW.zavrseno THEN 'Oglas je završen' ELSE 'Oglas je ponovo aktivan' END);
