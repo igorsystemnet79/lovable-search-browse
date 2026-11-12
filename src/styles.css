@@ -374,3 +374,13 @@ table {
   overscroll-behavior-x: contain;
   -webkit-overflow-scrolling: touch;
 }
+
+
+/* The catalog's outer wrapper is the single horizontal scroller on phones.
+   Keep the table itself from becoming a second nested scroll container. */
+.catalog-items-table {
+  display: table;
+  width: 100%;
+  max-width: none;
+  overflow: visible;
+}
