@@ -162,6 +162,8 @@ function RootComponent() {
     const previousHtmlTouchAction = html.style.touchAction;
     const previousBodyTouchAction = body.style.touchAction;
     const previousRootTouchAction = root.style.touchAction;
+    const viewportMeta = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const originalViewportContent = viewportMeta?.content || "width=device-width, initial-scale=1";
     html.style.touchAction = "pan-y";
     body.style.touchAction = "pan-y";
     root.style.touchAction = "pan-y";
@@ -174,6 +176,24 @@ function RootComponent() {
 
     const distance = (a: Touch, b: Touch) =>
       Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
+
+    const normalizeSafariViewport = () => {
+      if (!viewportMeta) return;
+      // iOS Safari can retain a zoomed visual viewport even after the
+      // temporary page transform has been removed. Temporarily constrain
+      // the viewport to its initial scale, then restore the site's normal
+      // zoom permissions so the next pinch gesture still works.
+      viewportMeta.setAttribute(
+        "content",
+        "width=device-width, initial-scale=1, maximum-scale=1"
+      );
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          viewportMeta.setAttribute("content", originalViewportContent);
+          window.scrollTo({ left: 0, top: window.scrollY, behavior: "instant" });
+        });
+      });
+    };
 
     const clearTemporaryZoom = () => {
       pinching = false;
@@ -195,6 +215,7 @@ function RootComponent() {
         cleanupFrame = 0;
       });
       pinchStartDistance = 0;
+      normalizeSafariViewport();
     };
 
     const onTouchStart = (event: TouchEvent) => {
