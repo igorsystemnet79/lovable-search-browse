@@ -26,47 +26,6 @@ function PoslovniKatalogPage() {
   const [form,setForm]=useState({sifra:"",naziv:"",opis:"",kategorija:"",cena:"",valuta:"RSD",kolicina:"",proizvodjac:""});
   const [editingId,setEditingId]=useState<string|null>(null);
 
-  // Match the homepage behavior: use the browser's native pinch zoom,
-  // then restore the page viewport to device width when the gesture ends.
-  useEffect(() => {
-    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    const originalContent = viewport?.content || "width=device-width, initial-scale=1";
-    let resetTimer: number | undefined;
-
-    const restoreViewport = () => {
-      if (!viewport) return;
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-
-      // Briefly constrain the viewport to its baseline, then restore the
-      // site's normal viewport settings so pinch zoom remains available.
-      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      resetTimer = window.setTimeout(() => {
-        viewport.content = originalContent;
-      }, 120);
-    };
-
-    const restoreAfterTouch = (event: TouchEvent) => {
-      if (event.touches.length !== 0) return;
-      // Fallback for embedded browsers that expose pinch only as touch events.
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(() => {
-        if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
-          viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-          resetTimer = window.setTimeout(() => { viewport.content = originalContent; }, 120);
-        }
-      }, 80);
-    };
-
-    document.addEventListener("gestureend", restoreViewport, { passive: true });
-    document.addEventListener("touchend", restoreAfterTouch, { passive: true });
-
-    return () => {
-      document.removeEventListener("gestureend", restoreViewport);
-      document.removeEventListener("touchend", restoreAfterTouch);
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      if (viewport) viewport.content = originalContent;
-    };
-  }, []);
   const load=useCallback(async()=>{
     if(!user)return;
     setBusy(true);setError("");
