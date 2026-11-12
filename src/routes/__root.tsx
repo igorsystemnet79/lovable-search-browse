@@ -195,6 +195,14 @@ function RootComponent() {
         document.documentElement.scrollLeft = 0;
         document.body.scrollLeft = 0;
 
+        // A wide business-catalog table has its own horizontal scroller.
+        // iOS Safari can leave that nested scroller offset after the root
+        // pinch transform is removed, even when the document is reset.
+        // Restore the catalog's outer scroller to its centered starting edge.
+        root.querySelectorAll<HTMLElement>(".catalog-page .overflow-x-auto").forEach((scroller) => {
+          scroller.scrollLeft = 0;
+        });
+
         cleanupFrame = requestAnimationFrame(() => {
           root.style.removeProperty("transform");
           root.style.removeProperty("transform-origin");
