@@ -150,70 +150,105 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // Restore the device scale after a pinch, then realign the page only after
-  // Safari has applied the viewport change. Scrolling before the reflow can leave
-  // the visual viewport horizontally displaced on iPhone.
+  // iOS Safari may keep the visual viewport magnified after a pinch even when
+  // the viewport meta tag is reset. Try the native reset first; if Safari keeps
+  // the zoom, visually normalize the app root without changing catalog layout.
   useEffect(() => {
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    if (!viewport) return;
+    const appRoot = document.getElementById("root");
+    if (!viewport || !appRoot) return;
 
     const originalContent = viewport.content || "width=device-width, initial-scale=1";
     let resetTimer: number | undefined;
     let restoreTimer: number | undefined;
-    let resetting = false;
+    let transitionTimer: number | undefined;
+    let compensationActive = false;
 
-    const alignPageToDevice = () => {
-      const top = window.scrollY;
-      document.documentElement.scrollLeft = 0;
-      if (document.body) document.body.scrollLeft = 0;
-      window.scrollTo({ left: 0, top, behavior: "auto" });
+    const clearCompensation = () => {
+      compensationActive = false;
+      appRoot.style.removeProperty("transform");
+      appRoot.style.removeProperty("transform-origin");
+      appRoot.style.removeProperty("will-change");
+      appRoot.style.removeProperty("transition");
+      window.visualViewport?.removeEventListener("resize", updateCompensation);
+      window.visualViewport?.removeEventListener("scroll", updateCompensation);
+      window.removeEventListener("scroll", updateCompensation);
     };
 
-    const alignAfterLayout = () => {
-      window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(alignPageToDevice);
-      });
+    const updateCompensation = () => {
+      const visualViewport = window.visualViewport;
+      if (!visualViewport || visualViewport.scale <= 1.02) {
+        clearCompensation();
+        return;
+      }
+
+      const scale = visualViewport.scale;
+      // Counter the visual viewport scale and its pan while retaining the
+      // current document scroll position. This changes no element dimensions.
+      const x = visualViewport.offsetLeft + window.scrollX * (1 - 1 / scale);
+      const y = visualViewport.offsetTop + window.scrollY * (1 - 1 / scale);
+      appRoot.style.transformOrigin = "0 0";
+      appRoot.style.willChange = "transform";
+      appRoot.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${1 / scale})`;
+    };
+
+    const enableCompensation = () => {
+      const visualViewport = window.visualViewport;
+      if (!visualViewport || visualViewport.scale <= 1.02) return;
+      compensationActive = true;
+      appRoot.style.transition = "transform 240ms ease-out";
+      updateCompensation();
+      visualViewport.addEventListener("resize", updateCompensation, { passive: true });
+      visualViewport.addEventListener("scroll", updateCompensation, { passive: true });
+      window.addEventListener("scroll", updateCompensation, { passive: true });
+      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
+      transitionTimer = window.setTimeout(() => {
+        appRoot.style.removeProperty("transition");
+        transitionTimer = undefined;
+      }, 280);
     };
 
     const restoreDeviceScale = () => {
-      if (resetting) return;
-      resetting = true;
-
-      // Temporarily disallow magnification so iOS returns to scale 1.
       viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      alignAfterLayout();
-
       restoreTimer = window.setTimeout(() => {
+        if ((window.visualViewport?.scale ?? 1) > 1.02) {
+          enableCompensation();
+        } else {
+          clearCompensation();
+        }
         viewport.content = originalContent;
-        // The original viewport declaration is restored first; then clear any
-        // horizontal offset Safari reintroduced while recalculating the layout.
-        alignAfterLayout();
-        resetting = false;
         restoreTimer = undefined;
-      }, 320);
+      }, 450);
     };
 
     const scheduleReset = () => {
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
       resetTimer = window.setTimeout(() => {
         resetTimer = undefined;
-        const scale = window.visualViewport?.scale ?? 1;
-        if (scale > 1.02) restoreDeviceScale();
-      }, 250);
+        if ((window.visualViewport?.scale ?? 1) > 1.02) restoreDeviceScale();
+      }, 220);
     };
 
+    const onTouchStart = (event: TouchEvent) => {
+      // Let a new two-finger gesture zoom naturally; normalize again on release.
+      if (event.touches.length >= 2 && compensationActive) clearCompensation();
+    };
     const onTouchEnd = (event: TouchEvent) => {
       if (event.touches.length === 0) scheduleReset();
     };
 
+    document.addEventListener("touchstart", onTouchStart, { passive: true });
     document.addEventListener("touchend", onTouchEnd, { passive: true });
     document.addEventListener("gestureend", scheduleReset, { passive: true });
 
     return () => {
+      document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchend", onTouchEnd);
       document.removeEventListener("gestureend", scheduleReset);
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
       if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+      if (transitionTimer !== undefined) window.clearTimeout(transitionTimer);
+      clearCompensation();
       viewport.content = originalContent;
     };
   }, []);
