@@ -1174,7 +1174,7 @@ app.post('/api/admin/access-grants',auth,admin,asyncRoute(async(req,res)=>{
   if(!user.rowCount){await c.query('ROLLBACK');return res.status(404).json({error:'Korisnički nalog nije pronađen.'});}
   await c.query("UPDATE user_access_grants SET status='zamenjen' WHERE user_id=$1 AND status='aktivan'",[userId]);
   const result=await c.query(`INSERT INTO user_access_grants(user_id,package_name,duration_days,gratis,cena_eur,status,vazi_od,vazi_do,napomena,kreirao_id)
-   VALUES($1,$2,$3,$4,$5,'aktivan',now(),now()+($6::text||' days')::interval,$7,$8) RETURNING *`,
+   VALUES($1,$2,$3,$4,$5,'aktivan',now(),now()+($3::text||' days')::interval,$6,$7) RETURNING *`,
    [userId,packageName,days,gratis,price,note||null,req.user.sub]);
   await c.query('COMMIT');
   res.status(201).json({data:result.rows[0],poruka:gratis?'Gratis period je aktiviran za izabranog korisnika.':'Paket je aktiviran za izabranog korisnika.'});
