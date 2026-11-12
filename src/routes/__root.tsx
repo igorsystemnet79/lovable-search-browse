@@ -150,6 +150,46 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
+  // Keep native pinch zoom, then return the viewport to the device width
+  // after the gesture ends. Register once at the root so every route behaves alike.
+  useEffect(() => {
+    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
+    const originalContent = viewport?.content || "width=device-width, initial-scale=1";
+    let resetTimer: number | undefined;
+
+    const restoreViewport = () => {
+      if (!viewport) return;
+      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+      resetTimer = window.setTimeout(() => {
+        viewport.content = originalContent;
+      }, 120);
+    };
+
+    const restoreAfterTouch = (event: TouchEvent) => {
+      if (event.touches.length !== 0) return;
+      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+      resetTimer = window.setTimeout(() => {
+        if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
+          viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
+          resetTimer = window.setTimeout(() => {
+            viewport.content = originalContent;
+          }, 120);
+        }
+      }, 80);
+    };
+
+    document.addEventListener("gestureend", restoreViewport, { passive: true });
+    document.addEventListener("touchend", restoreAfterTouch, { passive: true });
+
+    return () => {
+      document.removeEventListener("gestureend", restoreViewport);
+      document.removeEventListener("touchend", restoreAfterTouch);
+      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+      if (viewport) viewport.content = originalContent;
+    };
+  }, []);
+
   useEffect(() => {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
 
