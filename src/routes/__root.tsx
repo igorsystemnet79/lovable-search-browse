@@ -150,9 +150,9 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // Handle pinch zoom ourselves so the page always returns to its exact
-  // original layout when the fingers are released. Native iOS visual-viewport
-  // zoom cannot be reliably reset from page JavaScript.
+  // Controlled pinch zoom: prevent Safari from horizontally panning the page,
+  // and remove the temporary transform immediately when the gesture ends.
+  // Keeping the transform temporary avoids changing document layout/width.
   useEffect(() => {
     const root = document.getElementById("root");
     const html = document.documentElement;
@@ -162,31 +162,44 @@ function RootComponent() {
     const previousHtmlTouchAction = html.style.touchAction;
     const previousBodyTouchAction = body.style.touchAction;
     const previousRootTouchAction = root.style.touchAction;
-    html.style.touchAction = "pan-x pan-y";
-    body.style.touchAction = "pan-x pan-y";
-    root.style.touchAction = "pan-x pan-y";
+    html.style.touchAction = "pan-y";
+    body.style.touchAction = "pan-y";
+    root.style.touchAction = "pan-y";
 
     let pinchStartDistance = 0;
-    let pinchScale = 1;
     let pinchOriginX = 0;
     let pinchOriginY = 0;
-    let resetTimer: number | undefined;
     let pinching = false;
+    let cleanupFrame = 0;
 
     const distance = (a: Touch, b: Touch) =>
       Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 
+    const clearTemporaryZoom = () => {
+      pinching = false;
+      root.style.transition = "none";
+      root.style.transform = "none";
+      // Force the compositor to commit the unscaled layer before clearing
+      // inline styles. This avoids a stale translated layer in iOS Safari.
+      cancelAnimationFrame(cleanupFrame);
+      cleanupFrame = requestAnimationFrame(() => {
+        root.style.removeProperty("transform");
+        root.style.removeProperty("transform-origin");
+        root.style.removeProperty("transition");
+        root.style.removeProperty("will-change");
+        cleanupFrame = 0;
+      });
+      pinchStartDistance = 0;
+    };
+
     const onTouchStart = (event: TouchEvent) => {
       if (event.touches.length !== 2) return;
-      if (resetTimer !== undefined) {
-        window.clearTimeout(resetTimer);
-        resetTimer = undefined;
-      }
+      cancelAnimationFrame(cleanupFrame);
+      cleanupFrame = 0;
       const rect = root.getBoundingClientRect();
       const a = event.touches[0];
       const b = event.touches[1];
       pinchStartDistance = Math.max(1, distance(a, b));
-      pinchScale = 1;
       pinchOriginX = (a.clientX + b.clientX) / 2 - rect.left;
       pinchOriginY = (a.clientY + b.clientY) / 2 - rect.top;
       pinching = true;
@@ -198,59 +211,25 @@ function RootComponent() {
     const onTouchMove = (event: TouchEvent) => {
       if (!pinching || event.touches.length !== 2) return;
       event.preventDefault();
-      const nextScale = Math.min(2.5, Math.max(1, distance(event.touches[0], event.touches[1]) / pinchStartDistance));
-      pinchScale = nextScale;
-      root.style.transform = `scale(${pinchScale})`;
-    };
-
-    const resetPage = () => {
-      if (!pinching) return;
-      pinching = false;
-      root.style.transition = "transform 180ms ease-out";
-      root.style.transform = "scale(1)";
-      resetTimer = window.setTimeout(() => {
-        root.style.removeProperty("transform");
-        root.style.removeProperty("transform-origin");
-        root.style.removeProperty("transition");
-        root.style.removeProperty("will-change");
-        resetTimer = undefined;
-      }, 200);
-      pinchStartDistance = 0;
-      pinchScale = 1;
+      const scale = Math.min(2.5, Math.max(1, distance(event.touches[0], event.touches[1]) / pinchStartDistance));
+      root.style.transform = scale === 1 ? "none" : `scale(${scale})`;
     };
 
     const onTouchEnd = (event: TouchEvent) => {
-      if (pinching && event.touches.length < 2) resetPage();
-    };
-
-    const onGestureStart = (event: Event) => {
-      event.preventDefault();
-    };
-    const onGestureChange = (event: Event) => {
-      event.preventDefault();
-    };
-    const onGestureEnd = (event: Event) => {
-      event.preventDefault();
-      resetPage();
+      if (pinching && event.touches.length < 2) clearTemporaryZoom();
     };
 
     document.addEventListener("touchstart", onTouchStart, { passive: true });
     document.addEventListener("touchmove", onTouchMove, { passive: false });
     document.addEventListener("touchend", onTouchEnd, { passive: true });
-    document.addEventListener("touchcancel", resetPage, { passive: true });
-    document.addEventListener("gesturestart", onGestureStart, { passive: false });
-    document.addEventListener("gesturechange", onGestureChange, { passive: false });
-    document.addEventListener("gestureend", onGestureEnd, { passive: false });
+    document.addEventListener("touchcancel", clearTemporaryZoom, { passive: true });
 
     return () => {
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
-      document.removeEventListener("touchcancel", resetPage);
-      document.removeEventListener("gesturestart", onGestureStart);
-      document.removeEventListener("gesturechange", onGestureChange);
-      document.removeEventListener("gestureend", onGestureEnd);
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+      document.removeEventListener("touchcancel", clearTemporaryZoom);
+      cancelAnimationFrame(cleanupFrame);
       root.style.removeProperty("transform");
       root.style.removeProperty("transform-origin");
       root.style.removeProperty("transition");
