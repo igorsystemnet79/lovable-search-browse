@@ -27,8 +27,23 @@ app.use(express.json({ limit: '20mb' }));
 app.use((req,_res,next)=>{const raw=String(req.headers.cookie||'');req.cookies=Object.fromEntries(raw.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}));next();});
 // Google OAuth ima zaseban limit, da ponovljeni pokušaji ne blokiraju običnu prijavu.
 app.use('/api/auth/google', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja Google prijave. Sačekaj nekoliko minuta i pokušaj ponovo.' } }));
-app.use('/api/auth', rateLimit({ windowMs: 15 * 60 * 1000, limit: 30, standardHeaders: 'draft-8', legacyHeaders: false, skip: (req) => req.path.startsWith('/google') || req.path === '/register' }));
-// Registracija ima sopstveni brojač: pozivi prijave i ostalih auth ruta ne smeju da je blokiraju.
+// Login protection is scoped to failed attempts, not every authenticated-session check.
+// A shared IP (mobile carrier/Wi-Fi) must not lock unrelated accounts after normal app navigation.
+const loginIpLimiter = rateLimit({
+ windowMs: 15 * 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false,
+ skipSuccessfulRequests: true,
+ message: { error: 'Previše neuspešnih pokušaja prijave sa ove mreže. Sačekaj 15 minuta i pokušaj ponovo.' }
+});
+const loginAccountLimiter = rateLimit({
+ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false,
+ keyGenerator: (req) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  return createHash('sha256').update(email || `ip:${req.ip}`).digest('hex');
+ },
+ skipSuccessfulRequests: true,
+ message: { error: 'Previše neuspešnih pokušaja za ovaj nalog. Sačekaj 15 minuta i pokušaj ponovo.' }
+});
+// Registracija ima sopstveni brojač, odvojen od prijave.
 const registerLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja registracije. Sačekaj nekoliko minuta i pokušaj ponovo.' } });
 app.use('/api/db/query', rateLimit({ windowMs: 60 * 1000, limit: 180 }));
 app.use('/api/reports', rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: true, legacyHeaders: false }));
@@ -340,7 +355,7 @@ app.post('/api/auth/register', registerLimiter, asyncRoute(async(req,res)=>{
  if(zauzeto.rowCount){await c.query('ROLLBACK');return res.status(409).json({error:'Ovo korisničko ime je već zauzeto.'});}
  const {rows}=await c.query('INSERT INTO users(email,password_hash,email_confirmed_at,metadata) VALUES($1,$2,now(),$3) RETURNING *',[e,await bcrypt.hash(password,12),JSON.stringify({...metadata,korisnicko_ime:korisnickoIme})]); const u=rows[0]; const m=metadata; const pib=m.tip_lica==='pravno'&&String(m.pib||'').trim()?String(m.pib).trim().slice(0,30):null; const verified=!!(pib&&(await c.query('SELECT 1 FROM apr_firme WHERE pib=$1',[pib])).rowCount); await c.query(`INSERT INTO profiles(id,ime,prezime,korisnicko_ime,status_trgovca,telefon,grad,adresa,tip_lica,naziv_firme,pib,email,firma_verifikovana,firma_status_verifikacije) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,[u.id,m.ime||null,m.prezime||null,korisnickoIme,m.status_trgovca,m.telefon||null,m.grad||null,m.adresa||null,m.tip_lica==='pravno'?'pravno':'fizicko',m.naziv_firme||null,pib,e,verified,verified?'verifikovana':'na_cekanju']); await c.query("INSERT INTO user_roles(user_id,role) VALUES($1,'user')",[u.id]); const rulesVersion=await c.query('SELECT COALESCE(MAX(version),1)::int AS version FROM platform_rules_versions'); await c.query('INSERT INTO prihvatanja_uslova(user_id,verzija_pravila,verzija_obavestenja_privatnosti,potvrdjeno_punoletstvo,upoznat_sa_privatnoscu,ip_adresa,user_agent) VALUES($1,$2,$3,true,true,$4,$5)',[u.id,rulesVersion.rows[0].version,'nacrt-1.0',String(req.ip||'').slice(0,100)||null,String(req.headers['user-agent']||'').slice(0,500)||null]); await c.query('COMMIT'); const token=sign(u); res.status(201).json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}}); } catch(err){await c.query('ROLLBACK'); if(err.code==='23505') return res.status(409).json({error:err.constraint==='profiles_korisnicko_ime_unique'?'Ovo korisničko ime je već zauzeto.':'Nalog sa ovom e-mail adresom već postoji.'}); throw err;} finally{c.release();}
 }));
-app.post('/api/auth/login', asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
+app.post('/api/auth/login', loginIpLimiter, loginAccountLimiter, asyncRoute(async(req,res)=>{const e=String(req.body?.email||'').trim().toLowerCase();const {rows}=await pool.query('SELECT * FROM users WHERE email=$1',[e]);const u=rows[0];if(!u||!(await bcrypt.compare(String(req.body?.password||''),u.password_hash)))return res.status(400).json({error:'E-mail ili lozinka nisu ispravni.'});const p=await pool.query('SELECT blokiran FROM profiles WHERE id=$1',[u.id]);if(p.rows[0]?.blokiran)return res.status(403).json({error:'Nalog je privremeno blokiran.'});await pool.query('UPDATE profiles SET last_active_at=now() WHERE id=$1',[u.id]);const token=sign(u);res.json({user:publicUser(u),session:{access_token:token,token_type:'bearer',expires_in:604800,user:publicUser(u)}});}));
 app.get('/api/auth/me',auth,asyncRoute(async(req,res)=>{const {rows}=await pool.query('SELECT * FROM users WHERE id=$1',[req.user.sub]);if(!rows[0])return res.status(401).json({error:'Nalog ne postoji.'});await pool.query("UPDATE profiles SET last_active_at=now() WHERE id=$1 AND (last_active_at IS NULL OR last_active_at<now()-interval '5 minutes')",[req.user.sub]);res.json({user:publicUser(rows[0])});}));
 app.patch('/api/auth/password',auth,asyncRoute(async(req,res)=>{const password=String(req.body?.password||'');if(password.length<8)return res.status(400).json({error:'Lozinka mora imati najmanje 8 karaktera.'});await pool.query('UPDATE users SET password_hash=$1 WHERE id=$2',[await bcrypt.hash(password,12),req.user.sub]);res.json({ok:true});}));
 const resetRequestLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 5, standardHeaders: true, legacyHeaders: false });
