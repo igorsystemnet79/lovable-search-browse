@@ -150,9 +150,9 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // Return the page to its original device scale after a completed pinch.
-  // Keep the change brief and restore the original viewport declaration immediately
-  // afterwards so responsive catalog dimensions are not permanently altered.
+  // Restore the device scale after a pinch, then realign the page only after
+  // Safari has applied the viewport change. Scrolling before the reflow can leave
+  // the visual viewport horizontally displaced on iPhone.
   useEffect(() => {
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
     if (!viewport) return;
@@ -162,17 +162,35 @@ function RootComponent() {
     let restoreTimer: number | undefined;
     let resetting = false;
 
+    const alignPageToDevice = () => {
+      const top = window.scrollY;
+      document.documentElement.scrollLeft = 0;
+      if (document.body) document.body.scrollLeft = 0;
+      window.scrollTo({ left: 0, top, behavior: "auto" });
+    };
+
+    const alignAfterLayout = () => {
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(alignPageToDevice);
+      });
+    };
+
     const restoreDeviceScale = () => {
       if (resetting) return;
       resetting = true;
+
+      // Temporarily disallow magnification so iOS returns to scale 1.
       viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      window.scrollTo({ left: 0, top: window.scrollY, behavior: "auto" });
+      alignAfterLayout();
 
       restoreTimer = window.setTimeout(() => {
         viewport.content = originalContent;
+        // The original viewport declaration is restored first; then clear any
+        // horizontal offset Safari reintroduced while recalculating the layout.
+        alignAfterLayout();
         resetting = false;
         restoreTimer = undefined;
-      }, 250);
+      }, 320);
     };
 
     const scheduleReset = () => {
@@ -181,7 +199,7 @@ function RootComponent() {
         resetTimer = undefined;
         const scale = window.visualViewport?.scale ?? 1;
         if (scale > 1.02) restoreDeviceScale();
-      }, 180);
+      }, 250);
     };
 
     const onTouchEnd = (event: TouchEvent) => {
