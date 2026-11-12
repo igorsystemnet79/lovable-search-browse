@@ -342,40 +342,35 @@ table { max-width: 100%; }
   }
 }
 
-
-
-/* Full-device-width layout: shared by iOS, Android, tablets and desktop. */
+/* Prevent page-level horizontal drift; data tables keep their own horizontal scroll. */
 html,
 body,
 #root {
   width: 100%;
-  max-width: 100%;
   min-width: 0;
-  margin-inline: 0;
+  max-width: 100%;
 }
 
+html,
 body {
-  width: 100%;
+  overflow-x: hidden;
 }
 
 #root {
-  display: flow-root;
-}
-
-#root > * {
-  min-width: 0;
-  max-width: 100%;
+  overflow-x: clip;
 }
 
 .container-page {
   width: 100%;
   min-width: 0;
+  margin-inline: auto;
 }
 
-@media (max-width: 767px) {
-  .container-page {
-    width: 100%;
-    max-width: 100%;
-    padding-inline: 1rem;
-  }
+table {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
