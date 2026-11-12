@@ -150,43 +150,59 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // Keep native pinch zoom, then return the viewport to the device width
-  // after the gesture ends. Register once at the root so every route behaves alike.
+  // Restore the page to device scale after a pinch gesture on iOS and Android.
+  // This lives in the root so the behavior is identical on every route.
   useEffect(() => {
     const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    const originalContent = viewport?.content || "width=device-width, initial-scale=1";
-    let resetTimer: number | undefined;
+    if (!viewport) return;
 
-    const restoreViewport = () => {
-      if (!viewport) return;
+    const originalContent = viewport.content || "width=device-width, initial-scale=1";
+    let resetTimer: number | undefined;
+    let restoreTimer: number | undefined;
+    let resetInProgress = false;
+
+    const resetToDeviceWidth = () => {
+      if (resetInProgress) return;
+      resetInProgress = true;
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
       viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      resetTimer = window.setTimeout(() => {
+      window.scrollTo(0, window.scrollY);
+
+      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+      restoreTimer = window.setTimeout(() => {
         viewport.content = originalContent;
-      }, 120);
+        resetInProgress = false;
+        window.scrollTo(0, window.scrollY);
+      }, 350);
     };
 
-    const restoreAfterTouch = (event: TouchEvent) => {
-      if (event.touches.length !== 0) return;
+    const checkPinchScale = () => {
+      const scale = window.visualViewport?.scale ?? 1;
+      if (scale > 1.02) {
+        if (resetTimer !== undefined) window.clearTimeout(resetTimer);
+        resetTimer = window.setTimeout(resetToDeviceWidth, 120);
+      }
+    };
+
+    const onTouchEnd = (event: TouchEvent) => {
+      if (event.touches.length > 0) return;
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(() => {
-        if (viewport && window.visualViewport && window.visualViewport.scale > 1) {
-          viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-          resetTimer = window.setTimeout(() => {
-            viewport.content = originalContent;
-          }, 120);
-        }
-      }, 80);
+      resetTimer = window.setTimeout(checkPinchScale, 120);
     };
 
-    document.addEventListener("gestureend", restoreViewport, { passive: true });
-    document.addEventListener("touchend", restoreAfterTouch, { passive: true });
+    document.addEventListener("gestureend", checkPinchScale, { passive: true });
+    document.addEventListener("touchend", onTouchEnd, { passive: true });
+    window.visualViewport?.addEventListener("resize", checkPinchScale);
+    window.visualViewport?.addEventListener("scroll", checkPinchScale);
 
     return () => {
-      document.removeEventListener("gestureend", restoreViewport);
-      document.removeEventListener("touchend", restoreAfterTouch);
+      document.removeEventListener("gestureend", checkPinchScale);
+      document.removeEventListener("touchend", onTouchEnd);
+      window.visualViewport?.removeEventListener("resize", checkPinchScale);
+      window.visualViewport?.removeEventListener("scroll", checkPinchScale);
       if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      if (viewport) viewport.content = originalContent;
+      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
+      viewport.content = originalContent;
     };
   }, []);
 
