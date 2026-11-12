@@ -342,3 +342,40 @@ table { max-width: 100%; }
   }
 }
 
+
+
+/* Full-device-width layout: shared by iOS, Android, tablets and desktop. */
+html,
+body,
+#root {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  margin-inline: 0;
+}
+
+body {
+  width: 100%;
+}
+
+#root {
+  display: flow-root;
+}
+
+#root > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.container-page {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 767px) {
+  .container-page {
+    width: 100%;
+    max-width: 100%;
+    padding-inline: 1rem;
+  }
+}
