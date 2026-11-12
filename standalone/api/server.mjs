@@ -38,10 +38,10 @@ const loginAccountLimiter = rateLimit({
  windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false,
  keyGenerator: (req) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
-  return createHash('sha256').update(email || `ip:${req.ip}`).digest('hex');
+  return createHash('sha256').update(`${req.ip}:${email}`).digest('hex');
  },
  skipSuccessfulRequests: true,
- message: { error: 'Previše neuspešnih pokušaja za ovaj nalog. Sačekaj 15 minuta i pokušaj ponovo.' }
+ message: { error: 'Previše neuspešnih pokušaja za ovaj nalog sa ove mreže. Sačekaj 15 minuta i pokušaj ponovo.' }
 });
 // Registracija ima sopstveni brojač, odvojen od prijave.
 const registerLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja registracije. Sačekaj nekoliko minuta i pokušaj ponovo.' } });
