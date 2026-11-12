@@ -176,22 +176,32 @@ function RootComponent() {
       Math.hypot(b.clientX - a.clientX, b.clientY - a.clientY);
 
     const clearTemporaryZoom = () => {
+      if (!pinching && !cleanupFrame) return;
       pinching = false;
-      // Reset the page's horizontal position without changing Safari's
-      // viewport scale or viewport metadata.
-      document.documentElement.scrollLeft = 0;
-      document.body.scrollLeft = 0;
+
+      // First remove the temporary scale and let Safari commit the original
+      // layout. Resetting scrollLeft while the scaled layer is still active
+      // can be undone by WebKit when it recalculates the transformed bounds.
       root.style.transition = "none";
       root.style.transform = "none";
-      // Force the compositor to commit the unscaled layer before clearing
-      // inline styles. This avoids a stale translated layer in iOS Safari.
+      root.style.transformOrigin = "0 0";
       cancelAnimationFrame(cleanupFrame);
+
+      const pageTop = window.scrollY;
       cleanupFrame = requestAnimationFrame(() => {
-        root.style.removeProperty("transform");
-        root.style.removeProperty("transform-origin");
-        root.style.removeProperty("transition");
-        root.style.removeProperty("will-change");
-        cleanupFrame = 0;
+        // Restore horizontal alignment only after the unscaled frame has
+        // been committed by WebKit. Keep the user's vertical position.
+        window.scrollTo({ left: 0, top: pageTop, behavior: "instant" });
+        document.documentElement.scrollLeft = 0;
+        document.body.scrollLeft = 0;
+
+        cleanupFrame = requestAnimationFrame(() => {
+          root.style.removeProperty("transform");
+          root.style.removeProperty("transform-origin");
+          root.style.removeProperty("transition");
+          root.style.removeProperty("will-change");
+          cleanupFrame = 0;
+        });
       });
       pinchStartDistance = 0;
     };
