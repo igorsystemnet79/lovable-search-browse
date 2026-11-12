@@ -177,6 +177,11 @@ function RootComponent() {
 
     const clearTemporaryZoom = () => {
       pinching = false;
+      // Clear any horizontal scroll offset Safari may have introduced while
+      // compositing the temporarily scaled root.
+      window.scrollTo(0, window.scrollY);
+      document.documentElement.scrollLeft = 0;
+      document.body.scrollLeft = 0;
       root.style.transition = "none";
       root.style.transform = "none";
       // Force the compositor to commit the unscaled layer before clearing
@@ -200,8 +205,11 @@ function RootComponent() {
       const a = event.touches[0];
       const b = event.touches[1];
       pinchStartDistance = Math.max(1, distance(a, b));
-      pinchOriginX = (a.clientX + b.clientX) / 2 - rect.left;
-      pinchOriginY = (a.clientY + b.clientY) / 2 - rect.top;
+      // Keep pinch zoom anchored to the device center, not the moving
+      // midpoint between fingers. This prevents iOS from leaving the page
+      // horizontally translated after the gesture ends.
+      pinchOriginX = root.clientWidth / 2;
+      pinchOriginY = 0;
       pinching = true;
       root.style.transition = "none";
       root.style.transformOrigin = `${pinchOriginX}px ${pinchOriginY}px`;
