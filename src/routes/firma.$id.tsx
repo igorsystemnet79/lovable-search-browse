@@ -20,7 +20,7 @@ function FirmaKatalogPage() {
   });
   const company = query.data?.company;
   const products = query.data?.data || [];
-  return <div className="min-h-screen w-full overflow-x-hidden bg-background text-foreground"><SiteHeader/><main className="container-page mx-auto w-full py-8">
+  return <div className="min-h-screen w-full overflow-x-hidden bg-background text-foreground"><SiteHeader/><main className="catalog-page container-page mx-auto w-full py-8">
     <Link to="/pretraga" className="text-sm text-brand hover:underline">← Nazad na pretragu</Link>
     {loading || query.isLoading ? <p className="mt-8 text-sm text-muted-foreground">Učitavanje kataloga...</p> :
     !user ? <section className="mt-8 rounded-2xl border p-6 text-center"><h1 className="text-xl font-semibold">Prijava je potrebna</h1><p className="mt-2 text-sm text-muted-foreground">Prijavi se da pregledaš poslovne kataloge.</p><Link to="/prijava" className="mt-4 inline-flex rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground">Prijava</Link></section> :
