@@ -1171,7 +1171,7 @@ app.get('/api/admin/access-grants/users',auth,admin,asyncRoute(async(req,res)=>{
 }));
 app.get('/api/admin/access-grants',auth,admin,asyncRoute(async(_req,res)=>{
  await pool.query("UPDATE user_access_grants SET status='istekao' WHERE status='aktivan' AND vazi_do<=now()");
- const r=await pool.query(`SELECT g.*,coalesce(p.email,u.email) AS email,p.ime,p.prezime,p.naziv_firme,p.tip_lica FROM user_access_grants g JOIN users u ON u.id=g.user_id LEFT JOIN profiles p ON p.id=u.id WHERE g.status<>'otkazan' ORDER BY g.created_at DESC LIMIT 500`);
+ const r=await pool.query(`SELECT g.*,coalesce(p.email,u.email) AS email,p.ime,p.prezime,p.naziv_firme,p.tip_lica FROM user_access_grants g JOIN users u ON u.id=g.user_id LEFT JOIN profiles p ON p.id=u.id WHERE g.status NOT IN ('otkazan','istekao') ORDER BY g.created_at DESC LIMIT 500`);
  res.json({data:r.rows});
 }));
 app.post('/api/admin/access-grants',auth,admin,asyncRoute(async(req,res)=>{
