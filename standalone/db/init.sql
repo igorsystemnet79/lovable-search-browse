@@ -62,6 +62,9 @@ ALTER TABLE profiles ADD CONSTRAINT profiles_firma_status_verifikacije_check
 UPDATE profiles p SET prezime=NULLIF(BTRIM(u.metadata->>'prezime'),'') FROM users u WHERE u.id=p.id AND (p.prezime IS NULL OR BTRIM(p.prezime)='') AND NULLIF(BTRIM(u.metadata->>'prezime'),'') IS NOT NULL;
 UPDATE profiles p SET korisnicko_ime=LOWER(NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'')) FROM users u WHERE u.id=p.id AND (p.korisnicko_ime IS NULL OR p.korisnicko_ime='') AND NULLIF(BTRIM(u.metadata->>'korisnicko_ime'),'') IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS profiles_korisnicko_ime_unique ON profiles (lower(korisnicko_ime)) WHERE korisnicko_ime IS NOT NULL AND korisnicko_ime <> '';
+-- PIB format validation is intentionally disabled during testing; restore before public launch.
+ALTER TABLE profiles DROP CONSTRAINT IF EXISTS profiles_pib_check;
+
 CREATE TABLE IF NOT EXISTS user_roles (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
  role text NOT NULL CHECK (role IN ('admin','moderator','user')), UNIQUE(user_id,role)
