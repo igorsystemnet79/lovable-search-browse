@@ -181,8 +181,6 @@ function RootComponent() {
       // viewport scale or viewport metadata.
       document.documentElement.scrollLeft = 0;
       document.body.scrollLeft = 0;
-      root.style.width = "100%";
-      root.style.maxWidth = "100vw";
       root.style.transition = "none";
       root.style.transform = "none";
       // Force the compositor to commit the unscaled layer before clearing
@@ -196,6 +194,12 @@ function RootComponent() {
         cleanupFrame = 0;
       });
       pinchStartDistance = 0;
+    };
+
+    // Safari iOS emits proprietary gesture events for native page zoom.
+    // Cancel them so only our controlled temporary root transform handles pinch.
+    const preventNativeSafariZoom = (event: Event) => {
+      event.preventDefault();
     };
 
     const onTouchStart = (event: TouchEvent) => {
@@ -227,12 +231,18 @@ function RootComponent() {
       if (pinching && event.touches.length < 2) clearTemporaryZoom();
     };
 
+    document.addEventListener("gesturestart", preventNativeSafariZoom, { passive: false });
+    document.addEventListener("gesturechange", preventNativeSafariZoom, { passive: false });
+    document.addEventListener("gestureend", preventNativeSafariZoom, { passive: false });
     document.addEventListener("touchstart", onTouchStart, { passive: true });
     document.addEventListener("touchmove", onTouchMove, { passive: false });
     document.addEventListener("touchend", onTouchEnd, { passive: true });
     document.addEventListener("touchcancel", clearTemporaryZoom, { passive: true });
 
     return () => {
+      document.removeEventListener("gesturestart", preventNativeSafariZoom);
+      document.removeEventListener("gesturechange", preventNativeSafariZoom);
+      document.removeEventListener("gestureend", preventNativeSafariZoom);
       document.removeEventListener("touchstart", onTouchStart);
       document.removeEventListener("touchmove", onTouchMove);
       document.removeEventListener("touchend", onTouchEnd);
