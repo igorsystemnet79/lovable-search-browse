@@ -22,7 +22,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 32) throw new Error('JWT_SECRET mora imati najmanje 32 karaktera.');
 app.set('trust proxy', 1);
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(express.json({ limit: '2mb' }));
+// Poslovni katalog šalje Excel/CSV sadržaj kao JSON; 2 MB nije dovoljno za veće uvoze.
+app.use(express.json({ limit: '20mb' }));
 app.use((req,_res,next)=>{const raw=String(req.headers.cookie||'');req.cookies=Object.fromEntries(raw.split(';').map(x=>x.trim()).filter(Boolean).map(x=>{const i=x.indexOf('=');return [decodeURIComponent(x.slice(0,i)),decodeURIComponent(x.slice(i+1))]}));next();});
 // Google OAuth ima zaseban limit, da ponovljeni pokušaji ne blokiraju običnu prijavu.
 app.use('/api/auth/google', rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false, message: { error: 'Previše pokušaja Google prijave. Sačekaj nekoliko minuta i pokušaj ponovo.' } }));
