@@ -1122,7 +1122,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
   if(APR_VERIFICATION_REQUIRED && !firm.rows[0].firma_verifikovana){await c.query('ROLLBACK');return res.status(400).json({error:'Firma prvo mora biti verifikovana u APR evidenciji.'});}
   // Administratorska dodela uvek odmah aktivira paket. Status uplate ostaje
   // samo evidencioni podatak i nikada ne blokira pristup korisnika.
-  await c.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
+  await c.query("UPDATE paketi_firmi SET status='otkazan',updated_at=now() WHERE user_id=$1 AND status='aktivan'",[userId]);
   const result=await c.query(`INSERT INTO paketi_firmi(user_id,paket,cena_eur,status,status_uplate,vazi_od,vazi_do,napomena,referenca_uplate,kreirao_id)
    VALUES($1,$2,$3,'aktivan',$4,(now() AT TIME ZONE 'Europe/Belgrade')::date,((now() AT TIME ZONE 'Europe/Belgrade')::date + ($5::text || ' months')::interval)::date,$6,$7,$8) RETURNING *`,
    [userId,code,selected.cena_eur,payment,selected.trajanje_meseci,note||null,reference||null,req.user.sub]);
@@ -1130,7 +1130,7 @@ app.post('/api/admin/business-packages',auth,admin,asyncRoute(async(req,res)=>{
  }catch(e){await c.query('ROLLBACK');throw e;}finally{c.release();}
 }));
 app.post('/api/admin/business-packages/:id/cancel',auth,admin,asyncRoute(async(req,res)=>{
- const r=await pool.query("UPDATE paketi_firmi SET status='otkazano',updated_at=now() WHERE id=$1 AND status IN ('aktivan','na_cekanju') RETURNING id",[req.params.id]);
+ const r=await pool.query("UPDATE paketi_firmi SET status='otkazan',updated_at=now() WHERE id=$1 AND status IN ('aktivan','na_cekanju') RETURNING id",[req.params.id]);
  if(!r.rowCount)return res.status(404).json({error:'Aktivan paket nije pronađen.'});
  res.json({ok:true});
 }));
