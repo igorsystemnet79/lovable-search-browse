@@ -97,7 +97,7 @@ async function api(path: string, init: RequestInit = {}) {
     ? (process.env.API_INTERNAL_URL || API_ORIGIN)
     : API_ORIGIN;
   const target = `${apiOrigin}${path}`;
-  const response = await fetch(target, { ...init, headers });
+  const response = await fetch(target, { ...init, headers, ...(String(init.method || "GET").toUpperCase() === "GET" ? { cache: "no-store" as RequestCache } : {}) });
   const body = await response.json().catch(() => ({}));
   if (!response.ok) throw Object.assign(new Error(body.error || `Greška servera (${response.status})`), { status: response.status, code: body.code });
   return body;
