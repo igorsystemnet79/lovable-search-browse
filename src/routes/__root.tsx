@@ -219,11 +219,11 @@ function RootComponent() {
       const a = event.touches[0];
       const b = event.touches[1];
       pinchStartDistance = Math.max(1, distance(a, b));
-      // Keep pinch zoom anchored to the device center, not the moving
-      // midpoint between fingers. This prevents iOS from leaving the page
-      // horizontally translated after the gesture ends.
-      pinchOriginX = root.clientWidth / 2;
-      pinchOriginY = root.clientHeight / 2;
+      // Anchor the temporary scale to the top-left corner. Scaling around
+      // the center creates negative horizontal bounds on iOS Safari; WebKit
+      // can preserve that horizontal displacement after the transform clears.
+      pinchOriginX = 0;
+      pinchOriginY = 0;
       pinching = true;
       root.style.transition = "none";
       root.style.transformOrigin = `${pinchOriginX}px ${pinchOriginY}px`;
