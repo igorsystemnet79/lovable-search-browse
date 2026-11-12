@@ -150,61 +150,10 @@ function RootComponent() {
     return () => { active = false; window.clearInterval(interval); };
   }, []);
 
-  // Restore the page to device scale after a pinch gesture on iOS and Android.
-  // This lives in the root so the behavior is identical on every route.
-  useEffect(() => {
-    const viewport = document.querySelector<HTMLMetaElement>('meta[name="viewport"]');
-    if (!viewport) return;
+  // Do not rewrite the viewport meta tag during pinch gestures.
+  // Mobile browsers manage pinch scaling; changing it can unexpectedly shrink
+  // responsive content such as the business catalog.
 
-    const originalContent = viewport.content || "width=device-width, initial-scale=1";
-    let resetTimer: number | undefined;
-    let restoreTimer: number | undefined;
-    let resetInProgress = false;
-
-    const resetToDeviceWidth = () => {
-      if (resetInProgress) return;
-      resetInProgress = true;
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      viewport.content = "width=device-width, initial-scale=1, maximum-scale=1";
-      window.scrollTo(0, window.scrollY);
-
-      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
-      restoreTimer = window.setTimeout(() => {
-        viewport.content = originalContent;
-        resetInProgress = false;
-        window.scrollTo(0, window.scrollY);
-      }, 350);
-    };
-
-    const checkPinchScale = () => {
-      const scale = window.visualViewport?.scale ?? 1;
-      if (scale > 1.02) {
-        if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-        resetTimer = window.setTimeout(resetToDeviceWidth, 120);
-      }
-    };
-
-    const onTouchEnd = (event: TouchEvent) => {
-      if (event.touches.length > 0) return;
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      resetTimer = window.setTimeout(checkPinchScale, 120);
-    };
-
-    document.addEventListener("gestureend", checkPinchScale, { passive: true });
-    document.addEventListener("touchend", onTouchEnd, { passive: true });
-    window.visualViewport?.addEventListener("resize", checkPinchScale);
-    window.visualViewport?.addEventListener("scroll", checkPinchScale);
-
-    return () => {
-      document.removeEventListener("gestureend", checkPinchScale);
-      document.removeEventListener("touchend", onTouchEnd);
-      window.visualViewport?.removeEventListener("resize", checkPinchScale);
-      window.visualViewport?.removeEventListener("scroll", checkPinchScale);
-      if (resetTimer !== undefined) window.clearTimeout(resetTimer);
-      if (restoreTimer !== undefined) window.clearTimeout(restoreTimer);
-      viewport.content = originalContent;
-    };
-  }, []);
 
   useEffect(() => {
     if (!import.meta.env.PROD || !("serviceWorker" in navigator)) return;
