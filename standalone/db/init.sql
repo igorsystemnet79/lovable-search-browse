@@ -133,18 +133,14 @@ END
 WHERE n.listing_type IS NULL;
 ALTER TABLE ponudimi_smart_notifications ALTER COLUMN listing_type SET DEFAULT 'ponude';
 ALTER TABLE ponudimi_smart_notifications ALTER COLUMN listing_type SET NOT NULL;
-DO $
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint
-    WHERE conname = 'ponudimi_smart_notifications_listing_type_check'
-      AND conrelid = 'ponudimi_smart_notifications'::regclass
-  ) THEN
-    ALTER TABLE ponudimi_smart_notifications
-      ADD CONSTRAINT ponudimi_smart_notifications_listing_type_check
-      CHECK (listing_type IN ('ponude','zahtevi'));
-  END IF;
-END $;
+UPDATE ponudimi_smart_notifications
+SET listing_type = CASE WHEN listing_type = 'zahtevi' THEN 'zahtevi' ELSE 'ponude' END
+WHERE listing_type IS NULL OR listing_type NOT IN ('ponude','zahtevi');
+ALTER TABLE ponudimi_smart_notifications
+  DROP CONSTRAINT IF EXISTS ponudimi_smart_notifications_listing_type_check;
+ALTER TABLE ponudimi_smart_notifications
+  ADD CONSTRAINT ponudimi_smart_notifications_listing_type_check
+  CHECK (listing_type IN ('ponude','zahtevi'));
 CREATE INDEX IF NOT EXISTS ponudimi_smart_notifications_user_idx ON ponudimi_smart_notifications(user_id,created_at DESC);
 CREATE INDEX IF NOT EXISTS ponudimi_smart_notifications_unread_idx ON ponudimi_smart_notifications(user_id,read_at) WHERE read_at IS NULL;
 
