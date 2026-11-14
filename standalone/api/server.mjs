@@ -177,7 +177,23 @@ app.get('/api/admin/backup/export', auth, admin, backupExportLimit, asyncRoute(a
  };
  try {
   await localFiles(uploadDir);
+  const sourceRoot=path.resolve(process.env.APP_SOURCE_DIR || path.join(__dirname,'../..'));
+  let sourceIncluded=false;
+  if (fs.existsSync(path.join(sourceRoot,'package.json')) || fs.existsSync(path.join(sourceRoot,'standalone'))) {
+   const excluded=new Set(['.git','node_modules','.env','.env.local','.env.production','backups','coverage','.next']);
+   const walkSource=async(folder,prefix='')=>{
+    for(const entry of await fs.promises.readdir(folder,{withFileTypes:true})){
+     if(excluded.has(entry.name)||entry.name.startsWith('.env'))continue;
+     const full=path.join(folder,entry.name),rel=path.posix.join(prefix,entry.name);
+     if(entry.isDirectory())await walkSource(full,rel);
+     else if(entry.isFile())archive.file(full,{name:`application/${rel}`});
+    }
+   };
+   await walkSource(sourceRoot);
+   sourceIncluded=true;
+  }
   let r2Count=0;
+  const r2Index=[];
   if (s3) {
    let token;
    do {
@@ -185,16 +201,19 @@ app.get('/api/admin/backup/export', auth, admin, backupExportLimit, asyncRoute(a
     for (const item of page.Contents||[]) {
      if (!item.Key) continue;
      const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:item.Key}));
-     archive.append(object.Body,{name:`r2/${item.Key}`});
+     const storedPath=`r2/objects/${String(r2Count+1).padStart(8,'0')}.bin`;
+     archive.append(object.Body,{name:storedPath});
+     r2Index.push({key:item.Key,path:storedPath,content_type:object.ContentType||'application/octet-stream'});
      r2Count++;
     }
     token=page.IsTruncated?page.NextContinuationToken:undefined;
    } while(token);
   }
   await dumpExit;
-  const manifest={created_at:new Date().toISOString(),database:'database/ponudimi.sql',database_dump_format:'plain SQL (pg_dump)',local_upload_directory:uploadDir,local_uploads_included:fs.existsSync(uploadDir),r2_enabled:Boolean(s3),r2_objects_included:r2Count,application_source_included:false,notes:['PostgreSQL dump contains all schemas, tables, sequences, functions and data accessible to the DATABASE_URL role.','When R2 is enabled, object files are copied under r2/.','Application source code is not included in this API-only archive and must be packaged separately.','Keep this archive private: it contains personal data and account password hashes.']};
+  archive.append(JSON.stringify(r2Index,null,2),{name:'r2-index.json'});
+  const manifest={created_at:new Date().toISOString(),database:'database/ponudimi.sql',database_dump_format:'plain SQL (pg_dump)',local_upload_directory:uploadDir,local_uploads_included:fs.existsSync(uploadDir),r2_enabled:Boolean(s3),r2_objects_included:r2Count,application_source_included:sourceIncluded,application_source_directory:sourceIncluded?sourceRoot:null,notes:['PostgreSQL dump contains all schemas, tables, sequences, functions and data accessible to the DATABASE_URL role.','When R2 is enabled, object files are copied under r2/objects/; r2-index.json maps original object keys to archive paths.','Application source is included from APP_SOURCE_DIR or the detected repository root when present.','Keep this archive private: it contains personal data and account password hashes.']};
   archive.append(JSON.stringify(manifest,null,2),{name:'BACKUP-MANIFEST.json'});
-  archive.append('PonudiMi backup\n\nRestore database: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/ponudimi.sql\n\nRestore local uploads to the configured UPLOAD_DIR. If R2 was used, upload the contents of r2/ to the same bucket while preserving object keys.\n\nThis archive contains sensitive personal data. Store it securely.\n',{name:'RESTORE-INSTRUCTIONS.txt'});
+  archive.append('PonudiMi backup\n\nRestore database: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/ponudimi.sql\n\nRestore local uploads to the configured UPLOAD_DIR. If R2 was used, restore each r2/objects file to its original key using r2-index.json. Application source is under application/.\n\nThis archive contains sensitive personal data. Store it securely.\n',{name:'RESTORE-INSTRUCTIONS.txt'});
   await archive.finalize();
   finished=true;
  } catch(error) { dump.kill('SIGTERM'); fail(error); }
