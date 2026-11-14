@@ -14,10 +14,12 @@ Na Render API servisu mora postojati pg_dump (PostgreSQL client tools). Endpoint
 
 Za Docker Alpine image dodati:
 ```dockerfile
-RUN apk add --no-cache postgresql-client
+RUN apk add --no-cache postgresql-client unzip
+COPY standalone/api/business-catalog.mjs ./business-catalog.mjs
+COPY standalone/api/backup-export.mjs ./backup-export.mjs
 ```
 
-Render servis PonudiMi-Test-API trenutno koristi Native Node runtime i build komandu `cd standalone/api && npm install`. Pre aktiviranja endpointa treba obezbediti pg_dump u tom runtime okruženju. Nemoj menjati postojeće DATABASE_URL ili druge tajne.
+Render Native Node runtime zvanično uključuje `postgresql-client` i `unzip` i tokom build-a i tokom rada servisa. Zbog toga nije potrebno menjati runtime, build komandu ili instalirati sistemske pakete na postojećem servisu. Endpoint pri svakom izvozu proverava da li je `pg_dump` dostupan i da li njegova glavna verzija može da izveze aktuelnu PostgreSQL bazu; ako nije, prekida izvoz bez isporuke nepotpune arhive. Stvarna verzija na konkretnom servisu mora biti potvrđena uspešnim preflight-om. Nemoj menjati postojeće DATABASE_URL ili druge tajne.
 
 ## Sadržaj ZIP-a
 - database/ponudimi.sql — pg_dump SQL sa šemama, tabelama, sekvencama, funkcijama i podacima dostupnim DB korisniku.
@@ -43,4 +45,4 @@ Render servis PonudiMi-Test-API trenutno koristi Native Node runtime i build kom
 5. Proveri vraćanje u privremenoj test instalaciji pre prebacivanja javnog domena.
 
 ## Status
-Ovo je početna implementacija. Preuzimanje i vraćanje ZIP-a još nisu end-to-end testirani na stvarnoj Render bazi. Potpunost se potvrđuje tek nakon uspešnog SQL restore testa i provere fotografija/kataloga.
+API ruta je implementirana, ali ostaje isključena dok se ne postavi ENABLE_ADMIN_BACKUP_EXPORT=true. Izvoz proverava pg_dump, verziju servera, integritet ZIP-a preko unzip -t, lokalne upload fajlove i sve R2 objekte. Još nije urađen stvarni izvoz sa aktivne Render baze niti probno vraćanje u izolovanu bazu; zato se ZIP još ne smatra spremnim za preuzimanje.
