@@ -1,8 +1,8 @@
 import { Readable } from 'node:stream';
 import { createGzip } from 'node:zlib';
-import { rateLimit } from 'express-rate-limit';
+import rateLimit from 'express-rate-limit';
 
-const quoteIdentifier = value => '"' + String(value).replace(/"/g, '""') + "'";
+const quoteIdentifier = value => '"' + String(value).replace(/"/g, '""') + '"';
 
 export function registerBackupExport({ app, pool, auth, admin, asyncRoute }) {
   const exportLimit = rateLimit({
@@ -83,7 +83,7 @@ export function registerBackupExport({ app, pool, auth, admin, asyncRoute }) {
         res.destroy(error);
       });
       stream.pipe(gzip).pipe(res);
-      req.on('close', () => {
+      res.on('close', () => {
         if (!res.writableEnded) {
           stream.destroy();
           gzip.destroy();
