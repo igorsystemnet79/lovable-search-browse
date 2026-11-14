@@ -1197,7 +1197,7 @@ function RezervnaKopija() {
   }
   async function importBackup() {
     if (busy || !backupFile) return;
-    if (!window.confirm("PAŽNJA: Uvoz će zameniti strukturu i sadržaj ciljне baze. Nastavi samo ako je ovo nova i prazna baza. Postojeća baza sa podacima biće zaštićena i uvoz odbijen. Da li želiš da nastaviš?")) return;
+    if (!window.confirm("PAŽNJA: Uvoz će zameniti strukturu i sadržaj ciljne baze. Nastavi samo ako je ovo nova i prazna baza. Postojeća baza sa podacima biće zaštićena i uvoz odbijen. Da li želiš da nastaviš?")) return;
     setBusy(true); setError(""); setNotice("");
     try {
       const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
