@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'standalone/api/server.mjs'
+      - 'standalone/api/backup-export.mjs'
       - 'standalone/api/package.json'
       - 'standalone/Dockerfile.api'
       - 'standalone/BACKUP-EXPORT-SR.md'
@@ -23,6 +24,8 @@ jobs:
         with:
           node-version: '22'
       - name: Check API syntax
-        run: node --check standalone/api/server.mjs
+        run: |
+          node --check standalone/api/server.mjs
+          node --check standalone/api/backup-export.mjs
       - name: Validate package manifest
         run: node -e "JSON.parse(require('fs').readFileSync('standalone/api/package.json','utf8'))"
