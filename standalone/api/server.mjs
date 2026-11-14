@@ -1,6 +1,6 @@
 import express from 'express';
 import helmet from 'helmet';
-import rateLimit from 'express-rate-limit';
+import rateLimit, { ipKeyGenerator } from 'express-rate-limit';
 import pg from 'pg';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -38,7 +38,7 @@ const loginAccountLimiter = rateLimit({
  windowMs: 15 * 60 * 1000, limit: 10, standardHeaders: 'draft-8', legacyHeaders: false,
  keyGenerator: (req) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
-  return createHash('sha256').update(`${req.ip}:${email}`).digest('hex');
+  return createHash('sha256').update(`${ipKeyGenerator(req.ip)}:${email}`).digest('hex');
  },
  skipSuccessfulRequests: true,
  message: { error: 'Previše neuspešnih pokušaja za ovaj nalog sa ove mreže. Sačekaj 15 minuta i pokušaj ponovo.' }
