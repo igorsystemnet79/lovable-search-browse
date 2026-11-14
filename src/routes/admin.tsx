@@ -1165,6 +1165,7 @@ function RezervnaKopija() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [backupFile, setBackupFile] = useState<File | null>(null);
   async function downloadBackup() {
     if (busy) return;
     if (!window.confirm("Napraviti i preuzeti kompletnu rezervnu kopiju baze, fotografija i aplikacije?")) return;
@@ -1194,6 +1195,30 @@ function RezervnaKopija() {
       setError(e instanceof Error ? e.message : "Greška pri preuzimanju rezervne kopije.");
     } finally { setBusy(false); }
   }
+  async function importBackup() {
+    if (busy || !backupFile) return;
+    if (!window.confirm("PAŽNJA: Uvoz će zameniti strukturu i sadržaj ciljне baze. Nastavi samo ako je ovo nova i prazna baza. Postojeća baza sa podacima biće zaštićena i uvoz odbijen. Da li želiš da nastaviš?")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
+      if (!session?.access_token) throw new Error("Sesija nije pronađena. Prijavi se ponovo.");
+      const form = new FormData();
+      form.append("backup", backupFile);
+      const response = await fetch(`${API_ORIGIN}/api/admin/backup/import`, {
+        method: "POST",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Uvoz baze nije uspeo.");
+      setNotice(data.message || "Baza je uspešno uvezena.");
+      setBackupFile(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Greška pri uvozu baze.");
+    } finally { setBusy(false); }
+  }
+
   return <section className="mx-auto max-w-3xl space-y-4">
     <div className="rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-6">
       <h2 className="text-xl font-semibold">Rezervna kopija PonudiMi</h2>
@@ -1207,8 +1232,15 @@ function RezervnaKopija() {
       <p className="mt-3 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">Bezbednost: preuzimanje je dozvoljeno samo administratoru sa važećom prijavom. Lozinke, JWT tajne i ostale promenljive okruženja namerno se ne uključuju u ZIP; sačuvaj ih odvojeno.</p>
       <div className="mt-5 flex flex-wrap items-center gap-3">
         <button type="button" className="min-h-11 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50" onClick={() => void downloadBackup()} disabled={busy}>{busy ? "Pripremam arhivu..." : "Preuzmi kompletnu rezervnu kopiju (.ZIP)"}</button>
-        {busy && <span className="text-xs text-muted-foreground">Nemoj zatvarati stranicu dok se preuzimanje ne pokrene.</span>}
+        <label className="flex min-h-11 cursor-pointer items-center rounded-full border border-input px-5 py-2.5 text-sm font-semibold hover:bg-secondary">
+          Izaberi ZIP za uvoz
+          <input type="file" accept=".zip,application/zip" className="sr-only" disabled={busy} onChange={(event) => setBackupFile(event.target.files?.[0] || null)} />
+        </label>
+        <button type="button" className="min-h-11 rounded-full border border-brand px-5 py-2.5 text-sm font-semibold text-brand hover:bg-secondary disabled:opacity-50" onClick={() => void importBackup()} disabled={busy || !backupFile}>{busy ? "Obrada arhive..." : "Uvezi bazu iz ZIP-a"}</button>
+        {backupFile && <span className="w-full break-all text-xs text-muted-foreground">Izabrano: {backupFile.name}</span>}
+        {busy && <span className="text-xs text-muted-foreground">Nemoj zatvarati stranicu dok se postupak ne završi.</span>}
       </div>
+      <p className="mt-3 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">Uvoz prihvata PonudiMi ZIP i vraća PostgreSQL bazu. Radi samo nad praznom ciljnom bazom; ako pronađe postojeće zapise, prekida se bez menjanja podataka. Fotografije iz posebnog lokalnog ili S3/R2 skladišta zahtevaju zasebno vraćanje.</p>
       {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
       {notice && <p role="status" className="mt-4 text-sm text-green-700">{notice}</p>}
     </div>
