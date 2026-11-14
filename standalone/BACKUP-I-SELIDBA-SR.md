@@ -16,6 +16,32 @@ Trenutna baza PonudiMi-Test-Baza je Render Free PostgreSQL, verzija 18. Render F
 
 Render-ov alat za izvoz u Dashboard-u nije dostupan za Free plan. Potrebno je napraviti logički dump sa `pg_dump`.
 
+## Izvoz direktno sa telefona (PonudiMi administratorski panel)
+
+Kada se izmena iz grane `backup/admin-export` pregleda i objavi na aktivnim servisima:
+
+1. Otvori PonudiMi i prijavi se administratorskim nalogom.
+2. Otvori **Administracija → Backup baze**.
+3. Dodirni **Preuzmi rezervnu kopiju**.
+4. Sačekaj da Safari završi preuzimanje fajla `ponudimi-backup-....json.gz`.
+5. Na iPhone-u proveri Safari preuzimanja ili aplikaciju **Datoteke → Preuzimanja**. Premesti kopiju na bezbedno mesto.
+
+Izvoz koristi administratorsku sesiju, ograničen je na dva pokušaja u toku jednog sata i čita bazu u doslednom read-only snimku. Ne menja i ne briše podatke na izvornoj platformi.
+
+JSON arhiva sadrži sve tabele iz PostgreSQL šeme `public`. Kada je `storage_backend: postgres`, fotografije iz tabele `storage_objects` ulaze u arhivu. Ako API prijavi `filesystem` ili `r2`, mora se napraviti i posebna kopija fotografija prema uputstvu iz odeljka **Fotografije van baze**.
+
+## Vraćanje JSON arhive u novu bazu
+
+Nova verzija aplikacije sadrži skriptu `standalone/scripts/restore-json-backup.mjs`. Na novom serveru, u direktorijumu projekta, napravi novu praznu PostgreSQL bazu i postavi `DATABASE_URL` na nju. Zatim pokreni:
+
+```bash
+DATABASE_URL='postgresql://...' node standalone/scripts/restore-json-backup.mjs /putanja/ponudimi-backup.json.gz --i-understand-target-db-will-be-cleared
+```
+
+Skripta prvo priprema šemu aplikacije, proverava da li su potrebne tabele dostupne i određuje redosled vraćanja prema stranim ključevima. Tek potom, u transakciji, prazni tabele ciljne baze i vraća podatke. Zato je komanda namenjena isključivo novoj ciljnoj bazi — nikada je ne pokreći nad aktivnom bazom ili bazom sa važnim podacima. Ako se pojavi greška, transakcija sa brisanjem i upisom podataka se poništava.
+
+Ovaj JSON postupak treba proveriti na probnoj praznoj bazi pre konačnog preseljenja. Za klasičan PostgreSQL `.dump` i dalje je dostupan postojeći postupak sa `pg_dump` iz ovog dokumenta.
+
 ## Kako napraviti kopiju sa računara ili novog servera
 
 1. U Render Dashboard-u otvori bazu `PonudiMi-Test-Baza`.
