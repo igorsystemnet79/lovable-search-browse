@@ -31,7 +31,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Backup baze", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -60,6 +60,7 @@ function AdminPage() {
             {tab === "Zahtevi" && <Oglasi tabela="zahtevi" />}
             {tab === "Prijave" && <Prijave />}
             {tab === "Statistika" && <Statistika />}
+            {tab === "Backup baze" && <BackupBaze />}
             {tab === "Odobrenja" && <PredloziZaOdobrenje />}
             {tab === "Poruke" && <Poruke />}
             {tab === "Poruke korisnika" && <AdminKorisnickePoruke />}
@@ -1365,3 +1366,67 @@ function AdminKorisnickePoruke() {
 
  </section>;
 }
+
+function BackupBaze() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState("");
+
+  async function downloadBackup() {
+    setBusy(true);
+    setMessage("");
+    setError("");
+    try {
+      const { data } = await ponudimi.auth.getSession();
+      const token = data.session?.access_token;
+      if (!token) throw new Error("Sesija je istekla. Prijavi se ponovo kao administrator.");
+
+      const response = await fetch(`${API_ORIGIN}/api/admin/backup/export`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Izvoz nije uspeo (HTTP ${response.status}).`);
+      }
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("Server je vratio praznu rezervnu kopiju.");
+      const disposition = response.headers.get("content-disposition") || "";
+      const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || "ponudimi-backup.json.gz";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setMessage(`Izvoz je pripremljen: ${filename} · ${(blob.size / 1024 / 1024).toFixed(2)} MB. Proveri preuzimanja u Safariju ili aplikaciji Datoteke.`);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Rezervnu kopiju nije moguće preuzeti.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="max-w-3xl space-y-4">
+      <div>
+        <h2 className="text-xl font-semibold">Rezervna kopija baze</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Preuzmi podatke sa aktivne PonudiMi baze u kompresovanom formatu. Izvoz obuhvata sve tabele u PostgreSQL šemi, uključujući korisnike, oglase, zahteve, praćenja, pakete, poslovne kataloge i fotografije koje se čuvaju u PostgreSQL skladištu.</p>
+      </div>
+      <div className="rounded-2xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-950">
+        Ova arhiva sadrži lične podatke korisnika i podatke za prijavu. Čuvaj je na bezbednom mestu i nemoj je slati drugim osobama. Preuzimanje ne menja niti briše podatke na aktivnoj platformi.
+      </div>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      {message && <p role="status" className="text-sm text-brand">{message}</p>}
+      <button type="button" className="min-h-11 rounded-full bg-brand px-5 py-2 text-sm font-semibold text-brand-foreground disabled:opacity-50" onClick={downloadBackup} disabled={busy}>
+        {busy ? "Pripremam rezervnu kopiju..." : "Preuzmi rezervnu kopiju"}
+      </button>
+      <p className="text-xs text-muted-foreground">Dozvoljena su najviše dva izvoza u toku jednog sata. Preuzimanje se obavlja preko zaštićene administratorske sesije.</p>
+    </section>
+  );
+}
+

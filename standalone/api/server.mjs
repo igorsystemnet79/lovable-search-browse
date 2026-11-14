@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
+import { registerBackupExport } from './backup-export.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -1257,6 +1258,7 @@ async function startServer(){
  await pool.query(schema);
  const { registerBusinessCatalog } = await import('./business-catalog.mjs');
  await registerBusinessCatalog({ app, pool, auth, asyncRoute, memoryUpload, normalizeImage, saveImage, removeImage });
+ registerBackupExport({ app, pool, auth, admin, asyncRoute });
  console.log('PonudiMi poslovni katalog je spreman.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
   console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
