@@ -1,0 +1,29 @@
+name: Build PonudiMi Windows Installer
+on:
+  workflow_dispatch:
+  push:
+    branches: [windows-installer-prep]
+    paths:
+      - "installer/windows/**"
+      - ".github/workflows/build-windows-installer.yml"
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Inno Setup
+        run: choco install innosetup --yes --no-progress
+      - name: Compile installer
+        shell: pwsh
+        run: |
+          $compiler = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          if (!(Test-Path $compiler)) { throw "Inno Setup compiler not found" }
+          & $compiler "installer\windows\PonudiMi-Installer.iss"
+          if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PonudiMi-Installer-Windows
+          path: dist/PonudiMi-Installer-Windows.exe
+          if-no-files-found: error
