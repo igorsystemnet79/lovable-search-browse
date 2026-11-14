@@ -31,7 +31,7 @@ Render servis PonudiMi-Test-API trenutno koristi Native Node runtime i build kom
 1. Administrator se prijavi u PonudiMi i dobije važeći Bearer token.
 2. U Render Environment privremeno postavi ENABLE_ADMIN_BACKUP_EXPORT=true.
 3. Sačekaj restart/deploy API servisa.
-4. Pozovi GET /api/admin/backup/export uz Authorization: Bearer TOKEN. Odgovor je ZIP; za preuzimanje preko telefona treba koristiti autentifikovani download iz browsera ili dodati dugme u admin interfejs.
+4. U administratorskom panelu otvori karticu „Izvoz baze“ i pritisni „Preuzmi kompletnu ZIP kopiju“. Dugme šalje važeći Bearer token i pokreće preuzimanje na telefonu ili računaru.
 5. Proveri manifest i sve očekivane direktorijume.
 6. Odmah ukloni ENABLE_ADMIN_BACKUP_EXPORT ili ga postavi na false i restartuj servis.
 
