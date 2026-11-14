@@ -261,6 +261,7 @@ export function registerBackupExport({ app, pool, auth, admin, s3, s3Bucket, upl
         archive.once('error', reject);
         archive.once('warning', reject);
       });
+      archiveDone.catch(() => {});
       archive.pipe(output);
       archive.file(sqlPath, { name: 'database/ponudimi.sql' });
 
@@ -291,7 +292,7 @@ export function registerBackupExport({ app, pool, auth, admin, s3, s3Bucket, upl
           directory: 'application/',
           files: applicationStats.files,
           bytes: applicationStats.bytes,
-          excluded: ['.env*', .git, node_modules, credentials, private keys, temporary files],
+          excluded: ['.env*', '.git', 'node_modules', 'credentials', 'private keys', 'temporary files'],
         },
       }, null, 2), { name: 'BACKUP-MANIFEST.json' });
       archive.append(JSON.stringify(r2Index, null, 2), { name: 'r2-index.json' });
