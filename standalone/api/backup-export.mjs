@@ -89,7 +89,7 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
         'Ako se koristi S3/R2, podesiti odgovarajuće S3 promenljive i prebaciti sadržaj storage/s3/ u isti bucket/key raspored.',
         'Ako se koristi lokalno skladište, kopirati sadržaj uploads/ u putanju UPLOAD_DIR na novom serveru.',
         ''
-      ].join('\\n');
+      ].join('\n');
       await fs.promises.writeFile(readmePath, readme, { mode: 0o600 });
 
       const output = createWriteStream(zipPath, { flags: 'wx' });
