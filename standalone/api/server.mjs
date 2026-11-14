@@ -11,6 +11,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
+import { registerBackupExport } from './backup-export.mjs';
 import { randomUUID, randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -1257,6 +1258,7 @@ async function startServer(){
  await pool.query(schema);
  const { registerBusinessCatalog } = await import('./business-catalog.mjs');
  await registerBusinessCatalog({ app, pool, auth, asyncRoute, memoryUpload, normalizeImage, saveImage, removeImage });
+ registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3, s3Enabled, filesystemStorage, repoRoot: path.resolve(__dirname, '../..') });
  console.log('PonudiMi poslovni katalog je spreman.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
   console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
