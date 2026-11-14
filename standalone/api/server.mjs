@@ -7,7 +7,9 @@ import jwt from 'jsonwebtoken';
 import multer from 'multer';
 import sharp from 'sharp';
 import QRCode from 'qrcode';
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3';
+import archiver from 'archiver';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import fs from 'node:fs';
 import { readFile } from 'node:fs/promises';
@@ -134,6 +136,69 @@ const admin = asyncRoute(async (req,res,next) => {
  if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'});
  next();
 });
+
+// Privremeni, administratorski izvoz PostgreSQL baze i datoteka.
+// Zahteva pg_dump u runtime okruženju; bez njega izvoz se bezbedno odbija.
+const backupExportLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 2, standardHeaders: true, legacyHeaders: false });
+app.get('/api/admin/backup/export', auth, admin, backupExportLimit, asyncRoute(async (req,res) => {
+ const { promisify } = await import('node:util');
+ const execFile = promisify((await import('node:child_process')).execFile);
+ try { await execFile('pg_dump', ['--version'], { timeout: 5000 }); }
+ catch { return res.status(503).json({ error:'Na API serveru nije instaliran pg_dump. Izvoz nije pokrenut; podaci nisu menjani.' }); }
+ if (!process.env.DATABASE_URL) return res.status(503).json({error:'DATABASE_URL nije podešen.'});
+ const stamp = new Date().toISOString().replace(/[:.]/g,'-');
+ res.setHeader('Content-Type','application/zip');
+ res.setHeader('Content-Disposition',`attachment; filename="ponudimi-backup-${stamp}.zip"`);
+ res.setHeader('Cache-Control','no-store, private');
+ const archive = archiver('zip', { zlib: { level: 6 } });
+ let finished = false;
+ const fail = error => { console.error('Backup export failed:', error?.message || error); if (!res.headersSent) res.status(500).json({error:'Izvoz nije uspeo.'}); else res.destroy(error); };
+ archive.on('warning', error => { if (error.code !== 'ENOENT') fail(error); });
+ archive.on('error', fail);
+ archive.pipe(res);
+ const pgArgs = ['--no-owner','--no-acl','--format=plain','--dbname',process.env.DATABASE_URL];
+ const dump = spawn('pg_dump', pgArgs, { env: process.env, stdio:['ignore','pipe','pipe'] });
+ let dumpError = '';
+ dump.stderr.on('data', chunk => { dumpError += chunk.toString().slice(0,4000); });
+ dump.on('error', fail);
+ dump.stdout.on('error', fail);
+ archive.append(dump.stdout, {name:'database/ponudimi.sql'});
+ const dumpExit = new Promise((resolve,reject) => dump.on('close', code => code===0 ? resolve() : reject(new Error(dumpError || `pg_dump exit code ${code}`))));
+ const localFiles = async dir => {
+  if (!fs.existsSync(dir)) return;
+  const walk = async (folder, prefix='') => {
+   for (const entry of await fs.promises.readdir(folder,{withFileTypes:true})) {
+    const full=path.join(folder,entry.name), rel=path.posix.join(prefix,entry.name);
+    if (entry.isDirectory()) await walk(full,rel);
+    else if (entry.isFile()) archive.file(full,{name:`uploads/${rel}`});
+   }
+  };
+  await walk(dir);
+ };
+ try {
+  await localFiles(uploadDir);
+  let r2Count=0;
+  if (s3) {
+   let token;
+   do {
+    const page=await s3.send(new ListObjectsV2Command({Bucket:process.env.S3_BUCKET,ContinuationToken:token}));
+    for (const item of page.Contents||[]) {
+     if (!item.Key) continue;
+     const object=await s3.send(new GetObjectCommand({Bucket:process.env.S3_BUCKET,Key:item.Key}));
+     archive.append(object.Body,{name:`r2/${item.Key}`});
+     r2Count++;
+    }
+    token=page.IsTruncated?page.NextContinuationToken:undefined;
+   } while(token);
+  }
+  await dumpExit;
+  const manifest={created_at:new Date().toISOString(),database:'database/ponudimi.sql',database_dump_format:'plain SQL (pg_dump)',local_upload_directory:uploadDir,local_uploads_included:fs.existsSync(uploadDir),r2_enabled:Boolean(s3),r2_objects_included:r2Count,application_source_included:false,notes:['PostgreSQL dump contains all schemas, tables, sequences, functions and data accessible to the DATABASE_URL role.','When R2 is enabled, object files are copied under r2/.','Application source code is not included in this API-only archive and must be packaged separately.','Keep this archive private: it contains personal data and account password hashes.']};
+  archive.append(JSON.stringify(manifest,null,2),{name:'BACKUP-MANIFEST.json'});
+  archive.append('PonudiMi backup\n\nRestore database: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f database/ponudimi.sql\n\nRestore local uploads to the configured UPLOAD_DIR. If R2 was used, upload the contents of r2/ to the same bucket while preserving object keys.\n\nThis archive contains sensitive personal data. Store it securely.\n',{name:'RESTORE-INSTRUCTIONS.txt'});
+  await archive.finalize();
+  finished=true;
+ } catch(error) { dump.kill('SIGTERM'); fail(error); }
+}));
 
 async function createUserNotification(userId,type,title,message,link=null,metadata={},dedupeKey=null){
  const pref=await pool.query('SELECT in_app_enabled,listing_updates,important_changes,new_offers,new_requests,email_enabled FROM notification_preferences WHERE user_id=$1',[userId]);
