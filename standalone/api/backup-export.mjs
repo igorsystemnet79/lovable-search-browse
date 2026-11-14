@@ -5,6 +5,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import jwt from 'jsonwebtoken';
+import multer from 'multer';
+import yauzl from 'yauzl';
+import { createWriteStream } from 'node:fs';
+import { pipeline } from 'node:stream/promises';
 
 const safeKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 const ignoredPath = relative => {
@@ -138,6 +142,90 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
       await cleanup();
       if (res.headersSent) return res.destroy(error);
       next(error);
+    }
+  });
+
+  const restoreUpload = multer({
+    dest: os.tmpdir(),
+    limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
+    fileFilter: (_req, file, cb) => {
+      if (/\\.zip$/i.test(file.originalname || '')) cb(null, true);
+      else cb(new Error('Izaberi ZIP arhivu koju je napravio PonudiMi izvoz.'));
+    }
+  });
+
+  const extractDatabaseDump = (zipPath, outputPath) => new Promise((resolve, reject) => {
+    yauzl.open(zipPath, { lazyEntries: true, autoClose: true, decodeStrings: true }, (openError, zip) => {
+      if (openError) return reject(new Error('ZIP arhiva nije ispravna ili nije moguće da se otvori.'));
+      let found = false;
+      let settled = false;
+      const fail = error => { if (settled) return; settled = true; reject(error); };
+      zip.on('error', fail);
+      zip.on('entry', entry => {
+        if (entry.fileName !== 'database/ponudimi-database.dump') {
+          zip.readEntry();
+          return;
+        }
+        if (found || entry.fileName.endsWith('/') || entry.uncompressedSize < 1 || entry.uncompressedSize > 2 * 1024 * 1024 * 1024) {
+          return fail(new Error('Datoteka baze u ZIP arhivi nije dozvoljene veličine ili formata.'));
+        }
+        found = true;
+        zip.openReadStream(entry, (streamError, stream) => {
+          if (streamError) return fail(streamError);
+          pipeline(stream, createWriteStream(outputPath, { flags: 'wx' }))
+            .then(() => { if (!settled) { settled = true; resolve(entry.uncompressedSize); } })
+            .catch(fail);
+        });
+      });
+      zip.on('end', () => { if (!found) fail(new Error('ZIP ne sadrži database/ponudimi-database.dump. Izaberi PonudiMi rezervnu kopiju.')); });
+      zip.readEntry();
+    });
+  });
+
+  app.post('/api/admin/backup/import', authenticateBackupAdmin, restoreUpload.single('backup'), async (req, res, next) => {
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ponudimi-restore-'));
+    const dumpPath = path.join(tempDir, 'ponudimi-database.dump');
+    try {
+      if (!req.file) return res.status(400).json({ error: 'Izaberi ZIP arhivu za uvoz.' });
+      const dumpSize = await extractDatabaseDump(req.file.path, dumpPath);
+      const tables = await pool.query(
+        "SELECT table_schema, table_name FROM information_schema.tables WHERE table_type='BASE TABLE' AND table_schema NOT IN ('pg_catalog','information_schema') ORDER BY table_schema,table_name"
+      );
+      const quoteIdent = value => '"' + String(value).replace(/"/g, '""') + '"';
+      for (const table of tables.rows) {
+        const existing = await pool.query(
+          'SELECT EXISTS (SELECT 1 FROM ' + quoteIdent(table.table_schema) + '.' + quoteIdent(table.table_name) + ' LIMIT 1) AS has_rows'
+        );
+        if (existing.rows[0]?.has_rows) {
+          return res.status(409).json({
+            error: 'Uvoz je zaustavljen radi zaštite podataka: ciljna baza već sadrži zapise. Uvoz je dozvoljen samo u praznu bazu na novom serveru. Postojeći podaci nisu menjani.'
+          });
+        }
+      }
+      if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL nije podešen na API servisu.');
+      await new Promise((resolve, reject) => {
+        const child = spawn('pg_restore', [
+          '--clean', '--if-exists', '--no-owner', '--no-acl',
+          '--single-transaction', '--exit-on-error',
+          '--dbname', process.env.DATABASE_URL, dumpPath
+        ], { env: process.env, stdio: ['ignore', 'ignore', 'pipe'] });
+        let stderr = '';
+        child.stderr.on('data', chunk => { if (stderr.length < 12000) stderr += chunk.toString(); });
+        child.once('error', error => reject(error.code === 'ENOENT'
+          ? new Error('Na API servisu nije instaliran pg_restore. Instaliraj PostgreSQL client alate.')
+          : error));
+        child.once('close', code => code === 0 ? resolve() : reject(new Error('Uvoz baze nije uspeo. Transakcija je poništena; postojeći podaci nisu promenjeni. ' + stderr.slice(0, 1200))));
+      });
+      return res.json({
+        ok: true,
+        message: 'Baza je uspešno uvezena. Pre ponovnog korišćenja proveri prijavu, oglase, zahteve i fotografije.',
+        dump_size: dumpSize
+      });
+    } catch (error) {
+      next(error);
+    } finally {
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+      if (req.file?.path) await fs.promises.rm(req.file.path, { force: true }).catch(() => {});
     }
   });
 }
