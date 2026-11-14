@@ -21,7 +21,7 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
   const authenticateBackupAdmin = async (req, res, next) => {
     try {
       const header = String(req.headers.authorization || '');
-      const token = header.match(/^Bearer\\s+(.+)$/i)?.[1];
+      const token = header.match(/^Bearer\s+(.+)$/i)?.[1];
       if (!token || !process.env.JWT_SECRET) return unauthorized(res);
       let claims;
       try { claims = jwt.verify(token, process.env.JWT_SECRET); } catch { return unauthorized(res); }
