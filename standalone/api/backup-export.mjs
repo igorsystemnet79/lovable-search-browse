@@ -46,9 +46,7 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
   app.get('/api/admin/backup/export', authenticateBackupAdmin, async (req, res, next) => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ponudimi-backup-'));
     const dumpPath = path.join(tempDir, 'ponudimi-database.dump');
-    let archive;
-    let finished = false;
-    const cleanup = () => fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+    const zipPath = path.join(tempDir, 'ponudimi-rezervna-kopija.zip');
     try {
       if (!process.env.DATABASE_URL) throw new Error('DATABASE_URL nije podešen na API servisu.');
       await new Promise((resolve, reject) => {
@@ -64,8 +62,8 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
         child.once('close', code => code === 0 ? resolve() : reject(new Error('PostgreSQL izvoz nije uspeo: ' + stderr.slice(0, 1500))));
       });
 
-      const stat = await fs.promises.stat(dumpPath);
-      if (!stat.size) throw new Error('PostgreSQL je vratio praznu rezervnu kopiju.');
+      const dumpStat = await fs.promises.stat(dumpPath);
+      if (!dumpStat.size) throw new Error('PostgreSQL je vratio praznu rezervnu kopiju.');
 
       const schemaPath = path.join(repoRoot, 'standalone', 'db', 'init.sql');
       const catalogPath = path.join(repoRoot, 'standalone', 'api', 'business-catalog.mjs');
@@ -91,22 +89,20 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
         'Ako se koristi S3/R2, podesiti odgovarajuće S3 promenljive i prebaciti sadržaj storage/s3/ u isti bucket/key raspored.',
         'Ako se koristi lokalno skladište, kopirati sadržaj uploads/ u putanju UPLOAD_DIR na novom serveru.',
         ''
-      ].join('\n');
+      ].join('\\n');
       await fs.promises.writeFile(readmePath, readme, { mode: 0o600 });
 
-      res.status(200);
-      res.set({
-        'Content-Type': 'application/zip',
-        'Content-Disposition': 'attachment; filename="ponudimi-rezervna-kopija.zip"',
-        'Cache-Control': 'no-store, private',
-        'X-Content-Type-Options': 'nosniff'
+      const output = createWriteStream(zipPath, { flags: 'wx' });
+      const archive = archiver('zip', { zlib: { level: 1 } });
+      const archiveDone = new Promise((resolve, reject) => {
+        output.once('close', resolve);
+        output.once('error', reject);
+        archive.once('error', reject);
       });
-      archive = archiver('zip', { zlib: { level: 1 } });
-      archive.on('warning', error => { if (error.code !== 'ENOENT') archive.destroy(error); });
-      archive.on('error', error => { if (!res.headersSent) next(error); else res.destroy(error); });
-      archive.on('end', () => { finished = true; });
-      res.on('close', () => { if (!finished) archive?.abort(); void cleanup(); });
-      archive.pipe(res);
+      archive.on('warning', error => {
+        if (error.code !== 'ENOENT') archive.destroy(error);
+      });
+      archive.pipe(output);
       archive.file(dumpPath, { name: 'database/ponudimi-database.dump' });
       if (fs.existsSync(schemaPath)) archive.file(schemaPath, { name: 'database/init.sql' });
       if (fs.existsSync(catalogPath)) archive.file(catalogPath, { name: 'database/business-catalog-schema-and-routes.mjs' });
@@ -137,10 +133,25 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
       }
 
       await archive.finalize();
-      res.once('finish', () => { void cleanup(); });
+      await archiveDone;
+      const zipStat = await fs.promises.stat(zipPath);
+      if (zipStat.size <= dumpStat.size || zipStat.size < 1024) {
+        throw new Error('ZIP arhiva nije potpuna: veličina arhive nije očekivana. Izvoz nije poslat.');
+      }
+
+      res.set({
+        'Content-Type': 'application/zip',
+        'Cache-Control': 'no-store, private',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Backup-Size': String(zipStat.size)
+      });
+      res.download(zipPath, 'ponudimi-rezervna-kopija.zip', error => {
+        void fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
+        if (error && !res.headersSent) next(error);
+        else if (error) res.destroy(error);
+      });
     } catch (error) {
-      await cleanup();
-      if (res.headersSent) return res.destroy(error);
+      await fs.promises.rm(tempDir, { recursive: true, force: true }).catch(() => {});
       next(error);
     }
   });
