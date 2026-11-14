@@ -1,9 +1,11 @@
 FROM node:22-alpine
 WORKDIR /app
-COPY standalone/api/package.json ./package.json
-RUN npm install --omit=dev
-COPY standalone/api/server.mjs ./server.mjs
-COPY standalone/db/init.sql /db/init.sql
+# Keep the same repository layout as Render Native Node: server.mjs expects
+# /app/standalone/api and resolves the complete application root as /app.
+COPY . /app
+WORKDIR /app/standalone/api
+RUN apk add --no-cache postgresql-client unzip \
+ && npm install --omit=dev
 RUN mkdir -p /data/uploads && chown -R node:node /data
 USER node
 ENV UPLOAD_DIR=/data/uploads API_PORT=4000 NODE_ENV=production
