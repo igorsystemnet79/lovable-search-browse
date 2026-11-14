@@ -27,7 +27,10 @@ jobs:
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
       - name: Verify standalone API syntax
-        run: node --check standalone/api/server.mjs
+        run: |
+          node --check standalone/api/server.mjs
+          node --check standalone/api/business-catalog.mjs
+          node --check standalone/api/backup-export.mjs
       - name: Run automated tests
         run: bun test tests
       - name: Report frontend dependency vulnerabilities
@@ -48,6 +51,8 @@ jobs:
       - name: Smoke test standalone Docker stack
         run: |
           set -euo pipefail
+          export ENABLE_ADMIN_BACKUP_EXPORT=true
+          export ENABLE_ADMIN_BACKUP_IMPORT=true
           COMPOSE=(docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml)
           timeout 300s "${COMPOSE[@]}" up -d --build
           for attempt in $(seq 1 60); do
@@ -55,12 +60,17 @@ jobs:
             sleep 2
           done
           grep -q '"storage_backend":"postgres"' "$RUNNER_TEMP/ponudimi-health.json"
+          "${COMPOSE[@]}" exec -T api pg_dump --version
+          "${COMPOSE[@]}" exec -T api pg_restore --version
+          "${COMPOSE[@]}" exec -T api unzip -v
           curl --connect-timeout 2 --max-time 10 -fsS -X POST http://localhost/api/db/query -H 'Content-Type: application/json' -d '{"table":"ponude","action":"select","limit":5}' -o "$RUNNER_TEMP/ponudimi-preview.json"
           grep -q '"data":\[\]' "$RUNNER_TEMP/ponudimi-preview.json"
           search_status=$(curl --connect-timeout 2 --max-time 10 -sS -o "$RUNNER_TEMP/ponudimi-search.json" -w '%{http_code}' -X POST http://localhost/api/db/rpc -H 'Content-Type: application/json' -d '{"fn":"pretrazi_ponude","args":{}}')
           test "$search_status" = "401"
           offers_status=$(curl --connect-timeout 2 --max-time 10 -sS -o /dev/null -w '%{http_code}' http://localhost/api/ponude)
           test "$offers_status" = "401"
+          backup_status=$(curl --connect-timeout 2 --max-time 10 -sS -o /dev/null -w '%{http_code}' http://localhost/api/admin/backup/export)
+          test "$backup_status" = "401"
           curl --connect-timeout 2 --max-time 10 -fsS http://localhost/ -o /dev/null
           "${COMPOSE[@]}" ps
       - name: Print standalone Docker logs on failure
