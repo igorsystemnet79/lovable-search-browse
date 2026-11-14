@@ -141,6 +141,7 @@ const admin = asyncRoute(async (req,res,next) => {
 // Zahteva pg_dump u runtime okruženju; bez njega izvoz se bezbedno odbija.
 const backupExportLimit = rateLimit({ windowMs: 60 * 60 * 1000, limit: 2, standardHeaders: true, legacyHeaders: false });
 app.get('/api/admin/backup/export', auth, admin, backupExportLimit, asyncRoute(async (req,res) => {
+ if (process.env.ENABLE_ADMIN_BACKUP_EXPORT !== 'true') return res.status(404).json({error:'Izvoz trenutno nije omogućen.'});
  const { promisify } = await import('node:util');
  const execFile = promisify((await import('node:child_process')).execFile);
  try { await execFile('pg_dump', ['--version'], { timeout: 5000 }); }
