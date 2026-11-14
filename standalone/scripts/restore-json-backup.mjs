@@ -57,11 +57,6 @@ try {
     if (!targetTables.has(table.name)) throw new Error('U ciljnoj bazi nedostaje tabela ' + table.name + '.');
   }
 
-  const allTables = [...targetTables];
-  if (allTables.length) {
-    await client.query('TRUNCATE TABLE ' + allTables.map(name => 'public.' + quote(name)).join(', ') + ' RESTART IDENTITY CASCADE');
-  }
-
   const dependencyResult = await client.query(
     "SELECT child.relname AS child, parent.relname AS parent " +
     "FROM pg_constraint c " +
@@ -98,6 +93,10 @@ try {
 
   await client.query('BEGIN');
   try {
+    const allTables = [...targetTables];
+    if (allTables.length) {
+      await client.query('TRUNCATE TABLE ' + allTables.map(name => 'public.' + quote(name)).join(', ') + ' RESTART IDENTITY CASCADE');
+    }
     for (const name of ordered) {
       const table = backup.tables.find(item => item.name === name);
       const target = 'public.' + quote(name);
@@ -109,6 +108,20 @@ try {
         );
       }
       console.log(name + ': ' + table.rows.length + ' redova');
+    }
+    const serialColumns = await client.query(
+      "SELECT table_name, column_name FROM information_schema.columns " +
+      "WHERE table_schema='public' AND column_default LIKE 'nextval(%'"
+    );
+    for (const item of serialColumns.rows) {
+      const tableName = item.table_name;
+      const columnName = item.column_name;
+      const sequence = await client.query('SELECT pg_get_serial_sequence($1, $2) AS name', ['public.' + tableName, columnName]);
+      if (!sequence.rows[0]?.name) continue;
+      const maxValue = await client.query(
+        'SELECT setval($1::regclass, COALESCE(MAX(' + quote(columnName) + '), 1), MAX(' + quote(columnName) + ') IS NOT NULL) FROM public.' + quote(tableName),
+        [sequence.rows[0].name]
+      );
     }
     await client.query('COMMIT');
   } catch (error) {
