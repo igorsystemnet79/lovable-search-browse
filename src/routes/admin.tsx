@@ -31,7 +31,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "Rezervna kopija", "ChatGPT"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -69,6 +69,7 @@ function AdminPage() {
             {tab === "Ponuda paketa" && <UpravljanjePonudomPaketa />}
             {tab === "Kategorije" && <UpravljanjeKategorijama />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
+            {tab === "Rezervna kopija" && <RezervnaKopija />}
             {tab === "ChatGPT" && <AdminChatGPT />}
           </>
 
@@ -1157,6 +1158,60 @@ function UpravljanjePravilima() {
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Pregled teksta</h3><div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-wrap rounded-xl bg-background p-4 text-sm leading-6 text-muted-foreground">{text || "Pregled će se prikazati kada uneseš tekst pravila."}</div></div>
     <div className="flex flex-wrap gap-2"><button type="button" className="min-h-10 rounded-full border border-input px-4 py-2 text-sm font-medium hover:bg-secondary" onClick={() => void load()} disabled={busy}>Osveži</button><button type="button" className="min-h-10 rounded-full border border-amber-400 bg-amber-100 px-5 py-2 text-sm font-semibold text-amber-950 hover:bg-amber-200 disabled:opacity-50" onClick={() => void publish()} disabled={busy || text.trim().length < 30}>{busy ? "Sačekaj..." : "Sačuvaj i objavi pravila"}</button></div>
     <div className="rounded-2xl border border-border bg-surface p-4"><h3 className="font-semibold">Istorija objavljenih verzija</h3><p className="mt-1 text-xs text-muted-foreground">Čuva se do 50 poslednjih verzija u pregledu. Vraćanje stare verzije objavljuje je kao novu, bez brisanja istorije.</p><div className="mt-3 space-y-2">{history.map(item => <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border p-3"><div><p className="text-sm font-semibold">Verzija {item.version}</p><p className="text-xs text-muted-foreground">{new Date(item.published_at).toLocaleString("sr-RS")}</p></div><button type="button" className={small} onClick={() => void restore(item.id)} disabled={busy || item.version === version}>Vrati ovu verziju</button></div>)}{!history.length && <p className="text-sm text-muted-foreground">Još nema objavljenih verzija kroz ovaj panel.</p>}</div></div>
+  </section>;
+}
+
+function RezervnaKopija() {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  async function downloadBackup() {
+    if (busy) return;
+    if (!window.confirm("Napraviti i preuzeti kompletnu rezervnu kopiju baze, fotografija i aplikacije?")) return;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const session = JSON.parse(window.localStorage.getItem("ponudimi_session") || "null");
+      if (!session?.access_token) throw new Error("Sesija nije pronađena. Prijavi se ponovo.");
+      const response = await fetch(`${API_ORIGIN}/api/admin/backup/export`, {
+        method: "GET",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || "Izvoz rezervne kopije nije uspeo.");
+      }
+      const blob = await response.blob();
+      if (!blob.size) throw new Error("Server je vratio praznu arhivu. Izvoz nije sačuvan.");
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `ponudimi-rezervna-kopija-${new Date().toISOString().slice(0,10)}.zip`;
+      document.body.appendChild(link); link.click(); link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      setNotice(`Arhiva je pripremljena (${(blob.size / 1024 / 1024).toFixed(2)} MB). Proveri folder Preuzimanja na uređaju.`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Greška pri preuzimanju rezervne kopije.");
+    } finally { setBusy(false); }
+  }
+  return <section className="mx-auto max-w-3xl space-y-4">
+    <div className="rounded-2xl border border-border bg-surface p-4 shadow-card sm:p-6">
+      <h2 className="text-xl font-semibold">Rezervna kopija PonudiMi</h2>
+      <p className="mt-2 text-sm text-muted-foreground">Preuzmi arhivu za čuvanje ili preseljenje platforme na drugi server. Izvoz obuhvata PostgreSQL bazu, izvorni kod aplikacije i fotografije iz aktivnog skladišta.</p>
+      <ul className="mt-4 list-inside list-disc space-y-1 text-sm">
+        <li>Sve tabele, zapise, indekse i sekvence PostgreSQL baze</li>
+        <li>Fotografije sačuvane u bazi ili lokalnom skladištu</li>
+        <li>Fotografije i datoteke iz S3/R2 skladišta, ako je povezano</li>
+        <li>Izvorni kod aplikacije i uputstvo za vraćanje baze</li>
+      </ul>
+      <p className="mt-3 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">Bezbednost: preuzimanje je dozvoljeno samo administratoru sa važećom prijavom. Lozinke, JWT tajne i ostale promenljive okruženja namerno se ne uključuju u ZIP; sačuvaj ih odvojeno.</p>
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <button type="button" className="min-h-11 rounded-full bg-brand px-5 py-2.5 text-sm font-semibold text-brand-foreground hover:opacity-90 disabled:opacity-50" onClick={() => void downloadBackup()} disabled={busy}>{busy ? "Pripremam arhivu..." : "Preuzmi kompletnu rezervnu kopiju (.ZIP)"}</button>
+        {busy && <span className="text-xs text-muted-foreground">Nemoj zatvarati stranicu dok se preuzimanje ne pokrene.</span>}
+      </div>
+      {error && <p role="alert" className="mt-4 text-sm text-destructive">{error}</p>}
+      {notice && <p role="status" className="mt-4 text-sm text-green-700">{notice}</p>}
+    </div>
   </section>;
 }
 
