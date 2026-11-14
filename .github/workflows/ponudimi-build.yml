@@ -73,6 +73,8 @@ jobs:
           test "$backup_status" = "401"
           curl --connect-timeout 2 --max-time 10 -fsS http://localhost/ -o /dev/null
           "${COMPOSE[@]}" ps
+      - name: Verify complete backup export and isolated restore
+        run: bash standalone/scripts/verify-backup-export.sh
       - name: Print standalone Docker logs on failure
         if: failure()
         run: docker compose --env-file standalone/.env.example -f standalone/docker-compose.yml logs --no-color
