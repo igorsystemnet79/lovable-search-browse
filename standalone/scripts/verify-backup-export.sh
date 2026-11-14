@@ -73,7 +73,7 @@ unzip -p "$ZIP_FILE" BACKUP-MANIFEST.json | grep -q '"backend": "postgres"'
 
 unzip -p "$ZIP_FILE" database/ponudimi-database.dump > "$DUMP_FILE"
 test -s "$DUMP_FILE"
-"${COMPOSE[@]}" exec -T api pg_restore --list - < "$DUMP_FILE" > "$WORK_DIR/ponudimi-backup-ci-toc.txt"
+"${COMPOSE[@]}" exec -T api pg_restore --list < "$DUMP_FILE" > "$WORK_DIR/ponudimi-backup-ci-toc.txt"
 grep -q 'business_catalog_products' "$WORK_DIR/ponudimi-backup-ci-toc.txt"
 
 echo "Restoring dump into a separate empty PostgreSQL database..."
@@ -82,7 +82,7 @@ echo "Restoring dump into a separate empty PostgreSQL database..."
 SOURCE_DATABASE_URL=$("${COMPOSE[@]}" exec -T api node -e "process.stdout.write(process.env.DATABASE_URL)")
 TARGET_DATABASE_URL=$(node -e "const u=new URL(process.argv[1]);u.pathname='/$RESTORE_DB';process.stdout.write(u.toString())" "$SOURCE_DATABASE_URL")
 unzip -p "$ZIP_FILE" database/ponudimi-database.dump | \
-  "${COMPOSE[@]}" exec -T api pg_restore --no-owner --no-acl --single-transaction --exit-on-error --dbname "$TARGET_DATABASE_URL" -
+  "${COMPOSE[@]}" exec -T api pg_restore --no-owner --no-acl --single-transaction --exit-on-error --dbname "$TARGET_DATABASE_URL"
 
 QUERY="SELECT
   (SELECT count(*) FROM users WHERE id='$ADMIN_ID') || ':' ||
