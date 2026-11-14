@@ -1182,8 +1182,17 @@ function RezervnaKopija() {
         const data = await response.json().catch(() => ({}));
         throw new Error(data.error || "Izvoz rezervne kopije nije uspeo.");
       }
+      const contentType = response.headers.get("content-type") || "";
+      if (!contentType.toLowerCase().includes("application/zip")) {
+        const detail = await response.text().catch(() => "");
+        throw new Error(detail.slice(0, 300) || "Server nije vratio ZIP arhivu. Preuzimanje je zaustavljeno.");
+      }
       const blob = await response.blob();
-      if (!blob.size) throw new Error("Server je vratio praznu arhivu. Izvoz nije sačuvan.");
+      if (blob.size < 1024) throw new Error(`Server je vratio premalu datoteku (${blob.size} bajtova), a ne kompletnu rezervnu kopiju. Datoteka nije sačuvana.`);
+      const signature = new Uint8Array(await blob.slice(0, 4).arrayBuffer());
+      if (signature[0] !== 0x50 || signature[1] !== 0x4b) {
+        throw new Error("Preuzeti sadržaj nije ispravna ZIP arhiva. Datoteka nije sačuvana.");
+      }
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
