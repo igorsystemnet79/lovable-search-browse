@@ -7,7 +7,7 @@ import os from 'node:os';
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import rateLimit from 'express-rate-limit';
 
-const safeKey = value => String(value || '').replace(/^\\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
+const safeKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 const ignoredPath = relative => {
   const parts = relative.split(path.sep);
   return parts.some(part =>
