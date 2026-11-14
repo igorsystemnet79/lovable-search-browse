@@ -113,6 +113,33 @@ export async function requestPonudiMiApi(path: string, method = "GET", body?: un
   });
 }
 
+export async function preuzmiAdminBackup(): Promise<void> {
+  await ensureApiReady();
+  const session = readSession();
+  if (!session?.access_token) throw new Error("Prijava je obavezna.");
+  const response = await fetch(`${API_ORIGIN}/api/admin/backup/export`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${session.access_token}` },
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.error || `Izvoz nije uspeo (HTTP ${response.status}).`);
+  }
+  const blob = await response.blob();
+  const disposition = response.headers.get("content-disposition") || "";
+  const filename = disposition.match(/filename="([^"]+)"/i)?.[1] || "ponudimi-backup.zip";
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 class QueryBuilder implements PromiseLike<any> {
   private action = "select";
   private columns = "*";
