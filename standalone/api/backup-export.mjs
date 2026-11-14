@@ -4,7 +4,6 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { randomUUID } from 'node:crypto';
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import rateLimit from 'express-rate-limit';
 
