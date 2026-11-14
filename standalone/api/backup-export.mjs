@@ -108,10 +108,10 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
       if (fs.existsSync(catalogPath)) archive.file(catalogPath, { name: 'database/business-catalog-schema-and-routes.mjs' });
       archive.file(readmePath, { name: 'UPUTSTVO-ZA-VRACANJE.txt' });
       archive.directory(repoRoot, 'application', entry => {
-        const relative = String(entry.name || '');
-        if (!relative || ignoredPath(relative)) return false;
-        if (relative === 'standalone/uploads' || relative.startsWith('standalone/uploads' + path.sep)) return false;
-        return true;
+        const relative = String(entry.name || '').replace(/\\\\/g, '/');
+        if (!relative || ignoredPath(relative)) return null;
+        if (relative === 'standalone/uploads' || relative.startsWith('standalone/uploads/')) return null;
+        return entry;
       });
 
       if (filesystemStorage && fs.existsSync(uploadDir)) archive.directory(uploadDir, 'uploads');
