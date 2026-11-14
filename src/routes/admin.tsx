@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Fragment, useCallback, useEffect, useState, type ChangeEvent } from "react";
-import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju, obrisiKategoriju, obrisiPotkategoriju, izmeniKategoriju, izmeniPotkategoriju, postaviSlikuKategorije, postaviSlikuPodkategorije } from "@/integrations/standalone/client";
+import { API_ORIGIN, ponudimi, ucitajPravilaPlatforme, sacuvajPravilaPlatforme, ucitajIstorijuPravilaPlatforme, vratiVerzijuPravilaPlatforme, ucitajRezimOdrzavanja, podesiRezimOdrzavanja, ucitajKategorije, dodajKategoriju, dodajPotkategoriju, obrisiKategoriju, obrisiPotkategoriju, izmeniKategoriju, izmeniPotkategoriju, postaviSlikuKategorije, postaviSlikuPodkategorije, preuzmiAdminBackup } from "@/integrations/standalone/client";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useIsAdmin } from "@/hooks/use-is-admin";
 import { obrisiKorisnika, sacuvajAdminProfil, sinhronizujApr, dodajAdminFotografije, obrisiAdminFotografiju, posaljiPredlogIzmene, ucitajPredlogeModeratora, ucitajAdminPredloge, odluciOPredlogu, pretraziFirmeZaPaket, ucitajPaketeFirmi, dodeliPaketFirmi, otkaziPaketFirme, obrisiEvidencijuPaketaFirme, reaktivirajPaketFirme, ucitajKatalogPaketa, sacuvajKatalogPaketa, pretraziKorisnikeZaPaket, ucitajAdminDodelePaketa, dodeliPaketKorisniku, otkaziDodeluPaketa } from "@/lib/admin.functions";
@@ -31,7 +31,7 @@ export const Route = createFileRoute("/admin")({
 
 type Profil = Tables<"profiles">;
 type Uloga = "admin" | "moderator" | "user";
-const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT"] as const;
+const tabs = ["Korisnici", "Ponude", "Zahtevi", "Prijave", "Statistika", "Odobrenja", "Poruke", "Poruke korisnika", "APR firme", "Paketi firmi", "Paketi korisnika", "Ponuda paketa", "Kategorije", "Pravila platforme", "ChatGPT", "Izvoz baze"] as const;
 const small = "min-h-10 rounded-full border border-input px-3 py-2 text-xs font-medium hover:bg-secondary disabled:opacity-50";
 const danger = "min-h-10 rounded-full bg-destructive px-3 py-2 text-xs font-semibold text-destructive-foreground hover:opacity-90";
 
@@ -70,6 +70,7 @@ function AdminPage() {
             {tab === "Kategorije" && <UpravljanjeKategorijama />}
             {tab === "Pravila platforme" && <UpravljanjePravilima />}
             {tab === "ChatGPT" && <AdminChatGPT />}
+            {tab === "Izvoz baze" && <AdminBackupExport />}
           </>
 
         ) : <ModeratorWorkspace />}
@@ -89,6 +90,36 @@ function AdminPage() {
   );
 }
 
+
+
+function AdminBackupExport() {
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const [error, setError] = useState(false);
+  const run = async () => {
+    setBusy(true); setMessage(""); setError(false);
+    try {
+      await preuzmiAdminBackup();
+      setMessage("Izvoz je pripremljen. Proveri preuzetu ZIP arhivu i sačuvaj je na bezbedno mesto.");
+    } catch (cause) {
+      setError(true);
+      setMessage(cause instanceof Error ? cause.message : "Izvoz nije uspeo.");
+    } finally { setBusy(false); }
+  };
+  return (
+    <section className="max-w-2xl space-y-4 rounded-2xl border border-input bg-surface p-4 shadow-card">
+      <div>
+        <h2 className="font-semibold">Rezervna kopija platforme</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Preuzima ZIP sa PostgreSQL bazom, fotografijama, poslovnim katalozima i izvornim kodom aplikacije. Izvoz je dostupan samo administratoru i mora privremeno biti omogućen na API serveru.</p>
+      </div>
+      <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+        Arhiva sadrži lične podatke i heširane lozinke. Nemoj je slati drugim osobama niti čuvati na javnom mestu.
+      </div>
+      <button type="button" className={small} disabled={busy} onClick={run}>{busy ? "Priprema arhive..." : "Preuzmi kompletnu ZIP kopiju"}</button>
+      {message && <p role={error ? "alert" : "status"} className={error ? "text-sm text-destructive" : "text-sm text-brand"}>{message}</p>}
+    </section>
+  );
+}
 
 function Statistika() {
   const [data, setData] = useState<any>(null);
