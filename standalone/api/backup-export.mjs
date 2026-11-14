@@ -1,11 +1,10 @@
 import archiver from 'archiver';
-import bcrypt from 'bcryptjs';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
-import rateLimit from 'express-rate-limit';
+import jwt from 'jsonwebtoken';
 
 const safeKey = value => String(value || '').replace(/^\/+/, '').split('/').filter(part => part && part !== '.' && part !== '..').join('/');
 const ignoredPath = relative => {
@@ -16,44 +15,31 @@ const ignoredPath = relative => {
     part === '.render' || part === 'dist' || part === 'build'
   ) || parts.some(part => part === '.env' || part.startsWith('.env.'));
 };
-const challenge = res => {
-  res.set('WWW-Authenticate', 'Basic realm="PonudiMi rezervna kopija", charset="UTF-8"');
-  return res.status(401).json({ error: 'Unesi administratorski email i lozinku za preuzimanje rezervne kopije.' });
-};
+const unauthorized = res => res.status(401).json({ error: 'Sesija je istekla. Prijavi se ponovo kao administrator.' });
 
 export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3, s3Enabled, filesystemStorage, repoRoot }) {
-  const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    limit: 3,
-    standardHeaders: 'draft-8',
-    legacyHeaders: false,
-    message: { error: 'Previše pokušaja izvoza. Sačekaj 15 minuta.' }
-  });
-
   const authenticateBackupAdmin = async (req, res, next) => {
     try {
       const header = String(req.headers.authorization || '');
-      if (!header.startsWith('Basic ')) return challenge(res);
-      let decoded = '';
-      try { decoded = Buffer.from(header.slice(6), 'base64').toString('utf8'); } catch { return challenge(res); }
-      const separator = decoded.indexOf(':');
-      if (separator < 1) return challenge(res);
-      const email = decoded.slice(0, separator).trim().toLowerCase();
-      const password = decoded.slice(separator + 1);
-      if (!email || !password || password.length > 1024) return challenge(res);
-      const found = await pool.query('SELECT id,email,password_hash FROM users WHERE lower(email)=lower($1) LIMIT 1', [email]);
+      const token = header.match(/^Bearer\\s+(.+)$/i)?.[1];
+      if (!token || !process.env.JWT_SECRET) return unauthorized(res);
+      let claims;
+      try { claims = jwt.verify(token, process.env.JWT_SECRET); } catch { return unauthorized(res); }
+      if (!claims?.sub || !claims?.email) return unauthorized(res);
+      const found = await pool.query('SELECT id,email FROM users WHERE id=$1 AND lower(email)=lower($2) LIMIT 1', [claims.sub, claims.email]);
       const user = found.rows[0];
-      if (!user || !(await bcrypt.compare(password, user.password_hash))) return challenge(res);
+      if (!user) return unauthorized(res);
       if (!(await isPlatformAdmin({ sub: user.id, email: user.email }))) {
         return res.status(403).json({ error: 'Izvoz je dozvoljen samo administratoru platforme.' });
       }
+      req.backupAdmin = user;
       next();
     } catch (error) {
       next(error);
     }
   };
 
-  app.get('/api/admin/backup/export', limiter, authenticateBackupAdmin, async (req, res, next) => {
+  app.get('/api/admin/backup/export', authenticateBackupAdmin, async (req, res, next) => {
     const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'ponudimi-backup-'));
     const dumpPath = path.join(tempDir, 'ponudimi-database.dump');
     let archive;
