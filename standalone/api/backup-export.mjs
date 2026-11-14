@@ -266,7 +266,7 @@ export function registerBackupExport({ app, pool, isPlatformAdmin, uploadDir, s3
     dest: os.tmpdir(),
     limits: { fileSize: 2 * 1024 * 1024 * 1024, files: 1 },
     fileFilter: (_req, file, cb) => {
-      if (/\\.zip$/i.test(file.originalname || '')) cb(null, true);
+      if (/\.zip$/i.test(file.originalname || '')) cb(null, true);
       else cb(new Error('Izaberi ZIP arhivu koju je napravio PonudiMi izvoz.'));
     }
   });
