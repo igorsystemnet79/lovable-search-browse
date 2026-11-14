@@ -18,7 +18,7 @@ jobs:
       - name: Compile installer
         shell: pwsh
         run: |
-          $compiler = "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe"
+          $compiler = Join-Path ${env:ProgramFiles(x86)} "Inno Setup 6\ISCC.exe"
           if (!(Test-Path $compiler)) { throw "Inno Setup compiler not found" }
           & $compiler "installer\windows\PonudiMi-Installer.iss"
           if ($LASTEXITCODE -ne 0) { throw "Installer compilation failed" }
