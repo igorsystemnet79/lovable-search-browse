@@ -140,6 +140,7 @@ const optionalAuth = asyncRoute(async (req,res,next) => {
 });
 const isPlatformAdmin = async user => { const email=String(user?.email||'').trim().toLowerCase(); const configuredAdminEmail=String(process.env.ADMIN_EMAIL||'igorsystemnet@gmail.com').trim().toLowerCase(); if(email && email===configuredAdminEmail) return true; const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='admin'",[user.sub]); return r.rowCount>0; };
 const admin = asyncRoute(async (req,res,next) => { if (!(await isPlatformAdmin(req.user))) return res.status(403).json({error:'Nemate administratorska prava.'}); next(); });
+registerBackupExport({ app, pool, auth, admin, s3, s3Bucket: process.env.S3_BUCKET, uploadDir, repoRoot: path.resolve(__dirname, '../..'), storageBackend: s3 ? 'r2' : filesystemStorage ? 'filesystem' : 'postgres' });
 const moderatorOrAdmin = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role IN ('admin','moderator')",[req.user.sub]);if(!r.rowCount && !(await isPlatformAdmin(req.user)))return res.status(403).json({error:'Nemate moderatorska prava.'});next();});
 const moderatorOnly = asyncRoute(async(req,res,next)=>{const r=await pool.query("SELECT 1 FROM user_roles WHERE user_id=$1 AND role='moderator'",[req.user.sub]);if(!r.rowCount)return res.status(403).json({error:'Samo moderator može poslati predlog izmene.'});next();});
 const publicUser = u => ({ id:u.id, email:u.email, user_metadata:u.metadata || {}, created_at:u.created_at });
@@ -1258,7 +1259,6 @@ async function startServer(){
  await pool.query(schema);
  const { registerBusinessCatalog } = await import('./business-catalog.mjs');
  await registerBusinessCatalog({ app, pool, auth, asyncRoute, memoryUpload, normalizeImage, saveImage, removeImage });
- registerBackupExport({ app, pool, auth, admin, s3, s3Bucket: process.env.S3_BUCKET, uploadDir, repoRoot: path.resolve(__dirname, '../..'), storageBackend: s3 ? 'r2' : filesystemStorage ? 'filesystem' : 'postgres' });
  console.log('PonudiMi poslovni katalog je spreman.');
  console.log('PonudiMi PostgreSQL šema je uspešno proverena/inicijalizovana.');
   console.log('PonudiMi skladište fotografija: '+(s3?'r2':filesystemStorage?'filesystem':'postgres')+'.');
