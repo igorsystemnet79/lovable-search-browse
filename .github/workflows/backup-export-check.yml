@@ -1,0 +1,28 @@
+name: PonudiMi backup export checks
+on:
+  pull_request:
+    paths:
+      - 'standalone/api/server.mjs'
+      - 'standalone/api/package.json'
+      - 'standalone/Dockerfile.api'
+      - 'standalone/BACKUP-EXPORT-SR.md'
+  push:
+    branches:
+      - feature/ponudimi-backup-export
+    paths:
+      - 'standalone/api/server.mjs'
+      - 'standalone/api/package.json'
+      - 'standalone/Dockerfile.api'
+      - 'standalone/BACKUP-EXPORT-SR.md'
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check API syntax
+        run: node --check standalone/api/server.mjs
+      - name: Validate package manifest
+        run: node -e "JSON.parse(require('fs').readFileSync('standalone/api/package.json','utf8'))"
